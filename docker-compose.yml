@@ -1,0 +1,61 @@
+# Local development stack for Tasker.
+#
+# Two services:
+#   - db    : Postgres (always on)
+#   - app   : the Next.js app, only started when `--profile app` is passed
+#
+# Common usage:
+#   docker compose up -d                  # just the DB (most local dev)
+#   docker compose --profile app up -d    # DB + production-style app on :3000
+#   docker compose down                   # stop everything (data persists)
+#   docker compose down -v                # stop + drop the data volume
+#
+# Credentials below intentionally match the values in `.env.example` so the
+# Next.js app on the host can connect with the same DATABASE_URL.
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: tasker-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: demo
+    ports:
+      # Override the host port via DB_PORT env var if 5432 is already in use.
+      - "${DB_PORT:-5432}:5432"
+    volumes:
+      - tasker_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d demo"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  # Production-mode container useful for a final smoke before deploying. Not
+  # needed for day-to-day dev (use `npm run dev` for that). Activate with:
+  #   docker compose --profile app up -d
+  app:
+    profiles: ["app"]
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: tasker-app
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://postgres:password@db:5432/demo
+      DIRECT_URL: postgresql://postgres:password@db:5432/demo
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:-dev-secret-do-not-use-in-prod}
+      NEXTAUTH_URL: ${NEXTAUTH_URL:-http://localhost:3000}
+      NODE_ENV: production
+    ports:
+      - "${APP_PORT:-3000}:3000"
+    # Schema must already be applied (run `npm run db:start` once on the host
+    # before `docker compose --profile app up`). The standalone Next image is
+    # intentionally minimal and does not ship the Prisma CLI.
+
+volumes:
+  tasker_pgdata:

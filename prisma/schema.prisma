@@ -1,0 +1,200 @@
+// Prisma schema for the Task Management & Collaboration Tool.
+// Database: PostgreSQL (Supabase in production).
+// Auth: NextAuth.js w/ Credentials provider (email + password) — `password`
+// is stored as a bcrypt hash directly on `User`.
+
+generator client {
+    provider      = "prisma-client-js"
+    // Ship engine binaries for both the developer's machine ("native") and
+    // the alpine-based Docker / Lambda runtime so the generated client works
+    // on each. Without this, `prisma generate` would only target the host OS.
+    binaryTargets = ["native", "linux-musl-openssl-3.0.x", "linux-musl-arm64-openssl-3.0.x"]
+}
+
+datasource db {
+    provider  = "postgresql"
+    url       = env("DATABASE_URL")
+    // `directUrl` lets Prisma migrate bypass Supabase's PgBouncer pool which
+    // does not support prepared statements / DDL.
+    directUrl = env("DIRECT_URL")
+}
+
+// ---------------------------------------------------------------------------
+// NextAuth.js models
+// ---------------------------------------------------------------------------
+
+model Account {
+    id                       String  @id @default(cuid())
+    userId                   String
+    type                     String
+    provider                 String
+    providerAccountId        String
+    refresh_token            String?
+    access_token             String?
+    expires_at               Int?
+    token_type               String?
+    scope                    String?
+    id_token                 String?
+    session_state            String?
+    user                     User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+    refresh_token_expires_in Int?
+
+    @@unique([provider, providerAccountId])
+}
+
+model Session {
+    id           String   @id @default(cuid())
+    sessionToken String   @unique
+    userId       String
+    expires      DateTime
+    user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+    identifier String
+    token      String   @unique
+    expires    DateTime
+
+    @@unique([identifier, token])
+}
+
+// ---------------------------------------------------------------------------
+// Application models
+// ---------------------------------------------------------------------------
+
+/// Represents an account in the system. The `password` column holds a bcrypt
+/// hash and is only used by the Credentials provider — OAuth users keep it
+/// null. Profile fields (`bio`, `timezone`) are surfaced on the /profile page.
+model User {
+    id            String    @id @default(cuid())
+    name          String?
+    email         String    @unique
+    emailVerified DateTime?
+    image         String?
+    password      String? // bcrypt hash; null for OAuth-only accounts
+    bio           String?
+    timezone      String?   @default("UTC")
+    createdAt     DateTime  @default(now())
+    updatedAt     DateTime  @updatedAt
+
+    accounts          Account[]
+    sessions          Session[]
+    ownedProjects     Project[]       @relation("ProjectOwner")
+    memberships       ProjectMember[]
+    createdTasks      Task[]          @relation("TaskCreator")
+    assignedTasks     Task[]          @relation("TaskAssignees")
+    comments          Comment[]
+}
+
+/// Top-level container that groups tasks. Owned by a single user but can have
+/// many members through `ProjectMember`.
+model Project {
+    id          String   @id @default(cuid())
+    name        String
+    description String?
+    color       String   @default("#6366F1") // indigo-500 default
+    createdAt   DateTime @default(now())
+    updatedAt   DateTime @updatedAt
+
+    ownerId String
+    owner   User   @relation("ProjectOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+
+    members ProjectMember[]
+    tasks   Task[]
+    tags    Tag[]
+
+    @@index([ownerId])
+}
+
+enum ProjectRole {
+    OWNER
+    ADMIN
+    MEMBER
+}
+
+/// Join table mapping users to projects with a role. The `(userId, projectId)`
+/// tuple is unique so a user can only be a member of a given project once.
+model ProjectMember {
+    id        String      @id @default(cuid())
+    role      ProjectRole @default(MEMBER)
+    joinedAt  DateTime    @default(now())
+
+    userId    String
+    user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+    projectId String
+    project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+    @@unique([userId, projectId])
+    @@index([projectId])
+}
+
+enum TaskPriority {
+    LOW
+    MEDIUM
+    HIGH
+    URGENT
+}
+
+enum TaskStatus {
+    TODO
+    IN_PROGRESS
+    IN_REVIEW
+    DONE
+}
+
+/// Core unit of work. Belongs to a Project, optionally has a deadline, can be
+/// assigned to many users, and can be tagged.
+model Task {
+    id          String       @id @default(cuid())
+    title       String
+    description String?
+    status      TaskStatus   @default(TODO)
+    priority    TaskPriority @default(MEDIUM)
+    deadline    DateTime?
+    createdAt   DateTime     @default(now())
+    updatedAt   DateTime     @updatedAt
+
+    projectId   String
+    project     Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+    creatorId   String
+    creator     User         @relation("TaskCreator", fields: [creatorId], references: [id])
+
+    assignees User[]    @relation("TaskAssignees")
+    tags      Tag[]
+    comments  Comment[]
+
+    @@index([projectId])
+    @@index([creatorId])
+    @@index([status])
+}
+
+/// Per-project, color-coded label. Names are unique within a project.
+model Tag {
+    id        String   @id @default(cuid())
+    name      String
+    color     String   @default("#94A3B8") // slate-400
+    createdAt DateTime @default(now())
+
+    projectId String
+    project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+    tasks Task[]
+
+    @@unique([projectId, name])
+    @@index([projectId])
+}
+
+/// Lightweight discussion thread on a task.
+model Comment {
+    id        String   @id @default(cuid())
+    body      String
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    taskId   String
+    task     Task   @relation(fields: [taskId], references: [id], onDelete: Cascade)
+    authorId String
+    author   User   @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+    @@index([taskId])
+}
