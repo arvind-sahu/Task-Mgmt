@@ -23,30 +23,59 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Check required secrets
+      # Build DATABASE_URL / DIRECT_URL in the runner so you can use simple secrets
+      # (SUPABASE_PROJECT_REF + SUPABASE_DB_PASSWORD) instead of pasting full URLs.
+      - name: Configure deploy environment
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           DIRECT_URL: ${{ secrets.DIRECT_URL }}
+          SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
           NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET }}
           NEXTAUTH_URL: ${{ secrets.NEXTAUTH_URL }}
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_REGION: ${{ secrets.AWS_REGION }}
         run: |
-          check() { if [ -z "${1}" ]; then echo "::error::Missing GitHub secret: $2 — add it at Settings → Secrets and variables → Actions → Repository secrets"; exit 1; fi; }
-          check "$DATABASE_URL" "DATABASE_URL"
-          check "$DIRECT_URL" "DIRECT_URL"
-          check "$NEXTAUTH_SECRET" "NEXTAUTH_SECRET"
-          check "$NEXTAUTH_URL" "NEXTAUTH_URL"
-          check "$AWS_ACCESS_KEY_ID" "AWS_ACCESS_KEY_ID"
-          check "$AWS_SECRET_ACCESS_KEY" "AWS_SECRET_ACCESS_KEY"
-          check "$AWS_REGION" "AWS_REGION"
-          echo "All required secrets are set."
+          set -euo pipefail
+
+          if [ -n "${DATABASE_URL:-}" ] && [ -n "${DIRECT_URL:-}" ]; then
+            echo "Using DATABASE_URL and DIRECT_URL repository secrets."
+          elif [ -n "${SUPABASE_PROJECT_REF:-}" ] && [ -n "${SUPABASE_DB_PASSWORD:-}" ]; then
+            echo "Building database URLs from SUPABASE_PROJECT_REF and SUPABASE_DB_PASSWORD."
+            ENC=$(python3 -c 'import urllib.parse, os; print(urllib.parse.quote(os.environ["SUPABASE_DB_PASSWORD"], safe=""))')
+            DATABASE_URL="postgresql://postgres:${ENC}@db.${SUPABASE_PROJECT_REF}.supabase.co:5432/postgres"
+            DIRECT_URL="$DATABASE_URL"
+          else
+            echo "::error::Missing database secrets. Add EITHER:"
+            echo "::error::  • DATABASE_URL + DIRECT_URL (full connection strings)"
+            echo "::error::  OR"
+            echo "::error::  • SUPABASE_PROJECT_REF (e.g. qgofdiippdlcbtbpqlas) + SUPABASE_DB_PASSWORD (plain password)"
+            exit 1
+          fi
+
+          missing=""
+          for name in NEXTAUTH_SECRET NEXTAUTH_URL AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_REGION; do
+            eval "val=\${$name:-}"
+            if [ -z "$val" ]; then
+              missing="$missing $name"
+            fi
+          done
+          if [ -n "$missing" ]; then
+            echo "::error::Missing GitHub repository secrets:$missing"
+            exit 1
+          fi
+
+          {
+            echo "DATABASE_URL=$DATABASE_URL"
+            echo "DIRECT_URL=$DIRECT_URL"
+            echo "NEXTAUTH_SECRET=$NEXTAUTH_SECRET"
+            echo "NEXTAUTH_URL=$NEXTAUTH_URL"
+          } >> "$GITHUB_ENV"
+
+          echo "Deploy environment configured."
 
       - name: Push database schema
-        env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
-          DIRECT_URL: ${{ secrets.DIRECT_URL }}
         run: npx prisma db push
 
       - name: Configure AWS credentials
@@ -57,9 +86,4 @@ jobs:
           aws-region: ${{ secrets.AWS_REGION }}
 
       - name: Deploy with SST
-        env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
-          DIRECT_URL: ${{ secrets.DIRECT_URL }}
-          NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET }}
-          NEXTAUTH_URL: ${{ secrets.NEXTAUTH_URL }}
         run: npx sst deploy --stage prod

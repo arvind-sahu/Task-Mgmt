@@ -1,26 +1,42 @@
-# GitHub secrets for arvind-sahu/Task-Mgmt
+# GitHub secrets (arvind-sahu/Task-Mgmt)
 
-Open: https://github.com/arvind-sahu/Task-Mgmt/settings/secrets/actions
+## Easiest: 2 database secrets (recommended)
 
-**Important:** use **Repository secrets** (the "Secrets" tab), NOT "Variables".
-Names must match **exactly** (case-sensitive).
+The workflow builds the connection string for you.
 
-Click **New repository secret** for each row:
+| Secret name | Value |
+|-------------|--------|
+| `SUPABASE_PROJECT_REF` | `qgofdiippdlcbtbpqlas` |
+| `SUPABASE_DB_PASSWORD` | Your Supabase DB password **plain** (e.g. `Supabase@2k25`) — not URL-encoded |
 
-| Secret name (copy exactly) | Value |
-|----------------------------|--------|
-| `DATABASE_URL` | Full line from `.env` after `DATABASE_URL=` |
-| `DIRECT_URL` | Full line from `.env` after `DIRECT_URL=` |
-| `NEXTAUTH_SECRET` | From `.env` |
-| `NEXTAUTH_URL` | `http://localhost:3000` (first deploy) |
-| `AWS_ACCESS_KEY_ID` | IAM access key (not `AWS_ACCESS_KEY`) |
-| `AWS_SECRET_ACCESS_KEY` | IAM secret key |
+Plus these (if not already set):
+
+| Secret name | Value |
+|-------------|--------|
+| `NEXTAUTH_SECRET` | from `.env` |
+| `NEXTAUTH_URL` | `http://localhost:3000` |
+| `AWS_ACCESS_KEY_ID` | IAM access key |
+| `AWS_SECRET_ACCESS_KEY` | IAM secret |
 | `AWS_REGION` | `ap-south-1` |
 
-Common mistake: creating `AWS_ACCESS_KEY` — the workflow expects `AWS_ACCESS_KEY_ID`.
+Add at: https://github.com/arvind-sahu/Task-Mgmt/settings/secrets/actions  
+Tab: **Secrets** → **Repository secrets** (NOT Variables).
 
-Then run the workflow:
+---
 
-https://github.com/arvind-sahu/Task-Mgmt/actions/workflows/deploy.yml → **Run workflow**
+## Or use PowerShell script
 
-After it finishes, copy the **CloudFront URL** from the log, update secret `NEXTAUTH_URL` to that URL, and **Run workflow** again.
+```powershell
+cd C:\Users\ASUS\Desktop\Assignment\Task-Mgmt
+& "${env:ProgramFiles}\GitHub CLI\gh.exe" auth login
+.\scripts\set-github-secrets.ps1
+```
+
+---
+
+## Or Git Bash
+
+```bash
+"/c/Program Files/GitHub CLI/gh.exe" auth login
+bash scripts/set-github-secrets.sh
+```
