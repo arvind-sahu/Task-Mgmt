@@ -29,9 +29,17 @@ set_secret() {
 }
 
 read -r -p "Supabase database password (plain): " SUPABASE_DB_PASSWORD
+if [ -z "$SUPABASE_DB_PASSWORD" ]; then
+  echo "Error: password cannot be empty."
+  exit 1
+fi
 read -r -p "AWS_ACCESS_KEY_ID: " AWS_ACCESS_KEY_ID
 read -r -s -p "AWS_SECRET_ACCESS_KEY: " AWS_SECRET_ACCESS_KEY
 echo
+if [ -z "$AWS_ACCESS_KEY_ID" ] || [ -z "$AWS_SECRET_ACCESS_KEY" ]; then
+  echo "Error: AWS credentials cannot be empty."
+  exit 1
+fi
 
 set_secret SUPABASE_PROJECT_REF "qgofdiippdlcbtbpqlas"
 set_secret SUPABASE_DB_PASSWORD "$SUPABASE_DB_PASSWORD"
