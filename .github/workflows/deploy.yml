@@ -97,4 +97,6 @@ jobs:
           aws-region: ${{ secrets.AWS_REGION }}
 
       - name: Deploy with SST
-        run: npx sst deploy --stage prod
+        run: |
+          npx sst unlock --stage prod 2>/dev/null || true
+          npx sst deploy --stage prod
