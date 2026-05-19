@@ -40,15 +40,19 @@ jobs:
         run: |
           set -euo pipefail
 
-          if [ -n "${DATABASE_URL:-}" ] && [ -n "${DIRECT_URL:-}" ]; then
-            echo "Using DATABASE_URL and DIRECT_URL repository secrets."
-          elif [ -n "${SUPABASE_PROJECT_REF:-}" ] && [ -n "${SUPABASE_DB_PASSWORD:-}" ]; then
-            echo "Building database URLs from SUPABASE_PROJECT_REF and SUPABASE_DB_PASSWORD."
+          # Lambda cannot reach db.<ref>.supabase.co — always use the Supabase pooler in prod.
+          if [ -n "${SUPABASE_PROJECT_REF:-}" ] && [ -n "${SUPABASE_DB_PASSWORD:-}" ]; then
+            echo "Building pooler database URLs for AWS Lambda."
             ENC=$(python3 -c 'import urllib.parse, os; print(urllib.parse.quote(os.environ["SUPABASE_DB_PASSWORD"], safe=""))')
-            REGION="${SUPABASE_DB_REGION:-us-east-1}"
-            # Pooler (required for Lambda). User is `postgres`, not postgres.<ref>, for this project.
+            REGION="${SUPABASE_DB_REGION:-ap-south-1}"
             DATABASE_URL="postgresql://postgres:${ENC}@aws-0-${REGION}.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=1"
             DIRECT_URL="postgresql://postgres:${ENC}@aws-0-${REGION}.pooler.supabase.com:5432/postgres"
+          elif [ -n "${DATABASE_URL:-}" ] && [ -n "${DIRECT_URL:-}" ]; then
+            if echo "$DATABASE_URL" | grep -q '@db\.'; then
+              echo "::error::DATABASE_URL uses db.<ref>.supabase.co which Lambda cannot reach. Remove DATABASE_URL/DIRECT_URL secrets and set SUPABASE_PROJECT_REF + SUPABASE_DB_PASSWORD instead."
+              exit 1
+            fi
+            echo "Using DATABASE_URL and DIRECT_URL repository secrets."
           else
             echo "::error::Missing database secrets. Add EITHER:"
             echo "::error::  • DATABASE_URL + DIRECT_URL (full connection strings)"
