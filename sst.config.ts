@@ -20,7 +20,7 @@ export default $config({
       removal: input?.stage === "prod" ? "retain" : "remove",
       home: "aws",
       providers: {
-        aws: { region: "us-east-1" },
+        aws: { region: "ap-south-1" },
       },
     };
   },
