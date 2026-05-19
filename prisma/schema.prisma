@@ -5,10 +5,10 @@
 
 generator client {
     provider      = "prisma-client-js"
-    // Ship engine binaries for both the developer's machine ("native") and
-    // the alpine-based Docker / Lambda runtime so the generated client works
-    // on each. Without this, `prisma generate` would only target the host OS.
-    binaryTargets = ["native", "linux-musl-openssl-3.0.x", "linux-musl-arm64-openssl-3.0.x"]
+    // Ship engine binaries for dev ("native"), Docker (musl), and AWS Lambda
+    // on Amazon Linux (rhel-openssl-3.0.x). Without rhel, Prisma fails at runtime
+    // on CloudFront/Lambda even though `prisma generate` works on GitHub Actions.
+    binaryTargets = ["native", "rhel-openssl-3.0.x", "linux-musl-openssl-3.0.x", "linux-musl-arm64-openssl-3.0.x"]
 }
 
 datasource db {
