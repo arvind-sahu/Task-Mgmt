@@ -23,6 +23,26 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Check required secrets
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DIRECT_URL: ${{ secrets.DIRECT_URL }}
+          NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET }}
+          NEXTAUTH_URL: ${{ secrets.NEXTAUTH_URL }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION: ${{ secrets.AWS_REGION }}
+        run: |
+          check() { if [ -z "${1}" ]; then echo "::error::Missing GitHub secret: $2 — add it at Settings → Secrets and variables → Actions → Repository secrets"; exit 1; fi; }
+          check "$DATABASE_URL" "DATABASE_URL"
+          check "$DIRECT_URL" "DIRECT_URL"
+          check "$NEXTAUTH_SECRET" "NEXTAUTH_SECRET"
+          check "$NEXTAUTH_URL" "NEXTAUTH_URL"
+          check "$AWS_ACCESS_KEY_ID" "AWS_ACCESS_KEY_ID"
+          check "$AWS_SECRET_ACCESS_KEY" "AWS_SECRET_ACCESS_KEY"
+          check "$AWS_REGION" "AWS_REGION"
+          echo "All required secrets are set."
+
       - name: Push database schema
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}

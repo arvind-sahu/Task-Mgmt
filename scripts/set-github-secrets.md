@@ -2,17 +2,22 @@
 
 Open: https://github.com/arvind-sahu/Task-Mgmt/settings/secrets/actions
 
-Click **New repository secret** for each row (copy values from your local `.env` and IAM).
+**Important:** use **Repository secrets** (the "Secrets" tab), NOT "Variables".
+Names must match **exactly** (case-sensitive).
 
-| Secret name | Where to get the value |
-|-------------|-------------------------|
-| `AWS_ACCESS_KEY_ID` | IAM → Users → your deploy user → Security credentials → Access key |
-| `AWS_SECRET_ACCESS_KEY` | Same access key creation flow |
+Click **New repository secret** for each row:
+
+| Secret name (copy exactly) | Value |
+|----------------------------|--------|
+| `DATABASE_URL` | Full line from `.env` after `DATABASE_URL=` |
+| `DIRECT_URL` | Full line from `.env` after `DIRECT_URL=` |
+| `NEXTAUTH_SECRET` | From `.env` |
+| `NEXTAUTH_URL` | `http://localhost:3000` (first deploy) |
+| `AWS_ACCESS_KEY_ID` | IAM access key (not `AWS_ACCESS_KEY`) |
+| `AWS_SECRET_ACCESS_KEY` | IAM secret key |
 | `AWS_REGION` | `ap-south-1` |
-| `DATABASE_URL` | Your `.env` `DATABASE_URL` (Supabase pooled URL, port 6543, recommended for Lambda) |
-| `DIRECT_URL` | Your `.env` `DIRECT_URL` |
-| `NEXTAUTH_SECRET` | Your `.env` `NEXTAUTH_SECRET` |
-| `NEXTAUTH_URL` | `http://localhost:3000` for the **first** deploy only |
+
+Common mistake: creating `AWS_ACCESS_KEY` — the workflow expects `AWS_ACCESS_KEY_ID`.
 
 Then run the workflow:
 
