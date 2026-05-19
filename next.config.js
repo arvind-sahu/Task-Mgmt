@@ -31,6 +31,9 @@ const config = {
     defaultLocale: "en",
   },
   transpilePackages: ["geist"],
+
+  // Skips OpenNext image-optimizer Lambda (avoids Windows build failures; fine for assignment).
+  images: { unoptimized: true },
 };
 
 export default config;
