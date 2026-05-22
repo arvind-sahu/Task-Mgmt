@@ -1,5 +1,14 @@
 import { TRPCError } from "@trpc/server";
-import type { PrismaClient, ProjectRole } from "@prisma/client";
+import { db } from "~/server/db";
+
+type DbClient = typeof db;
+type ProjectRole = "OWNER" | "ADMIN" | "MEMBER";
+
+const roleRank: Record<ProjectRole, number> = {
+  MEMBER: 1,
+  ADMIN: 2,
+  OWNER: 3,
+};
 
 /**
  * Throw 403 if `userId` is not a member or owner of `projectId`. Returns the
@@ -9,7 +18,7 @@ import type { PrismaClient, ProjectRole } from "@prisma/client";
  * it trivial to unit-test (see src/server/api/__tests__).
  */
 export async function assertProjectAccess(
-  db: PrismaClient,
+  db: DbClient,
   projectId: string,
   userId: string,
   required: ProjectRole | "ANY" = "ANY",
@@ -38,12 +47,11 @@ export async function assertProjectAccess(
   }
 
   if (required !== "ANY") {
-    const order: Record<ProjectRole, number> = {
-      MEMBER: 1,
-      ADMIN: 2,
-      OWNER: 3,
-    };
-    if (order[membership.role] < order[required]) {
+    const memberRole = membership.role as ProjectRole;
+    const memberRank = roleRank[memberRole] ?? 0;
+    const requiredRank = roleRank[required] ?? Number.MAX_SAFE_INTEGER;
+
+    if (memberRank < requiredRank) {
       throw new TRPCError({
         code: "FORBIDDEN",
         message: `Requires ${required} role`,

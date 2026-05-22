@@ -1,9 +1,9 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import type { GetServerSidePropsContext } from "next";
 import { useRouter } from "next/router";
 
 import Layout from "~/components/Layout";
-import { getServerAuthSession } from "~/server/auth";
+import { requireAuth } from "~/server/auth";
 import { api } from "~/utils/api";
 import { initialsFromName } from "~/utils/avatar";
 import ThemePicker from "~/components/ThemePicker";
@@ -39,6 +39,8 @@ export default function ProfilePage() {
   const [saved, setSaved] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [imageError, setImageError] = useState<string | null>(null);
+  const [photoMenuOpen, setPhotoMenuOpen] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const activeTab = router.query.tab === "settings" ? "settings" : "profile";
 
   const initials = initialsFromName(name || me.data?.name, me.data?.email);
@@ -71,6 +73,11 @@ export default function ProfilePage() {
     });
   }
 
+  async function savePhoto(nextImage: string | null) {
+    setImage(nextImage ?? "");
+    await update.mutateAsync({ image: nextImage });
+  }
+
   async function handleImageUpload(file: File) {
     setImageError(null);
     if (!file.type.startsWith("image/")) return;
@@ -86,11 +93,26 @@ export default function ProfilePage() {
         reader.onerror = () => reject(new Error("Failed to read selected image"));
         reader.readAsDataURL(file);
       });
-      setImage(dataUrl);
+      await savePhoto(dataUrl);
     } finally {
       setUploadingImage(false);
     }
   }
+
+  useEffect(() => {
+    function closeOnOutsideClick(e: MouseEvent) {
+      const target = e.target as HTMLElement | null;
+      if (!target) return;
+      if (!target.closest("[data-photo-menu]")) {
+        setPhotoMenuOpen(false);
+      }
+    }
+    if (photoMenuOpen) {
+      document.addEventListener("mousedown", closeOnOutsideClick, true);
+    }
+    return () =>
+      document.removeEventListener("mousedown", closeOnOutsideClick, true);
+  }, [photoMenuOpen]);
 
   return (
     <Layout title="Profile">
@@ -126,57 +148,6 @@ export default function ProfilePage() {
         </button>
       </div>
 
-      <div className="card mb-5 max-w-2xl space-y-4">
-        <div>
-          <h2 className="text-lg font-semibold">Profile photo</h2>
-          <p className="mt-1 text-sm text-slate-500">
-            Paste an image URL or upload directly from your device.
-          </p>
-        </div>
-        <div className="flex items-center gap-4">
-          <div className="grid h-14 w-14 place-items-center overflow-hidden rounded-full bg-indigo-100 text-lg font-semibold text-indigo-700 ring-2 ring-indigo-200">
-            {image ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={image}
-                alt={name || "Profile"}
-                className="h-full w-full object-cover"
-              />
-            ) : (
-              initials
-            )}
-          </div>
-          <div className="flex-1">
-            <input
-              className="input"
-              value={image}
-              onChange={(e) => setImage(e.target.value)}
-              placeholder="https://..."
-            />
-            <div className="mt-2">
-              <label className="btn-ghost cursor-pointer">
-                {uploadingImage ? "Uploading..." : "Upload from device"}
-                <input
-                  type="file"
-                  accept="image/*"
-                  capture="user"
-                  className="hidden"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) {
-                      void handleImageUpload(file);
-                    }
-                    e.currentTarget.value = "";
-                  }}
-                />
-              </label>
-            </div>
-          </div>
-        </div>
-        <p className="text-xs text-slate-500">Supports phone/laptop image picker, max 4MB.</p>
-        {imageError && <p className="text-xs text-red-600">{imageError}</p>}
-      </div>
-
       {activeTab === "settings" ? (
         <div className="card max-w-2xl space-y-5">
           <div>
@@ -190,23 +161,84 @@ export default function ProfilePage() {
       ) : (
         <form onSubmit={submit} className="card max-w-2xl space-y-5">
         <div className="flex items-center gap-4">
-          <div className="grid h-16 w-16 place-items-center overflow-hidden rounded-full bg-indigo-100 text-xl font-semibold text-indigo-700 ring-2 ring-indigo-200">
-            {image ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={image}
-                alt={name || "Profile"}
-                className="h-full w-full object-cover"
-              />
-            ) : (
-              initials
+          <div className="relative" data-photo-menu>
+            <button
+              type="button"
+              onClick={() => setPhotoMenuOpen((prev) => !prev)}
+              className="grid h-16 w-16 place-items-center overflow-hidden rounded-full bg-indigo-100 text-xl font-semibold text-indigo-700 ring-2 ring-indigo-200 transition hover:ring-indigo-400"
+              title="Update profile photo"
+            >
+              {image ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={image}
+                  alt={name || "Profile"}
+                  className="h-full w-full object-cover"
+                />
+              ) : (
+                initials
+              )}
+            </button>
+            {photoMenuOpen && (
+              <div className="absolute left-0 top-[72px] z-20 w-60 rounded-md border border-slate-200 bg-white p-1 shadow-lg">
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="w-full rounded-md px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-100"
+                >
+                  {uploadingImage ? "Uploading..." : "Upload photo"}
+                </button>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const url = window.prompt("Enter direct image URL");
+                    if (!url) return;
+                    setImageError(null);
+                    await savePhoto(url.trim());
+                    setPhotoMenuOpen(false);
+                  }}
+                  className="w-full rounded-md px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-100"
+                >
+                  Use photo URL
+                </button>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    await savePhoto(null);
+                    setPhotoMenuOpen(false);
+                  }}
+                  className="w-full rounded-md px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50"
+                >
+                  Remove photo
+                </button>
+              </div>
             )}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              capture="user"
+              className="hidden"
+              onChange={async (e) => {
+                const input = e.currentTarget;
+                const file = input.files?.[0];
+                if (file) {
+                  await handleImageUpload(file);
+                  setPhotoMenuOpen(false);
+                }
+                input.value = "";
+              }}
+            />
           </div>
           <div>
             <p className="text-sm font-medium">{me.data?.email}</p>
             <p className="text-xs text-slate-500">
               Email is used for sign-in and cannot be changed
             </p>
+            <p className="mt-1 text-xs text-slate-500">
+              Click profile photo to upload/update/remove
+            </p>
+            {imageError && <p className="mt-1 text-xs text-red-600">{imageError}</p>}
           </div>
         </div>
 
@@ -222,13 +254,16 @@ export default function ProfilePage() {
         </div>
 
         <div>
-          <label className="label">Avatar URL (optional)</label>
+          <label className="label">Email</label>
           <input
-            className="input mt-1"
-            value={image}
-            onChange={(e) => setImage(e.target.value)}
-            placeholder="https://…"
+            className="input mt-1 cursor-not-allowed opacity-70"
+            value={me.data?.email ?? ""}
+            readOnly
+            disabled
           />
+          <p className="mt-1 text-xs text-slate-500">
+            Email is used for sign-in and cannot be updated.
+          </p>
         </div>
 
         <div>
@@ -284,10 +319,6 @@ export default function ProfilePage() {
   );
 }
 
-export async function getServerSideProps(ctx: GetServerSidePropsContext) {
-  const session = await getServerAuthSession(ctx);
-  if (!session) {
-    return { redirect: { destination: "/auth/signin", permanent: false } };
-  }
-  return { props: {} };
+export function getServerSideProps(ctx: GetServerSidePropsContext) {
+  return requireAuth(ctx);
 }

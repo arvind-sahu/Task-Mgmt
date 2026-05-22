@@ -7,7 +7,7 @@ import EmptyState from "~/components/EmptyState";
 import Layout from "~/components/Layout";
 import TaskForm, { type TaskFormValues } from "~/components/TaskForm";
 import { PriorityBadge, StatusBadge } from "~/components/Badges";
-import { getServerAuthSession } from "~/server/auth";
+import { requireAuth } from "~/server/auth";
 import { api } from "~/utils/api";
 import { formatDate, isOverdue, relativeDeadline } from "~/utils/date";
 
@@ -317,10 +317,6 @@ function Field({
   );
 }
 
-export async function getServerSideProps(ctx: GetServerSidePropsContext) {
-  const session = await getServerAuthSession(ctx);
-  if (!session) {
-    return { redirect: { destination: "/auth/signin", permanent: false } };
-  }
-  return { props: {} };
+export function getServerSideProps(ctx: GetServerSidePropsContext) {
+  return requireAuth(ctx);
 }
