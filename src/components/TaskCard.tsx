@@ -32,9 +32,13 @@ export default function TaskCard({ task }: { task: TaskListItem }) {
         {task.tags.map((t) => (
           <span
             key={t.id}
-            className="rounded px-1.5 py-0.5 text-[10px] font-medium ring-1 ring-inset ring-slate-200"
+            className="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] font-medium ring-1 ring-inset ring-slate-200"
             style={{ color: t.color, backgroundColor: `${t.color}15` }}
           >
+            <span
+              className="h-1.5 w-1.5 rounded-full"
+              style={{ backgroundColor: t.color }}
+            />
             {t.name}
           </span>
         ))}

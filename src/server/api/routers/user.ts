@@ -7,6 +7,7 @@ import {
   protectedProcedure,
   publicProcedure,
 } from "~/server/api/trpc";
+import { issueEmailOtp, verifyEmailOtp } from "~/server/otp";
 
 // Reusable input shapes — exported so tests can import the same schemas.
 export const registerInput = z.object({
@@ -14,6 +15,17 @@ export const registerInput = z.object({
   email: z.string().email(),
   password: z.string().min(8).max(72), // bcrypt's effective max is 72 bytes
 });
+
+const strongPasswordSchema = z
+  .string()
+  .min(8, "Password must be at least 8 characters long")
+  .max(72, "Password is too long")
+  .regex(/[A-Za-z]/, "Password must contain at least one letter")
+  .regex(/\d/, "Password must contain at least one number")
+  .regex(
+    /[ !"#$%&'()*+,\-./:;<=>?@[\\\]^_`{|}~]/,
+    "Password must contain at least one special character",
+  );
 
 export const updateProfileInput = z.object({
   name: z.string().min(1).max(80).optional(),
@@ -47,6 +59,201 @@ export const userRouter = createTRPCRouter({
         select: { id: true, email: true, name: true },
       });
       return user;
+    }),
+
+  sendSignupOtp: publicProcedure
+    .input(
+      z.object({
+        name: z.string().min(1).max(80),
+        email: z.string().email(),
+        password: strongPasswordSchema,
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const email = input.email.toLowerCase();
+      const existing = await ctx.db.user.findUnique({ where: { email } });
+      if (existing) {
+        throw new TRPCError({
+          code: "CONFLICT",
+          message: "An account with this email already exists",
+        });
+      }
+      await issueEmailOtp(email, "SIGNUP_VERIFY");
+      return { message: "OTP sent to your email for signup verification." };
+    }),
+
+  verifySignupOtpAndRegister: publicProcedure
+    .input(
+      z.object({
+        name: z.string().min(1).max(80),
+        email: z.string().email(),
+        password: strongPasswordSchema,
+        otp: z.string().regex(/^\d{6}$/, "Enter valid 6 digit OTP"),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const email = input.email.toLowerCase();
+      const existing = await ctx.db.user.findUnique({ where: { email } });
+      if (existing) {
+        throw new TRPCError({
+          code: "CONFLICT",
+          message: "An account with this email already exists",
+        });
+      }
+
+      const valid = await verifyEmailOtp({
+        email,
+        code: input.otp,
+        purpose: "SIGNUP_VERIFY",
+        consume: true,
+      });
+      if (!valid) {
+        throw new TRPCError({
+          code: "UNAUTHORIZED",
+          message: "Invalid or expired OTP",
+        });
+      }
+
+      const passwordHash = await bcrypt.hash(input.password, 10);
+      const user = await ctx.db.user.create({
+        data: {
+          name: input.name,
+          email,
+          password: passwordHash,
+        },
+        select: { id: true, email: true, name: true },
+      });
+      return user;
+    }),
+
+  sendLoginOtp: publicProcedure
+    .input(
+      z.object({
+        email: z.string().email(),
+        password: z.string().min(8).max(72),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const email = input.email.toLowerCase();
+      const user = await ctx.db.user.findUnique({
+        where: { email },
+        select: { id: true, email: true, password: true },
+      });
+      if (!user) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "No account exists with this email",
+        });
+      }
+      const ok = await bcrypt.compare(input.password, user.password ?? "");
+      if (!ok) {
+        throw new TRPCError({
+          code: "UNAUTHORIZED",
+          message: "Invalid email or password",
+        });
+      }
+      await issueEmailOtp(email, "LOGIN_2FA");
+      return { email, message: "OTP sent to your email" };
+    }),
+
+  verifyLoginOtp: publicProcedure
+    .input(
+      z.object({
+        email: z.string().email(),
+        otp: z.string().regex(/^\d{6}$/, "Enter valid 6 digit OTP"),
+      }),
+    )
+    .mutation(async ({ input }) => {
+      const valid = await verifyEmailOtp({
+        email: input.email,
+        code: input.otp,
+        purpose: "LOGIN_2FA",
+      });
+      if (!valid) {
+        throw new TRPCError({
+          code: "UNAUTHORIZED",
+          message: "Invalid or expired OTP",
+        });
+      }
+      return { ok: true };
+    }),
+
+  sendForgotPasswordOtp: publicProcedure
+    .input(z.object({ email: z.string().email() }))
+    .mutation(async ({ ctx, input }) => {
+      const email = input.email.toLowerCase();
+      const user = await ctx.db.user.findUnique({
+        where: { email },
+        select: { id: true, email: true },
+      });
+      // Keep this endpoint response generic to prevent account enumeration.
+      if (user) {
+        await issueEmailOtp(email, "FORGOT_PASSWORD");
+      }
+      return { message: "If an account exists, OTP has been sent to email." };
+    }),
+
+  verifyForgotPasswordOtp: publicProcedure
+    .input(
+      z.object({
+        email: z.string().email(),
+        otp: z.string().regex(/^\d{6}$/, "Enter valid 6 digit OTP"),
+      }),
+    )
+    .mutation(async ({ input }) => {
+      const valid = await verifyEmailOtp({
+        email: input.email,
+        code: input.otp,
+        purpose: "FORGOT_PASSWORD",
+        consume: false,
+      });
+      if (!valid) {
+        throw new TRPCError({
+          code: "UNAUTHORIZED",
+          message: "Invalid or expired OTP",
+        });
+      }
+      return { ok: true };
+    }),
+
+  resetPassword: publicProcedure
+    .input(
+      z.object({
+        email: z.string().email(),
+        otp: z.string().regex(/^\d{6}$/, "Enter valid 6 digit OTP"),
+        password: strongPasswordSchema,
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const email = input.email.toLowerCase();
+      const otpIsVerified = await verifyEmailOtp({
+        email,
+        code: input.otp,
+        purpose: "FORGOT_PASSWORD",
+        consume: true,
+      });
+      if (!otpIsVerified) {
+        throw new TRPCError({
+          code: "UNAUTHORIZED",
+          message: "Please verify OTP before resetting password",
+        });
+      }
+      const user = await ctx.db.user.findUnique({
+        where: { email },
+        select: { id: true },
+      });
+      if (!user) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "No account exists with this email",
+        });
+      }
+      const passwordHash = await bcrypt.hash(input.password, 10);
+      await ctx.db.user.update({
+        where: { id: user.id },
+        data: { password: passwordHash },
+      });
+      return { ok: true };
     }),
 
   /** Returns the currently signed-in user (no password). */

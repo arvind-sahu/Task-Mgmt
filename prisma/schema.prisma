@@ -142,6 +142,12 @@ enum TaskStatus {
     DONE
 }
 
+enum EmailOtpPurpose {
+    LOGIN_2FA
+    FORGOT_PASSWORD
+    SIGNUP_VERIFY
+}
+
 /// Core unit of work. Belongs to a Project, optionally has a deadline, can be
 /// assigned to many users, and can be tagged.
 model Task {
@@ -197,4 +203,18 @@ model Comment {
     author   User   @relation(fields: [authorId], references: [id], onDelete: Cascade)
 
     @@index([taskId])
+}
+
+/// One-time-passwords sent via email for 2FA and password reset flows.
+model EmailOtp {
+    id         String          @id @default(cuid())
+    email      String
+    purpose    EmailOtpPurpose
+    codeHash   String
+    expiresAt  DateTime
+    consumedAt DateTime?
+    createdAt  DateTime        @default(now())
+
+    @@index([email, purpose])
+    @@index([expiresAt])
 }

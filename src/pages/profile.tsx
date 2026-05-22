@@ -1,9 +1,12 @@
 import { useEffect, useState, type FormEvent } from "react";
 import type { GetServerSidePropsContext } from "next";
+import { useRouter } from "next/router";
 
 import Layout from "~/components/Layout";
 import { getServerAuthSession } from "~/server/auth";
 import { api } from "~/utils/api";
+import { initialsFromName } from "~/utils/avatar";
+import ThemePicker from "~/components/ThemePicker";
 
 /** A common (non-exhaustive) timezone list for the profile dropdown. */
 const TIMEZONES = [
@@ -25,6 +28,7 @@ const TIMEZONES = [
  * timezone, and avatar URL.
  */
 export default function ProfilePage() {
+  const router = useRouter();
   const me = api.user.me.useQuery();
   const utils = api.useUtils();
 
@@ -33,6 +37,9 @@ export default function ProfilePage() {
   const [timezone, setTimezone] = useState("UTC");
   const [image, setImage] = useState("");
   const [saved, setSaved] = useState(false);
+  const activeTab = router.query.tab === "settings" ? "settings" : "profile";
+
+  const initials = initialsFromName(name || me.data?.name, me.data?.email);
 
   // Hydrate local state once the query resolves.
   useEffect(() => {
@@ -71,12 +78,55 @@ export default function ProfilePage() {
         </p>
       </div>
 
-      <form onSubmit={submit} className="card max-w-2xl space-y-5">
+      <div className="mb-4 inline-flex rounded-lg bg-slate-100 p-1">
+        <button
+          type="button"
+          onClick={() => void router.push("/profile")}
+          className={`rounded-md px-3 py-1.5 text-sm font-medium ${
+            activeTab === "profile"
+              ? "bg-white text-slate-900 shadow-sm"
+              : "text-slate-600 hover:text-slate-900"
+          }`}
+        >
+          Profile
+        </button>
+        <button
+          type="button"
+          onClick={() => void router.push("/profile?tab=settings")}
+          className={`rounded-md px-3 py-1.5 text-sm font-medium ${
+            activeTab === "settings"
+              ? "bg-white text-slate-900 shadow-sm"
+              : "text-slate-600 hover:text-slate-900"
+          }`}
+        >
+          Settings
+        </button>
+      </div>
+
+      {activeTab === "settings" ? (
+        <div className="card max-w-2xl space-y-5">
+          <div>
+            <h2 className="text-lg font-semibold">Theme</h2>
+            <p className="mt-1 text-sm text-slate-500">
+              Choose your preferred application look and feel.
+            </p>
+          </div>
+          <ThemePicker />
+        </div>
+      ) : (
+        <form onSubmit={submit} className="card max-w-2xl space-y-5">
         <div className="flex items-center gap-4">
-          <div className="grid h-16 w-16 place-items-center rounded-full bg-indigo-100 text-xl font-semibold text-indigo-700">
-            {(name?.trim() ?? me.data?.email ?? "?")
-              .charAt(0)
-              .toUpperCase() || "?"}
+          <div className="grid h-16 w-16 place-items-center overflow-hidden rounded-full bg-indigo-100 text-xl font-semibold text-indigo-700 ring-2 ring-indigo-200">
+            {image ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={image}
+                alt={name || "Profile"}
+                className="h-full w-full object-cover"
+              />
+            ) : (
+              initials
+            )}
           </div>
           <div>
             <p className="text-sm font-medium">{me.data?.email}</p>
@@ -154,7 +204,8 @@ export default function ProfilePage() {
             {update.isPending ? "Saving…" : "Save changes"}
           </button>
         </div>
-      </form>
+        </form>
+      )}
     </Layout>
   );
 }

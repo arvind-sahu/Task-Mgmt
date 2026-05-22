@@ -159,9 +159,13 @@ export default function TaskDetail() {
                 {t.tags.map((tg) => (
                   <span
                     key={tg.id}
-                    className="rounded-full px-2 py-0.5 text-xs ring-1 ring-inset"
+                    className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs ring-1 ring-inset"
                     style={{ color: tg.color, borderColor: tg.color }}
                   >
+                    <span
+                      className="h-2 w-2 rounded-full"
+                      style={{ backgroundColor: tg.color }}
+                    />
                     {tg.name}
                   </span>
                 ))}

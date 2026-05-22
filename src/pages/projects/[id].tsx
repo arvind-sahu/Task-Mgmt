@@ -298,9 +298,13 @@ function TagsPanel({ projectId }: { projectId: string }) {
         {tags.data?.map((t) => (
           <li
             key={t.id}
-            className="group inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs ring-1 ring-inset"
+            className="group inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs ring-1 ring-inset"
             style={{ color: t.color, borderColor: t.color }}
           >
+            <span
+              className="h-2.5 w-2.5 rounded-full"
+              style={{ backgroundColor: t.color }}
+            />
             {t.name}
             <button
               onClick={() => remove.mutate({ id: t.id })}
@@ -330,7 +334,7 @@ function TagsPanel({ projectId }: { projectId: string }) {
         />
         <input
           type="color"
-          className="h-9 w-9 cursor-pointer rounded border border-slate-300"
+          className="h-9 w-9 cursor-pointer rounded-full border border-slate-300 p-0"
           value={color}
           onChange={(e) => setColor(e.target.value)}
           title="Tag color"

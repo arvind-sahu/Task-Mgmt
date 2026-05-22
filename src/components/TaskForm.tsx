@@ -175,7 +175,7 @@ export default function TaskForm({
                 type="button"
                 key={t.id}
                 onClick={() => setTagIds(toggle(tagIds, t.id))}
-                className={`rounded-full px-3 py-1 text-sm ring-1 ring-inset transition ${
+                className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-sm ring-1 ring-inset transition ${
                   selected ? "ring-2" : "hover:bg-slate-50"
                 }`}
                 style={{
@@ -184,6 +184,10 @@ export default function TaskForm({
                   borderColor: t.color,
                 }}
               >
+                <span
+                  className="h-2 w-2 rounded-full"
+                  style={{ backgroundColor: t.color }}
+                />
                 {t.name}
               </button>
             );

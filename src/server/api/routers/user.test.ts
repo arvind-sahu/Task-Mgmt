@@ -17,6 +17,7 @@ interface CreateUserArg {
 interface DbMocks {
   findUnique?: Mock;
   create?: Mock;
+  update?: Mock;
 }
 
 /**
@@ -34,11 +35,21 @@ function makeCtx(opts: DbMocks) {
       name: data.name,
     }));
 
+  const update = opts.update ?? vi.fn().mockResolvedValue({ id: "u1" });
+
   const db = {
-    user: { findUnique, create },
+    user: { findUnique, create, update },
+    emailOtp: {
+      create: vi.fn().mockResolvedValue({ id: "otp_1" }),
+      findFirst: vi.fn().mockResolvedValue({
+        id: "otp_1",
+        codeHash: "$2a$10$B2q9xL6guB8xQJ0I95r8Auj7mXlv5wVCK8SPoaqe7i0rGUNShUMy2", // hash for "123456"
+      }),
+      update: vi.fn().mockResolvedValue({ id: "otp_1", consumedAt: new Date() }),
+    },
   } as unknown as PrismaClient;
 
-  return { db, session: null, mocks: { findUnique, create } };
+  return { db, session: null, mocks: { findUnique, create, update } };
 }
 
 describe("user.register", () => {
@@ -88,6 +99,28 @@ describe("user.register", () => {
         name: "A",
         email: "not-an-email",
         password: "short",
+      }),
+    ).rejects.toThrow();
+  });
+
+  it("requires strong password for resetPassword", async () => {
+    const caller = createCaller(makeCtx({}));
+    await expect(
+      caller.user.resetPassword({
+        email: "alice@example.com",
+        otp: "123456",
+        password: "weakpass",
+      }),
+    ).rejects.toThrow();
+  });
+
+  it("requires strong password for sendSignupOtp payload", async () => {
+    const caller = createCaller(makeCtx({}));
+    await expect(
+      caller.user.sendSignupOtp({
+        name: "Alice",
+        email: "alice@example.com",
+        password: "weakpass",
       }),
     ).rejects.toThrow();
   });
