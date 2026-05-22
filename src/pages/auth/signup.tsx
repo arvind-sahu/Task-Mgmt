@@ -5,10 +5,19 @@ import { useRouter } from "next/router";
 import { useState, type FormEvent } from "react";
 import type { GetServerSidePropsContext } from "next";
 
+import { OAuthButtons } from "~/components/auth/OAuthButtons";
 import { getServerAuthSession } from "~/server/auth";
+import {
+  getOAuthProvidersForAuthPage,
+  type OAuthProviderOption,
+} from "~/server/oauth";
 import { api } from "~/utils/api";
 
-export default function SignUpPage() {
+type SignUpPageProps = {
+  oauthProviders: OAuthProviderOption[];
+};
+
+export default function SignUpPage({ oauthProviders }: SignUpPageProps) {
   const router = useRouter();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -82,7 +91,7 @@ export default function SignUpPage() {
             </div>
             <h1 className="text-2xl font-semibold">Create your account</h1>
             <p className="mt-1 text-sm text-slate-600">
-              Start collaborating on tasks in minutes
+              Register with email OTP or connect an account below
             </p>
           </div>
 
@@ -208,6 +217,8 @@ export default function SignUpPage() {
             )}
           </form>
 
+          <OAuthButtons providers={oauthProviders} callbackUrl="/dashboard" />
+
           <p className="mt-6 text-center text-sm text-slate-500">
             Already have an account?{" "}
             <Link
@@ -228,5 +239,9 @@ export async function getServerSideProps(ctx: GetServerSidePropsContext) {
   if (session) {
     return { redirect: { destination: "/dashboard", permanent: false } };
   }
-  return { props: {} };
+  return {
+    props: {
+      oauthProviders: getOAuthProvidersForAuthPage(),
+    },
+  };
 }

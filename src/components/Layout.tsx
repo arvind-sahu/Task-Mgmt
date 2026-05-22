@@ -33,6 +33,8 @@ export default function Layout({ title, children }: LayoutProps) {
   const displayEmail = me.data?.email ?? session?.user?.email;
   const displayImage = me.data?.image ?? session?.user?.image;
   const initials = initialsFromName(displayName, displayEmail);
+  const isAuthed = status === "authenticated" && !!session?.user;
+  const showGuestNav = status === "unauthenticated";
 
   useEffect(() => {
     function onOutsideClick(e: MouseEvent) {
@@ -64,7 +66,7 @@ export default function Layout({ title, children }: LayoutProps) {
               <span className="text-lg font-semibold">Tasker</span>
             </Link>
 
-            {session && (
+            {isAuthed && (
               <div className="flex items-center gap-3">
                 <nav className="flex items-center gap-1">
                   {navItems.map((item) => {
@@ -145,7 +147,7 @@ export default function Layout({ title, children }: LayoutProps) {
               </div>
             )}
 
-            {!session && status !== "loading" && (
+            {showGuestNav && (
               <div className="flex items-center gap-2">
                 <Link href="/auth/signin" className="btn-ghost">
                   Sign in

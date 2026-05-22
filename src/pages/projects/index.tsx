@@ -3,7 +3,7 @@ import { useState, type FormEvent } from "react";
 import type { GetServerSidePropsContext } from "next";
 
 import Layout from "~/components/Layout";
-import { getServerAuthSession } from "~/server/auth";
+import { requireAuth } from "~/server/auth";
 import { api } from "~/utils/api";
 
 const COLOR_PRESETS = [
@@ -164,10 +164,6 @@ export default function ProjectsPage() {
   );
 }
 
-export async function getServerSideProps(ctx: GetServerSidePropsContext) {
-  const session = await getServerAuthSession(ctx);
-  if (!session) {
-    return { redirect: { destination: "/auth/signin", permanent: false } };
-  }
-  return { props: {} };
+export function getServerSideProps(ctx: GetServerSidePropsContext) {
+  return requireAuth(ctx);
 }

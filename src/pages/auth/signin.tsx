@@ -5,7 +5,12 @@ import { useRouter } from "next/router";
 import { useState, type FormEvent } from "react";
 import type { GetServerSidePropsContext } from "next";
 
+import { OAuthButtons } from "~/components/auth/OAuthButtons";
 import { getServerAuthSession } from "~/server/auth";
+import {
+  getOAuthProvidersForAuthPage,
+  type OAuthProviderOption,
+} from "~/server/oauth";
 import { api } from "~/utils/api";
 
 /**
@@ -13,7 +18,11 @@ import { api } from "~/utils/api";
  * via `signIn("credentials", { redirect: false })` so we can show inline
  * errors instead of bouncing through `?error=` query params.
  */
-export default function SignInPage() {
+type SignInPageProps = {
+  oauthProviders: OAuthProviderOption[];
+};
+
+export default function SignInPage({ oauthProviders }: SignInPageProps) {
   const router = useRouter();
   const callbackUrl =
     typeof router.query.callbackUrl === "string"
@@ -76,21 +85,23 @@ export default function SignInPage() {
       <Head>
         <title>Sign in · Tasker</title>
       </Head>
-      <div className="auth-bg grid min-h-screen place-items-center px-4 py-8">
+      <div className="auth-bg auth-w11 grid min-h-screen place-items-center px-4 py-8">
         <div className="w-full max-w-md">
-          <div className="mb-8 text-center">
-            <div className="mx-auto mb-3 grid h-12 w-12 place-items-center rounded-xl bg-gradient-to-br from-indigo-500 to-fuchsia-500 text-lg font-bold text-white shadow-lg shadow-indigo-500/30">
+          <div className="mb-8 text-center auth-hero">
+            <div className="mx-auto mb-3 grid h-12 w-12 place-items-center rounded-xl bg-gradient-to-br from-cyan-400 via-indigo-500 to-blue-600 text-lg font-bold text-white shadow-xl shadow-indigo-500/40">
               T
             </div>
-            <h1 className="text-2xl font-semibold text-slate-900">Welcome back</h1>
-            <p className="mt-1 text-sm text-slate-600">
-              Sign in with password + OTP verification
+            <h1 className="text-2xl font-semibold text-slate-900 drop-shadow-sm">
+              Welcome back
+            </h1>
+            <p className="mt-1 text-sm text-slate-700">
+              Email + password with OTP, or a connected account below
             </p>
           </div>
 
           <form
             onSubmit={otpRequested ? handleOtpSubmit : handlePasswordSubmit}
-            className="card glass-card space-y-4"
+            className="card glass-card auth-panel space-y-4"
           >
             <div>
               <label className="label" htmlFor="email">
@@ -125,7 +136,7 @@ export default function SignInPage() {
                 <button
                   type="button"
                   onClick={() => setShowPassword((prev) => !prev)}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-slate-500 hover:bg-slate-100"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-slate-500 transition hover:bg-slate-100"
                   aria-label={showPassword ? "Hide password" : "Show password"}
                 >
                   {showPassword ? "🙈" : "👁️"}
@@ -165,7 +176,7 @@ export default function SignInPage() {
             <button
               type="submit"
               disabled={loading || sendLoginOtp.isPending || verifyLoginOtp.isPending}
-              className="btn-primary w-full"
+              className="btn-primary auth-cta w-full"
             >
               {!otpRequested
                 ? sendLoginOtp.isPending
@@ -190,6 +201,8 @@ export default function SignInPage() {
               </button>
             )}
           </form>
+
+          <OAuthButtons providers={oauthProviders} callbackUrl={callbackUrl} />
 
           <div className="mt-6 space-y-1 text-center text-sm text-slate-600">
             <p>
@@ -222,5 +235,9 @@ export async function getServerSideProps(ctx: GetServerSidePropsContext) {
   if (session) {
     return { redirect: { destination: "/dashboard", permanent: false } };
   }
-  return { props: {} };
+  return {
+    props: {
+      oauthProviders: getOAuthProvidersForAuthPage(),
+    },
+  };
 }

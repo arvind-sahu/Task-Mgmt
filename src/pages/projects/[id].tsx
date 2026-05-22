@@ -7,7 +7,7 @@ import Layout from "~/components/Layout";
 import TaskCard from "~/components/TaskCard";
 import TaskForm, { type TaskFormValues } from "~/components/TaskForm";
 import { TASK_STATUSES, statusLabel } from "~/components/Badges";
-import { getServerAuthSession } from "~/server/auth";
+import { requireAuth } from "~/server/auth";
 import { api } from "~/utils/api";
 
 /**
@@ -350,11 +350,7 @@ function TagsPanel({ projectId }: { projectId: string }) {
   );
 }
 
-export async function getServerSideProps(ctx: GetServerSidePropsContext) {
-  const session = await getServerAuthSession(ctx);
-  if (!session) {
-    return { redirect: { destination: "/auth/signin", permanent: false } };
-  }
-  return { props: {} };
+export function getServerSideProps(ctx: GetServerSidePropsContext) {
+  return requireAuth(ctx);
 }
 

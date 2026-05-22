@@ -1,10 +1,9 @@
 import Link from "next/link";
 import type { GetServerSidePropsContext } from "next";
-import { TaskStatus } from "@prisma/client";
 
 import Layout from "~/components/Layout";
 import { PriorityBadge, StatusBadge } from "~/components/Badges";
-import { getServerAuthSession } from "~/server/auth";
+import { requireAuth } from "~/server/auth";
 import { api } from "~/utils/api";
 import { isOverdue, relativeDeadline } from "~/utils/date";
 
@@ -18,10 +17,11 @@ export default function Dashboard() {
   const upcoming = api.task.myUpcoming.useQuery();
   const projects = api.project.list.useQuery();
 
-  const open = upcoming.data ?? [];
-  const overdueCount = open.filter((t) => isOverdue(t.deadline)).length;
-  const inProgress = open.filter((t) => t.status === TaskStatus.IN_PROGRESS)
-    .length;
+  const open = upcoming.data;
+  const overdueCount = open?.filter((t: any) => isOverdue(t.deadline)).length;
+  const inProgress = open?.filter(
+    (t: any) => t.status === "IN_PROGRESS",
+  ).length;
 
   return (
     <Layout title="Dashboard">
@@ -34,12 +34,12 @@ export default function Dashboard() {
 
       {/* Stat cards */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <Stat label="Open tasks" value={open.length} />
+        <Stat label="Open tasks" value={open?.length} />
         <Stat label="In progress" value={inProgress} accent="text-blue-600" />
         <Stat
           label="Overdue"
           value={overdueCount}
-          accent={overdueCount > 0 ? "text-red-600" : "text-slate-900"}
+          accent={(overdueCount ?? 0) > 0 ? "text-red-600" : "text-slate-900"}
         />
       </div>
 
@@ -56,7 +56,7 @@ export default function Dashboard() {
                 You&apos;re all caught up. Create a task to get started.
               </p>
             )}
-            {upcoming.data?.map((t) => (
+            {upcoming.data?.map((t: any) => (
               <Link
                 key={t.id}
                 href={`/tasks/${t.id}`}
@@ -108,7 +108,7 @@ export default function Dashboard() {
             {projects.data?.length === 0 && (
               <p className="p-2 text-sm text-slate-500">No projects yet.</p>
             )}
-            {projects.data?.slice(0, 6).map((p) => (
+            {projects.data?.slice(0, 6).map((p: any) => (
               <Link
                 key={p.id}
                 href={`/projects/${p.id}`}
@@ -141,25 +141,24 @@ function Stat({
   accent = "text-slate-900",
 }: {
   label: string;
-  value: number;
+  value: number | undefined;
   accent?: string;
 }) {
+  const loading = typeof value !== "number";
   return (
     <div className="card">
       <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
         {label}
       </p>
-      <p className={`mt-1 text-3xl font-bold ${accent}`}>{value}</p>
+      {loading ? (
+        <div className="mt-2 h-8 w-14 animate-pulse rounded-md bg-slate-200/80" />
+      ) : (
+        <p className={`mt-1 text-3xl font-bold ${accent}`}>{value}</p>
+      )}
     </div>
   );
 }
 
-export async function getServerSideProps(ctx: GetServerSidePropsContext) {
-  const session = await getServerAuthSession(ctx);
-  if (!session) {
-    return {
-      redirect: { destination: "/auth/signin", permanent: false },
-    };
-  }
-  return { props: {} };
+export function getServerSideProps(ctx: GetServerSidePropsContext) {
+  return requireAuth(ctx);
 }
