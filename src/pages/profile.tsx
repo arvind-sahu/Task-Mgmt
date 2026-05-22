@@ -37,6 +37,8 @@ export default function ProfilePage() {
   const [timezone, setTimezone] = useState("UTC");
   const [image, setImage] = useState("");
   const [saved, setSaved] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [imageError, setImageError] = useState<string | null>(null);
   const activeTab = router.query.tab === "settings" ? "settings" : "profile";
 
   const initials = initialsFromName(name || me.data?.name, me.data?.email);
@@ -67,6 +69,27 @@ export default function ProfilePage() {
       timezone,
       image: image || null,
     });
+  }
+
+  async function handleImageUpload(file: File) {
+    setImageError(null);
+    if (!file.type.startsWith("image/")) return;
+    if (file.size > 4 * 1024 * 1024) {
+      setImageError("Please upload an image up to 4MB.");
+      return;
+    }
+    setUploadingImage(true);
+    try {
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result ?? ""));
+        reader.onerror = () => reject(new Error("Failed to read selected image"));
+        reader.readAsDataURL(file);
+      });
+      setImage(dataUrl);
+    } finally {
+      setUploadingImage(false);
+    }
   }
 
   return (
@@ -101,6 +124,57 @@ export default function ProfilePage() {
         >
           Settings
         </button>
+      </div>
+
+      <div className="card mb-5 max-w-2xl space-y-4">
+        <div>
+          <h2 className="text-lg font-semibold">Profile photo</h2>
+          <p className="mt-1 text-sm text-slate-500">
+            Paste an image URL or upload directly from your device.
+          </p>
+        </div>
+        <div className="flex items-center gap-4">
+          <div className="grid h-14 w-14 place-items-center overflow-hidden rounded-full bg-indigo-100 text-lg font-semibold text-indigo-700 ring-2 ring-indigo-200">
+            {image ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={image}
+                alt={name || "Profile"}
+                className="h-full w-full object-cover"
+              />
+            ) : (
+              initials
+            )}
+          </div>
+          <div className="flex-1">
+            <input
+              className="input"
+              value={image}
+              onChange={(e) => setImage(e.target.value)}
+              placeholder="https://..."
+            />
+            <div className="mt-2">
+              <label className="btn-ghost cursor-pointer">
+                {uploadingImage ? "Uploading..." : "Upload from device"}
+                <input
+                  type="file"
+                  accept="image/*"
+                  capture="user"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      void handleImageUpload(file);
+                    }
+                    e.currentTarget.value = "";
+                  }}
+                />
+              </label>
+            </div>
+          </div>
+        </div>
+        <p className="text-xs text-slate-500">Supports phone/laptop image picker, max 4MB.</p>
+        {imageError && <p className="text-xs text-red-600">{imageError}</p>}
       </div>
 
       {activeTab === "settings" ? (

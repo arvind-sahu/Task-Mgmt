@@ -88,23 +88,33 @@ export default function Layout({ title, children }: LayoutProps) {
                   <button
                     type="button"
                     onClick={() => setMenuOpen((prev) => !prev)}
-                    className="grid h-9 w-9 place-items-center overflow-hidden rounded-full bg-indigo-100 text-xs font-bold text-indigo-700 ring-1 ring-indigo-200"
+                    className="flex items-center gap-2 rounded-md border border-transparent px-1.5 py-1 transition hover:border-slate-300 hover:bg-slate-100"
                     aria-label="Open profile menu"
                     aria-expanded={menuOpen}
                   >
-                    {displayImage ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={displayImage}
-                        alt={displayName ?? "Profile"}
-                        className="h-full w-full object-cover"
-                      />
-                    ) : (
-                      initials
-                    )}
+                    <span className="grid h-8 w-8 place-items-center overflow-hidden rounded-full bg-indigo-100 text-xs font-bold text-indigo-700 ring-1 ring-indigo-200">
+                      {displayImage ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={displayImage}
+                          alt={displayName ?? "Profile"}
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        initials
+                      )}
+                    </span>
+                    <span className="text-xs text-slate-500">▾</span>
                   </button>
                   {menuOpen && (
-                    <div className="absolute right-0 z-[60] mt-2 w-44 rounded-md border border-slate-200 bg-white p-1 shadow-lg">
+                    <div className="absolute right-0 z-[60] mt-2 w-56 overflow-hidden rounded-md border border-slate-200 bg-white shadow-xl">
+                      <div className="border-b border-slate-100 px-3 py-2">
+                        <p className="text-sm font-semibold text-slate-800">
+                          {displayName ?? "User"}
+                        </p>
+                        <p className="truncate text-xs text-slate-500">{displayEmail}</p>
+                      </div>
+                      <div className="p-1">
                       <Link
                         href="/profile"
                         className="block rounded-md px-3 py-2 text-sm text-slate-700 hover:bg-slate-100"
@@ -119,6 +129,8 @@ export default function Layout({ title, children }: LayoutProps) {
                       >
                         Settings
                       </Link>
+                      </div>
+                      <div className="border-t border-slate-100 p-1">
                       <button
                         type="button"
                         onClick={() => void signOut({ callbackUrl: "/auth/signin" })}
@@ -126,6 +138,7 @@ export default function Layout({ title, children }: LayoutProps) {
                       >
                         Sign out
                       </button>
+                      </div>
                     </div>
                   )}
                 </div>

@@ -31,7 +31,22 @@ export const updateProfileInput = z.object({
   name: z.string().min(1).max(80).optional(),
   bio: z.string().max(500).optional(),
   timezone: z.string().max(64).optional(),
-  image: z.string().url().optional().nullable(),
+  image: z
+    .string()
+    .refine(
+      (value) => {
+        if (value.startsWith("data:image/")) return true;
+        try {
+          const parsed = new URL(value);
+          return parsed.protocol === "http:" || parsed.protocol === "https:";
+        } catch {
+          return false;
+        }
+      },
+      { message: "Provide a valid http(s) image URL or uploaded image data" },
+    )
+    .optional()
+    .nullable(),
 });
 
 export const userRouter = createTRPCRouter({
