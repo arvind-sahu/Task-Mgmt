@@ -8,11 +8,23 @@ if [[ ! -f .env ]]; then
   exit 1
 fi
 
-# Load .env (skip comments and empty lines)
-set -a
-# shellcheck disable=SC1091
-source <(grep -v '^\s*#' .env | grep -v '^\s*$' | grep -v '^AWS_' | sed 's/\r$//')
-set +a
+# Load .env safely (skip comments/empty lines). This parser preserves
+# special characters in values (e.g. '&' in DATABASE_URL query params).
+while IFS= read -r raw_line || [[ -n "$raw_line" ]]; do
+  line="$(printf '%s' "$raw_line" | sed 's/\r$//')"
+  [[ -z "$line" || "$line" =~ ^[[:space:]]*# ]] && continue
+
+  key="${line%%=*}"
+  value="${line#*=}"
+
+  # Trim surrounding whitespace on key and value.
+  key="$(printf '%s' "$key" | sed -E 's/^[[:space:]]+|[[:space:]]+$//g')"
+  value="$(printf '%s' "$value" | sed -E 's/^[[:space:]]+|[[:space:]]+$//g')"
+
+  [[ -z "$key" ]] && continue
+
+  export "$key=$value"
+done < .env
 
 required=(DATABASE_URL DIRECT_URL NEXTAUTH_SECRET NEXTAUTH_URL)
 for v in "${required[@]}"; do
@@ -21,6 +33,10 @@ for v in "${required[@]}"; do
     exit 1
   fi
 done
+
+# Prefer credentials from `aws configure` for local deploys to avoid stale
+# values in .env causing signature failures.
+unset AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_SESSION_TOKEN AWS_REGION AWS_DEFAULT_REGION
 
 echo "→ Pushing Prisma schema to Supabase…"
 npm run db:push
