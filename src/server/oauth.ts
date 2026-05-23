@@ -14,7 +14,7 @@ function isConfigured(id: OAuthProviderId): boolean {
     case "google":
       return !!(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET);
     case "github":
-      return !!(env.GITHUB_ID && env.GITHUB_SECRET);
+      return !!(env.AUTH_GITHUB_ID && env.AUTH_GITHUB_SECRET);
   }
 }
 
