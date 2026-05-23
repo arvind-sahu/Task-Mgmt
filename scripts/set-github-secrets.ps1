@@ -42,6 +42,11 @@ Set-GhSecret "SUPABASE_DB_PASSWORD" $dbPassword
 Set-GhSecret "NEXTAUTH_SECRET" $vars["NEXTAUTH_SECRET"]
 Set-GhSecret "NEXTAUTH_URL" $vars["NEXTAUTH_URL"]
 
+if ($vars["AUTH_GITHUB_ID"]) { Set-GhSecret "AUTH_GITHUB_ID" $vars["AUTH_GITHUB_ID"] }
+if ($vars["AUTH_GITHUB_SECRET"]) { Set-GhSecret "AUTH_GITHUB_SECRET" $vars["AUTH_GITHUB_SECRET"] }
+if ($vars["GOOGLE_CLIENT_ID"]) { Set-GhSecret "GOOGLE_CLIENT_ID" $vars["GOOGLE_CLIENT_ID"] }
+if ($vars["GOOGLE_CLIENT_SECRET"]) { Set-GhSecret "GOOGLE_CLIENT_SECRET" $vars["GOOGLE_CLIENT_SECRET"] }
+
 # AWS
 $awsKey = Read-Host "AWS_ACCESS_KEY_ID"
 $awsSecret = Read-Host "AWS_SECRET_ACCESS_KEY" -AsSecureString

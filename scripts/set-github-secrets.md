@@ -14,7 +14,11 @@ Plus these (if not already set):
 | Secret name | Value |
 |-------------|--------|
 | `NEXTAUTH_SECRET` | from `.env` |
-| `NEXTAUTH_URL` | `http://localhost:3000` |
+| `NEXTAUTH_URL` | `https://d3011kpjkcpcxd.cloudfront.net` (your CloudFront URL) |
+| `AUTH_GITHUB_ID` | from `.env` (GitHub OAuth Client ID) |
+| `AUTH_GITHUB_SECRET` | from `.env` (GitHub OAuth Client Secret) |
+| `GOOGLE_CLIENT_ID` | from `.env` (optional) |
+| `GOOGLE_CLIENT_SECRET` | from `.env` (optional) |
 | `AWS_ACCESS_KEY_ID` | IAM access key |
 | `AWS_SECRET_ACCESS_KEY` | IAM secret |
 | `AWS_REGION` | `ap-south-1` |

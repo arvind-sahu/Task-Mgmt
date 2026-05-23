@@ -46,14 +46,14 @@ export function OAuthButtons({
               title={
                 configured
                   ? undefined
-                  : `Add ${id === "google" ? "GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET" : "GITHUB_ID and GITHUB_SECRET"} to .env, then restart npm run dev`
+                  : `Add ${id === "google" ? "GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET" : "AUTH_GITHUB_ID and AUTH_GITHUB_SECRET"} to .env, then redeploy`
               }
               onClick={() => {
                 if (!configured) {
                   setConfigHint(
                     id === "google"
                       ? "Google sign-in needs GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in your .env file. Restart the dev server after saving."
-                      : "GitHub sign-in needs GITHUB_ID and GITHUB_SECRET in your .env file. Restart the dev server after saving.",
+                      : "GitHub sign-in needs AUTH_GITHUB_ID and AUTH_GITHUB_SECRET in .env (and in AWS via redeploy).",
                   );
                   return;
                 }

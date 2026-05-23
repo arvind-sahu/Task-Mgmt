@@ -12,6 +12,9 @@
  *   - DATABASE_URL, DIRECT_URL  (Supabase)
  *   - NEXTAUTH_SECRET
  *   - NEXTAUTH_URL              (use the deployed CloudFront URL or custom domain)
+ *   - AUTH_GITHUB_ID, AUTH_GITHUB_SECRET (optional OAuth)
+ *   - GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET (optional OAuth)
+ *   - SMTP_* (optional, for email OTP)
  */
 export default $config({
   app(input) {
@@ -33,6 +36,15 @@ export default $config({
         DIRECT_URL: process.env.DIRECT_URL ?? process.env.DATABASE_URL!,
         NEXTAUTH_SECRET: process.env.NEXTAUTH_SECRET!,
         NEXTAUTH_URL: process.env.NEXTAUTH_URL!,
+        AUTH_GITHUB_ID: process.env.AUTH_GITHUB_ID ?? "",
+        AUTH_GITHUB_SECRET: process.env.AUTH_GITHUB_SECRET ?? "",
+        GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID ?? "",
+        GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET ?? "",
+        SMTP_HOST: process.env.SMTP_HOST ?? "",
+        SMTP_PORT: process.env.SMTP_PORT ?? "",
+        SMTP_USER: process.env.SMTP_USER ?? "",
+        SMTP_PASS: process.env.SMTP_PASS ?? "",
+        SMTP_FROM: process.env.SMTP_FROM ?? "",
       },
       // Add a custom domain by uncommenting and pointing your DNS at the
       // generated CloudFront distribution:
