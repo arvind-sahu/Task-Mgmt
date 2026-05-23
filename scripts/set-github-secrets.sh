@@ -45,6 +45,10 @@ set_secret SUPABASE_PROJECT_REF "qgofdiippdlcbtbpqlas"
 set_secret SUPABASE_DB_PASSWORD "$SUPABASE_DB_PASSWORD"
 set_secret NEXTAUTH_SECRET "${NEXTAUTH_SECRET:?missing in .env}"
 set_secret NEXTAUTH_URL "${NEXTAUTH_URL:-http://localhost:3000}"
+if [ -n "${AUTH_GITHUB_ID:-}" ]; then set_secret AUTH_GITHUB_ID "$AUTH_GITHUB_ID"; fi
+if [ -n "${AUTH_GITHUB_SECRET:-}" ]; then set_secret AUTH_GITHUB_SECRET "$AUTH_GITHUB_SECRET"; fi
+if [ -n "${GOOGLE_CLIENT_ID:-}" ]; then set_secret GOOGLE_CLIENT_ID "$GOOGLE_CLIENT_ID"; fi
+if [ -n "${GOOGLE_CLIENT_SECRET:-}" ]; then set_secret GOOGLE_CLIENT_SECRET "$GOOGLE_CLIENT_SECRET"; fi
 set_secret AWS_ACCESS_KEY_ID "$AWS_ACCESS_KEY_ID"
 set_secret AWS_SECRET_ACCESS_KEY "$AWS_SECRET_ACCESS_KEY"
 set_secret AWS_REGION "ap-south-1"
