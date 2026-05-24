@@ -1,8 +1,9 @@
 import { z } from "zod";
-import { TaskPriority, TaskStatus } from "@prisma/client";
+import { NotificationType, TaskPriority, TaskStatus } from "@prisma/client";
 
 import { assertProjectAccess } from "~/server/api/access";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
+import { notifyUsers } from "~/server/notifications";
 
 const baseInput = {
   title: z.string().min(1).max(200),
@@ -83,7 +84,12 @@ export const taskRouter = createTRPCRouter({
               author: {
                 select: { id: true, name: true, email: true, image: true },
               },
+              attachments: true,
             },
+            orderBy: { createdAt: "asc" },
+          },
+          attachments: {
+            where: { commentId: null },
             orderBy: { createdAt: "asc" },
           },
           project: { select: { id: true, name: true, color: true } },
@@ -126,7 +132,7 @@ export const taskRouter = createTRPCRouter({
 
       const { projectId, assigneeIds, tagIds, ...rest } = input;
 
-      return ctx.db.task.create({
+      const task = await ctx.db.task.create({
         data: {
           ...rest,
           projectId,
@@ -138,6 +144,18 @@ export const taskRouter = createTRPCRouter({
         },
         include: includeShape,
       });
+
+      if (assigneeIds?.length) {
+        const others = assigneeIds.filter((id) => id !== ctx.session.user.id);
+        await notifyUsers(ctx.db, others, {
+          type: NotificationType.TASK_ASSIGNED,
+          title: "Task assigned to you",
+          message: task.title,
+          link: `/tasks/${task.id}`,
+        });
+      }
+
+      return task;
     }),
 
   update: protectedProcedure
@@ -145,7 +163,11 @@ export const taskRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const existing = await ctx.db.task.findUniqueOrThrow({
         where: { id: input.id },
-        select: { projectId: true },
+        select: {
+          projectId: true,
+          title: true,
+          assignees: { select: { id: true } },
+        },
       });
       await assertProjectAccess(
         ctx.db,
@@ -155,7 +177,7 @@ export const taskRouter = createTRPCRouter({
 
       const { id, assigneeIds, tagIds, ...rest } = input;
 
-      return ctx.db.task.update({
+      const updated = await ctx.db.task.update({
         where: { id },
         data: {
           ...rest,
@@ -168,6 +190,23 @@ export const taskRouter = createTRPCRouter({
         },
         include: includeShape,
       });
+
+      if (assigneeIds) {
+        const prevIds = new Set(existing.assignees.map((a) => a.id));
+        const newlyAssigned = assigneeIds.filter(
+          (aid) => !prevIds.has(aid) && aid !== ctx.session.user.id,
+        );
+        if (newlyAssigned.length) {
+          await notifyUsers(ctx.db, newlyAssigned, {
+            type: NotificationType.TASK_ASSIGNED,
+            title: "Task assigned to you",
+            message: existing.title,
+            link: `/tasks/${id}`,
+          });
+        }
+      }
+
+      return updated;
     }),
 
   /** Quick column-drag style status change. */

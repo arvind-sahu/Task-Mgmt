@@ -4,7 +4,9 @@ import type { GetServerSidePropsContext } from "next";
 
 import EmptyState from "~/components/EmptyState";
 import Layout from "~/components/Layout";
+import { ProjectSettingsPanel } from "~/components/ProjectSettingsPanel";
 import TaskCard from "~/components/TaskCard";
+import { canManageProject } from "~/utils/projectRole";
 import TaskForm, { type TaskFormValues } from "~/components/TaskForm";
 import { TASK_STATUSES, statusLabel } from "~/components/Badges";
 import { requireAuth } from "~/server/auth";
@@ -93,6 +95,8 @@ export default function ProjectDetail() {
     );
   }
 
+  const canManage = canManageProject(project.data.currentUserRole);
+
   return (
     <Layout title={project.data.name}>
       <div className="mb-6 flex items-start justify-between gap-4">
@@ -174,7 +178,16 @@ export default function ProjectDetail() {
                         e.dataTransfer.setData("text/plain", t.id)
                       }
                     >
-                      <TaskCard task={t} />
+                      <TaskCard
+                        task={t}
+                        onStatusChange={(taskId, status) =>
+                          setStatus.mutate({ id: taskId, status })
+                        }
+                        statusUpdating={
+                          setStatus.isPending &&
+                          setStatus.variables?.id === t.id
+                        }
+                      />
                     </div>
                   ))}
                 </div>
@@ -185,8 +198,24 @@ export default function ProjectDetail() {
 
         {/* Sidebar */}
         <aside className="space-y-6">
-          <MembersPanel projectId={id} />
-          <TagsPanel projectId={id} />
+          {canManage && (
+            <ProjectSettingsPanel
+              projectId={id}
+              initial={{
+                name: project.data.name,
+                description: project.data.description,
+                color: project.data.color,
+              }}
+            />
+          )}
+          <MembersPanel
+            projectId={id}
+            canManage={canManage}
+            pendingInvites={
+              canManage && "invites" in project.data ? project.data.invites : []
+            }
+          />
+          <TagsPanel projectId={id} canManage={canManage} />
         </aside>
       </div>
     </Layout>
@@ -197,18 +226,39 @@ export default function ProjectDetail() {
 // Sidebar panels
 // ---------------------------------------------------------------------------
 
-function MembersPanel({ projectId }: { projectId: string }) {
+type PendingInvite = {
+  id: string;
+  email: string;
+  role: string;
+  createdAt: Date;
+};
+
+function MembersPanel({
+  projectId,
+  canManage,
+  pendingInvites,
+}: {
+  projectId: string;
+  canManage: boolean;
+  pendingInvites: PendingInvite[];
+}) {
   const utils = api.useUtils();
   const project = api.project.byId.useQuery({ id: projectId });
   const [email, setEmail] = useState("");
 
-  const add = api.project.addMember.useMutation({
-    onSuccess: async () => {
+  const invite = api.project.inviteMember.useMutation({
+    onSuccess: async (res) => {
       await utils.project.byId.invalidate({ id: projectId });
       setEmail("");
+      if (res.kind === "invite") {
+        alert("Invite sent. They can join after registering with that email.");
+      }
     },
   });
   const remove = api.project.removeMember.useMutation({
+    onSuccess: () => utils.project.byId.invalidate({ id: projectId }),
+  });
+  const cancelInvite = api.project.cancelInvite.useMutation({
     onSuccess: () => utils.project.byId.invalidate({ id: projectId }),
   });
 
@@ -232,7 +282,7 @@ function MembersPanel({ projectId }: { projectId: string }) {
                 <p className="text-xs text-slate-500">{m.role}</p>
               </div>
             </div>
-            {m.role !== "OWNER" && (
+            {canManage && m.role !== "OWNER" && (
               <button
                 onClick={() =>
                   remove.mutate({ projectId, userId: m.user.id })
@@ -246,33 +296,69 @@ function MembersPanel({ projectId }: { projectId: string }) {
         ))}
       </ul>
 
-      <form
-        className="mt-4 space-y-2"
-        onSubmit={(e) => {
-          e.preventDefault();
-          add.mutate({ projectId, email });
-        }}
-      >
-        <input
-          className="input"
-          type="email"
-          placeholder="teammate@example.com"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          required
-        />
-        <button className="btn-primary w-full" disabled={add.isPending}>
-          {add.isPending ? "Adding…" : "Invite member"}
-        </button>
-        {add.error && (
-          <p className="text-xs text-red-600">{add.error.message}</p>
-        )}
-      </form>
+      {canManage && pendingInvites.length > 0 && (
+        <div className="mt-4 border-t border-slate-100 pt-3">
+          <p className="mb-2 text-xs font-medium uppercase text-slate-500">
+            Pending invites
+          </p>
+          <ul className="space-y-2">
+            {pendingInvites.map((inv) => (
+              <li
+                key={inv.id}
+                className="flex items-center justify-between text-xs text-slate-600"
+              >
+                <span>{inv.email}</span>
+                <button
+                  type="button"
+                  className="text-red-600 hover:underline"
+                  onClick={() => cancelInvite.mutate({ inviteId: inv.id })}
+                >
+                  Cancel
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {canManage && (
+        <form
+          className="mt-4 space-y-2"
+          onSubmit={(e) => {
+            e.preventDefault();
+            invite.mutate({ projectId, email });
+          }}
+        >
+          <input
+            className="input"
+            type="email"
+            placeholder="teammate@example.com"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+          />
+          <button className="btn-primary w-full" disabled={invite.isPending}>
+            {invite.isPending ? "Sending…" : "Invite by email"}
+          </button>
+          <p className="text-[10px] text-slate-500">
+            If they are not registered yet, a pending invite is created.
+          </p>
+          {invite.error && (
+            <p className="text-xs text-red-600">{invite.error.message}</p>
+          )}
+        </form>
+      )}
     </div>
   );
 }
 
-function TagsPanel({ projectId }: { projectId: string }) {
+function TagsPanel({
+  projectId,
+  canManage,
+}: {
+  projectId: string;
+  canManage: boolean;
+}) {
   const utils = api.useUtils();
   const tags = api.tag.list.useQuery({ projectId });
   const [name, setName] = useState("");
@@ -306,17 +392,20 @@ function TagsPanel({ projectId }: { projectId: string }) {
               style={{ backgroundColor: t.color }}
             />
             {t.name}
-            <button
-              onClick={() => remove.mutate({ id: t.id })}
-              className="opacity-0 transition group-hover:opacity-100"
-              title="Delete tag"
-            >
-              ×
-            </button>
+            {canManage && (
+              <button
+                onClick={() => remove.mutate({ id: t.id })}
+                className="opacity-0 transition group-hover:opacity-100"
+                title="Delete tag"
+              >
+                ×
+              </button>
+            )}
           </li>
         ))}
       </ul>
 
+      {canManage && (
       <form
         className="mt-4 flex gap-2"
         onSubmit={(e) => {
@@ -343,6 +432,7 @@ function TagsPanel({ projectId }: { projectId: string }) {
           Add
         </button>
       </form>
+      )}
       {create.error && (
         <p className="mt-2 text-xs text-red-600">{create.error.message}</p>
       )}

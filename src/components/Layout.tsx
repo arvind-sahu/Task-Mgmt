@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/router";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 
+import { NotificationsBell } from "~/components/NotificationsBell";
 import { api } from "~/utils/api";
 import { initialsFromName } from "~/utils/avatar";
 
@@ -56,26 +57,31 @@ export default function Layout({ title, children }: LayoutProps) {
         <meta name="description" content="Task management & collaboration" />
       </Head>
 
-      <div className="min-h-screen">
-        <header className="border-b border-slate-200 bg-white">
-          <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
-            <Link href="/dashboard" className="flex items-center gap-2">
-              <div className="grid h-8 w-8 place-items-center rounded-md bg-indigo-600 text-sm font-bold text-white">
+      <div className="flex min-h-screen min-w-0 flex-col">
+        <header className="shrink-0 border-b border-slate-200 bg-white">
+          <div className="mx-auto flex w-full max-w-6xl min-w-0 items-center justify-between gap-2 px-3 py-3 sm:px-4">
+            <Link
+              href="/dashboard"
+              className="flex min-w-0 shrink-0 items-center gap-2"
+            >
+              <div className="grid h-8 w-8 shrink-0 place-items-center rounded-md bg-indigo-600 text-sm font-bold text-white">
                 T
               </div>
-              <span className="text-lg font-semibold">Tasker</span>
+              <span className="truncate text-base font-semibold sm:text-lg">
+                Tasker
+              </span>
             </Link>
 
             {isAuthed && (
-              <div className="flex items-center gap-3">
-                <nav className="flex items-center gap-1">
+              <div className="flex min-w-0 shrink items-center gap-1 sm:gap-2 md:gap-3">
+                <nav className="flex min-w-0 items-center gap-0.5 overflow-x-auto sm:gap-1 md:overflow-visible">
                   {navItems.map((item) => {
                     const active = router.pathname.startsWith(item.href);
                     return (
                       <Link
                         key={item.href}
                         href={item.href}
-                        className={`rounded-md px-3 py-1.5 text-sm font-medium transition ${
+                        className={`shrink-0 rounded-md px-2 py-1.5 text-xs font-medium transition sm:px-3 sm:text-sm ${
                           active
                             ? "bg-indigo-50 text-indigo-700"
                             : "text-slate-600 hover:bg-slate-100"
@@ -86,15 +92,16 @@ export default function Layout({ title, children }: LayoutProps) {
                     );
                   })}
                 </nav>
-                <div className="relative" ref={menuRef}>
+                <NotificationsBell />
+                <div className="relative shrink-0" ref={menuRef}>
                   <button
                     type="button"
                     onClick={() => setMenuOpen((prev) => !prev)}
-                    className="flex items-center gap-2 rounded-md border border-transparent px-1.5 py-1 transition hover:border-slate-300 hover:bg-slate-100"
+                    className="flex shrink-0 items-center gap-1 rounded-md border border-transparent p-1 transition hover:border-slate-300 hover:bg-slate-100 sm:gap-2 sm:px-1.5 sm:py-1"
                     aria-label="Open profile menu"
                     aria-expanded={menuOpen}
                   >
-                    <span className="grid h-8 w-8 place-items-center overflow-hidden rounded-full bg-indigo-100 text-xs font-bold text-indigo-700 ring-1 ring-indigo-200">
+                    <span className="grid h-8 w-8 shrink-0 place-items-center overflow-hidden rounded-full bg-indigo-100 text-xs font-bold text-indigo-700 ring-1 ring-indigo-200">
                       {displayImage ? (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img
@@ -106,7 +113,9 @@ export default function Layout({ title, children }: LayoutProps) {
                         initials
                       )}
                     </span>
-                    <span className="text-xs text-slate-500">▾</span>
+                    <span className="hidden text-xs text-slate-500 sm:inline">
+                      ▾
+                    </span>
                   </button>
                   {menuOpen && (
                     <div className="absolute right-0 z-[60] mt-2 w-56 overflow-hidden rounded-md border border-slate-200 bg-white shadow-xl">
@@ -130,6 +139,13 @@ export default function Layout({ title, children }: LayoutProps) {
                         onClick={() => setMenuOpen(false)}
                       >
                         Settings
+                      </Link>
+                      <Link
+                        href="/profile?tab=security"
+                        className="block rounded-md px-3 py-2 text-sm text-slate-700 hover:bg-slate-100"
+                        onClick={() => setMenuOpen(false)}
+                      >
+                        Security
                       </Link>
                       </div>
                       <div className="border-t border-slate-100 p-1">
@@ -160,7 +176,9 @@ export default function Layout({ title, children }: LayoutProps) {
           </div>
         </header>
 
-        <main className="mx-auto max-w-6xl px-4 py-8">{children}</main>
+        <main className="mx-auto w-full min-w-0 max-w-6xl flex-1 px-3 py-6 sm:px-4 sm:py-8">
+          {children}
+        </main>
       </div>
     </>
   );

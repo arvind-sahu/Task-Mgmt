@@ -5,6 +5,7 @@ import { useRouter } from "next/router";
 import { useState, type FormEvent } from "react";
 import type { GetServerSidePropsContext } from "next";
 
+import { AuthShell } from "~/components/auth/AuthShell";
 import { OAuthButtons } from "~/components/auth/OAuthButtons";
 import { getServerAuthSession } from "~/server/auth";
 import {
@@ -12,6 +13,7 @@ import {
   type OAuthProviderOption,
 } from "~/server/oauth";
 import { api } from "~/utils/api";
+import { getTrpcMutationErrorMessage } from "~/utils/trpcError";
 
 type SignUpPageProps = {
   oauthProviders: OAuthProviderOption[];
@@ -43,7 +45,10 @@ export default function SignUpPage({ oauthProviders }: SignUpPageProps) {
       setInfo(res.message);
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : "Could not send OTP",
+        getTrpcMutationErrorMessage(
+          err,
+          "Could not send the verification code. Please try again.",
+        ),
       );
       return;
     }
@@ -61,7 +66,7 @@ export default function SignUpPage({ oauthProviders }: SignUpPageProps) {
         otp,
       });
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not create account");
+      setError(getTrpcMutationErrorMessage(err, "Could not create account"));
       return;
     }
 
@@ -83,23 +88,15 @@ export default function SignUpPage({ oauthProviders }: SignUpPageProps) {
       <Head>
         <title>Sign up · Tasker</title>
       </Head>
-      <div className="auth-bg grid min-h-screen place-items-center px-4 py-8">
-        <div className="w-full max-w-md">
-          <div className="mb-8 text-center">
-            <div className="mx-auto mb-3 grid h-12 w-12 place-items-center rounded-xl bg-gradient-to-br from-indigo-500 to-fuchsia-500 text-lg font-bold text-white shadow-lg shadow-indigo-500/30">
-              T
-            </div>
-            <h1 className="text-2xl font-semibold">Create your account</h1>
-            <p className="mt-1 text-sm text-slate-600">
-              Register with email OTP or connect an account below
-            </p>
-          </div>
-
+      <AuthShell
+        title="Create your account"
+        subtitle="Start free with email OTP or a connected account. Upgrade only when your team needs more power."
+      >
           <form
             onSubmit={(e) =>
               void (otpStep ? handleVerifyAndCreate(e) : handleSendOtp(e))
             }
-            className="card glass-card space-y-4"
+            className="space-y-5 rounded-[2rem] border border-white/80 bg-white/90 p-6 shadow-2xl shadow-blue-200/60 backdrop-blur-xl"
           >
             <div>
               <label className="label" htmlFor="name">
@@ -107,7 +104,7 @@ export default function SignUpPage({ oauthProviders }: SignUpPageProps) {
               </label>
               <input
                 id="name"
-                className="input mt-1"
+                className="brand-input mt-2"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 required
@@ -121,7 +118,7 @@ export default function SignUpPage({ oauthProviders }: SignUpPageProps) {
               <input
                 id="email"
                 type="email"
-                className="input mt-1"
+                className="brand-input mt-2"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
@@ -137,7 +134,7 @@ export default function SignUpPage({ oauthProviders }: SignUpPageProps) {
                 <input
                   id="password"
                   type={showPassword ? "text" : "password"}
-                  className="input pr-10"
+                  className="brand-input pr-12"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   minLength={8}
@@ -148,10 +145,10 @@ export default function SignUpPage({ oauthProviders }: SignUpPageProps) {
                 <button
                   type="button"
                   onClick={() => setShowPassword((prev) => !prev)}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-slate-500 hover:bg-slate-100"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 rounded-lg px-2 py-1 text-xs font-bold text-slate-500 transition hover:bg-blue-50 hover:text-blue-600"
                   aria-label={showPassword ? "Hide password" : "Show password"}
                 >
-                  {showPassword ? "🙈" : "👁️"}
+                  {showPassword ? "Hide" : "Show"}
                 </button>
               </div>
             </div>
@@ -164,7 +161,7 @@ export default function SignUpPage({ oauthProviders }: SignUpPageProps) {
                 <input
                   id="otp"
                   type="text"
-                  className="input mt-1 tracking-[0.25em]"
+                  className="brand-input mt-2 tracking-[0.25em]"
                   value={otp}
                   onChange={(e) =>
                     setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))
@@ -177,13 +174,13 @@ export default function SignUpPage({ oauthProviders }: SignUpPageProps) {
             )}
 
             {info && (
-              <p className="rounded-md bg-emerald-50 px-3 py-2 text-sm text-emerald-700 ring-1 ring-emerald-200">
+              <p className="rounded-xl bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700 ring-1 ring-emerald-200">
                 {info}
               </p>
             )}
 
             {error && (
-              <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700 ring-1 ring-red-200">
+              <p className="rounded-xl bg-red-50 px-4 py-3 text-sm font-semibold text-red-700 ring-1 ring-red-200">
                 {error}
               </p>
             )}
@@ -191,7 +188,7 @@ export default function SignUpPage({ oauthProviders }: SignUpPageProps) {
             <button
               type="submit"
               disabled={sendSignupOtp.isPending || verifySignupOtpAndRegister.isPending}
-              className="btn-primary w-full"
+              className="brand-button-primary w-full"
             >
               {!otpStep
                 ? sendSignupOtp.isPending
@@ -204,7 +201,7 @@ export default function SignUpPage({ oauthProviders }: SignUpPageProps) {
             {otpStep && (
               <button
                 type="button"
-                className="btn-ghost w-full"
+                className="brand-button-secondary w-full"
                 onClick={() => {
                   setOtpStep(false);
                   setOtp("");
@@ -223,13 +220,12 @@ export default function SignUpPage({ oauthProviders }: SignUpPageProps) {
             Already have an account?{" "}
             <Link
               href="/auth/signin"
-              className="font-medium text-indigo-600 hover:underline"
+              className="font-bold text-purple-600 underline-offset-4 hover:underline"
             >
               Sign in
             </Link>
           </p>
-        </div>
-      </div>
+      </AuthShell>
     </>
   );
 }

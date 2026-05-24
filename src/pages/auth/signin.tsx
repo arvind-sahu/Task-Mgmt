@@ -5,6 +5,7 @@ import { useRouter } from "next/router";
 import { useState, type FormEvent } from "react";
 import type { GetServerSidePropsContext } from "next";
 
+import { AuthShell } from "~/components/auth/AuthShell";
 import { OAuthButtons } from "~/components/auth/OAuthButtons";
 import { getServerAuthSession } from "~/server/auth";
 import {
@@ -12,6 +13,7 @@ import {
   type OAuthProviderOption,
 } from "~/server/oauth";
 import { api } from "~/utils/api";
+import { getTrpcMutationErrorMessage } from "~/utils/trpcError";
 
 /**
  * Email + password sign-in page. Talks to the NextAuth Credentials provider
@@ -34,12 +36,15 @@ export default function SignInPage({ oauthProviders }: SignInPageProps) {
   const [otp, setOtp] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [otpRequested, setOtpRequested] = useState(false);
+  const [rememberDevice, setRememberDevice] = useState(true);
+  const [emailTouched, setEmailTouched] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   const sendLoginOtp = api.user.sendLoginOtp.useMutation();
   const verifyLoginOtp = api.user.verifyLoginOtp.useMutation();
+  const emailInvalid = emailTouched && email.length > 0 && !email.includes("@");
 
   async function handlePasswordSubmit(e: FormEvent) {
     e.preventDefault();
@@ -50,7 +55,12 @@ export default function SignInPage({ oauthProviders }: SignInPageProps) {
       setOtpRequested(true);
       setInfo("OTP sent to your email. Enter it below to continue.");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not send OTP");
+      setError(
+        getTrpcMutationErrorMessage(
+          err,
+          "Could not send the verification code. Please try again.",
+        ),
+      );
     }
   }
 
@@ -63,7 +73,9 @@ export default function SignInPage({ oauthProviders }: SignInPageProps) {
       await verifyLoginOtp.mutateAsync({ email, otp });
     } catch (err) {
       setLoading(false);
-      setError(err instanceof Error ? err.message : "OTP verification failed");
+      setError(
+        getTrpcMutationErrorMessage(err, "Invalid or expired verification code"),
+      );
       return;
     }
     const res = await signIn("credentials", {
@@ -85,23 +97,25 @@ export default function SignInPage({ oauthProviders }: SignInPageProps) {
       <Head>
         <title>Sign in · Tasker</title>
       </Head>
-      <div className="auth-bg auth-w11 grid min-h-screen place-items-center px-4 py-8">
-        <div className="w-full max-w-md">
-          <div className="mb-8 text-center auth-hero">
-            <div className="mx-auto mb-3 grid h-12 w-12 place-items-center rounded-xl bg-gradient-to-br from-cyan-400 via-indigo-500 to-blue-600 text-lg font-bold text-white shadow-xl shadow-indigo-500/40">
-              T
-            </div>
-            <h1 className="text-2xl font-semibold text-slate-900 drop-shadow-sm">
-              Welcome back
-            </h1>
-            <p className="mt-1 text-sm text-slate-700">
-              Email + password with OTP, or a connected account below
-            </p>
+      <AuthShell
+        title="Sign in to continue"
+        subtitle="Access your secure Tasker workspace with email OTP or a connected account."
+      >
+        <div className="rounded-[2rem] border border-white/80 bg-white/90 p-6 shadow-2xl shadow-blue-200/60 backdrop-blur-xl">
+          <div className="mb-5 flex flex-wrap gap-2">
+            {["Secure sign-in", "SSO available", "No public workspace data"].map((badge) => (
+              <span
+                key={badge}
+                className="rounded-full bg-blue-50 px-3 py-1 text-xs font-black text-blue-700 ring-1 ring-blue-100"
+              >
+                {badge}
+              </span>
+            ))}
           </div>
 
           <form
             onSubmit={otpRequested ? handleOtpSubmit : handlePasswordSubmit}
-            className="card glass-card auth-panel space-y-4"
+            className="space-y-4"
           >
             <div>
               <label className="label" htmlFor="email">
@@ -110,13 +124,21 @@ export default function SignInPage({ oauthProviders }: SignInPageProps) {
               <input
                 id="email"
                 type="email"
-                className="input mt-1"
+                className="brand-input mt-2"
                 value={email}
+                onBlur={() => setEmailTouched(true)}
                 onChange={(e) => setEmail(e.target.value)}
                 required
                 autoComplete="email"
                 disabled={otpRequested}
+                aria-invalid={emailInvalid}
+                aria-describedby={emailInvalid ? "email-error" : undefined}
               />
+              {emailInvalid && (
+                <p id="email-error" className="mt-2 text-sm font-semibold text-red-600">
+                  Enter a valid work email address.
+                </p>
+              )}
             </div>
             <div>
               <label className="label" htmlFor="password">
@@ -126,7 +148,7 @@ export default function SignInPage({ oauthProviders }: SignInPageProps) {
                 <input
                   id="password"
                   type={showPassword ? "text" : "password"}
-                  className="input pr-10"
+                  className="brand-input pr-12"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
@@ -136,13 +158,32 @@ export default function SignInPage({ oauthProviders }: SignInPageProps) {
                 <button
                   type="button"
                   onClick={() => setShowPassword((prev) => !prev)}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-slate-500 transition hover:bg-slate-100"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 rounded-lg px-2 py-1 text-xs font-bold text-slate-500 transition hover:bg-blue-50 hover:text-blue-600"
                   aria-label={showPassword ? "Hide password" : "Show password"}
                 >
-                  {showPassword ? "🙈" : "👁️"}
+                  {showPassword ? "Hide" : "Show"}
                 </button>
               </div>
             </div>
+
+            <div className="flex flex-col gap-3 rounded-2xl bg-slate-50 p-4 text-sm sm:flex-row sm:items-center sm:justify-between">
+              <label className="flex items-center gap-2 font-semibold text-slate-700">
+                <input
+                  type="checkbox"
+                  checked={rememberDevice}
+                  onChange={(event) => setRememberDevice(event.target.checked)}
+                  className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                />
+                Remember this device for 30 days
+              </label>
+              <Link
+                href="/auth/forgot-password"
+                className="font-bold text-purple-600 underline-offset-4 hover:underline"
+              >
+                Forgot password?
+              </Link>
+            </div>
+
             {otpRequested && (
               <div>
                 <label className="label" htmlFor="otp">
@@ -151,7 +192,7 @@ export default function SignInPage({ oauthProviders }: SignInPageProps) {
                 <input
                   id="otp"
                   type="text"
-                  className="input mt-1 tracking-[0.25em]"
+                  className="brand-input mt-2 tracking-[0.25em]"
                   value={otp}
                   onChange={(e) => setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
                   required
@@ -163,12 +204,12 @@ export default function SignInPage({ oauthProviders }: SignInPageProps) {
             )}
 
             {info && (
-              <p className="rounded-md bg-emerald-50 px-3 py-2 text-sm text-emerald-700 ring-1 ring-emerald-200">
+              <p className="rounded-xl bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700 ring-1 ring-emerald-200">
                 {info}
               </p>
             )}
             {error && (
-              <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700 ring-1 ring-red-200">
+              <p className="rounded-xl bg-red-50 px-4 py-3 text-sm font-semibold text-red-700 ring-1 ring-red-200">
                 {error}
               </p>
             )}
@@ -176,20 +217,33 @@ export default function SignInPage({ oauthProviders }: SignInPageProps) {
             <button
               type="submit"
               disabled={loading || sendLoginOtp.isPending || verifyLoginOtp.isPending}
-              className="btn-primary auth-cta w-full"
+              className="brand-button-primary w-full"
             >
               {!otpRequested
                 ? sendLoginOtp.isPending
-                  ? "Sending OTP…"
+                  ? (
+                    <span className="inline-flex items-center gap-2">
+                      <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />
+                      Sending OTP...
+                    </span>
+                  )
                   : "Continue with OTP"
                 : loading
-                  ? "Signing in…"
+                  ? (
+                    <span className="inline-flex items-center gap-2">
+                      <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />
+                      Signing in...
+                    </span>
+                  )
                   : "Verify OTP & sign in"}
             </button>
+            <p className="text-center text-xs font-medium text-slate-500">
+              Rate limiting is active to protect your account. Multiple failed attempts may pause sign-in briefly.
+            </p>
             {otpRequested && (
               <button
                 type="button"
-                className="btn-ghost w-full"
+                className="brand-button-secondary w-full"
                 onClick={() => {
                   setOtpRequested(false);
                   setOtp("");
@@ -204,27 +258,28 @@ export default function SignInPage({ oauthProviders }: SignInPageProps) {
 
           <OAuthButtons providers={oauthProviders} callbackUrl={callbackUrl} />
 
-          <div className="mt-6 space-y-1 text-center text-sm text-slate-600">
+          <div className="mt-5 space-y-1 text-center text-sm text-slate-600">
             <p>
               Don&apos;t have an account?{" "}
               <Link
                 href="/auth/signup"
-                className="font-medium text-indigo-600 hover:underline"
+                className="font-bold text-purple-600 underline-offset-4 hover:underline"
               >
                 Create one
               </Link>
             </p>
-            <p>
-              <Link
-                href="/auth/forgot-password"
-                className="font-medium text-fuchsia-600 hover:underline"
-              >
-                Forgot password?
-              </Link>
-            </p>
+            <details className="mt-3 rounded-2xl bg-slate-50 p-4 text-left">
+              <summary className="cursor-pointer text-sm font-black text-slate-800">
+                Need help signing in?
+              </summary>
+              <p className="mt-2 text-sm leading-6 text-slate-600">
+                Check your email for the OTP, verify OAuth keys are configured, or contact
+                support at hello@tasker.example.
+              </p>
+            </details>
           </div>
         </div>
-      </div>
+      </AuthShell>
     </>
   );
 }
