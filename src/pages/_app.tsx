@@ -5,6 +5,7 @@ import { type AppType } from "next/app";
 
 import { api } from "~/utils/api";
 import { ThemeProvider } from "~/contexts/theme";
+import { MarketingAnalytics } from "~/components/marketing/MarketingAnalytics";
 
 import "~/styles/globals.css";
 
@@ -16,6 +17,7 @@ const MyApp: AppType<{ session: Session | null }> = ({
     <SessionProvider session={session}>
       <ThemeProvider>
         <div className={GeistSans.className}>
+          <MarketingAnalytics />
           <Component {...pageProps} />
         </div>
       </ThemeProvider>

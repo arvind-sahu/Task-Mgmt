@@ -2,6 +2,28 @@
  * Format a `Date | string | null | undefined` as a short locale date, or `—`
  * when missing. Centralized so the UI is consistent everywhere.
  */
+export function formatDateTime(value: Date | string | null | undefined): string {
+  if (!value) return "—";
+  const d = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(d.getTime())) return "—";
+  return d.toLocaleString(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
+export function wasEdited(
+  createdAt: Date | string,
+  updatedAt: Date | string,
+): boolean {
+  const created = new Date(createdAt).getTime();
+  const updated = new Date(updatedAt).getTime();
+  return updated - created > 2000;
+}
+
 export function formatDate(value: Date | string | null | undefined): string {
   if (!value) return "—";
   const d = value instanceof Date ? value : new Date(value);

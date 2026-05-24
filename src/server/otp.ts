@@ -2,6 +2,10 @@ import bcrypt from "bcryptjs";
 import nodemailer from "nodemailer";
 
 import { env } from "~/env";
+import {
+  EmailDeliveryError,
+  friendlyEmailSendErrorMessage,
+} from "~/server/emailErrors";
 import { db } from "~/server/db";
 
 type OtpPurpose = "LOGIN_2FA" | "FORGOT_PASSWORD" | "SIGNUP_VERIFY";
@@ -33,16 +37,17 @@ async function sendEmailOtp(email: string, code: string, purpose: OtpPurpose) {
     },
   });
 
-  await transporter.sendMail({
-    from: env.SMTP_FROM ?? env.SMTP_USER,
-    to: email,
-    subject:
-      purpose === "LOGIN_2FA"
-        ? "Your Tasker login verification code"
-        : purpose === "FORGOT_PASSWORD"
-          ? "Your Tasker password reset code"
-          : "Your Tasker sign up verification code",
-    html: `
+  try {
+    await transporter.sendMail({
+      from: env.SMTP_FROM ?? env.SMTP_USER,
+      to: email,
+      subject:
+        purpose === "LOGIN_2FA"
+          ? "Your Tasker login verification code"
+          : purpose === "FORGOT_PASSWORD"
+            ? "Your Tasker password reset code"
+            : "Your Tasker sign up verification code",
+      html: `
       <div style="font-family: Arial, sans-serif; line-height:1.5; color:#111827;">
         <h2 style="margin-bottom: 8px;">Tasker verification code</h2>
         <p style="margin: 0 0 12px;">Use this OTP to continue:</p>
@@ -51,7 +56,11 @@ async function sendEmailOtp(email: string, code: string, purpose: OtpPurpose) {
         <p style="margin: 0; color: #6b7280;">If you did not request this, you can ignore this email.</p>
       </div>
     `,
-  });
+    });
+  } catch (err) {
+    console.error(`[email] Failed to send OTP (${purpose}) to ${email}:`, err);
+    throw new EmailDeliveryError(friendlyEmailSendErrorMessage(err));
+  }
 }
 
 export async function issueEmailOtp(email: string, purpose: OtpPurpose) {
@@ -60,7 +69,7 @@ export async function issueEmailOtp(email: string, purpose: OtpPurpose) {
   const codeHash = await bcrypt.hash(code, 10);
   const expiresAt = new Date(Date.now() + OTP_EXPIRY_MINUTES * 60 * 1000);
 
-  await db.emailOtp.create({
+  const record = await db.emailOtp.create({
     data: {
       email: normalizedEmail,
       purpose,
@@ -69,7 +78,12 @@ export async function issueEmailOtp(email: string, purpose: OtpPurpose) {
     },
   });
 
-  await sendEmailOtp(normalizedEmail, code, purpose);
+  try {
+    await sendEmailOtp(normalizedEmail, code, purpose);
+  } catch (err) {
+    await db.emailOtp.delete({ where: { id: record.id } }).catch(() => undefined);
+    throw err;
+  }
   return { expiresAt };
 }
 

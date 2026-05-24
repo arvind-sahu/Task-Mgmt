@@ -6,6 +6,7 @@ import Layout from "~/components/Layout";
 import { requireAuth } from "~/server/auth";
 import { api } from "~/utils/api";
 import { initialsFromName } from "~/utils/avatar";
+import { SecurityPanel } from "~/components/SecurityPanel";
 import ThemePicker from "~/components/ThemePicker";
 
 /** A common (non-exhaustive) timezone list for the profile dropdown. */
@@ -41,7 +42,13 @@ export default function ProfilePage() {
   const [imageError, setImageError] = useState<string | null>(null);
   const [photoMenuOpen, setPhotoMenuOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const activeTab = router.query.tab === "settings" ? "settings" : "profile";
+  const tabParam = router.query.tab;
+  const activeTab =
+    tabParam === "settings"
+      ? "settings"
+      : tabParam === "security"
+        ? "security"
+        : "profile";
 
   const initials = initialsFromName(name || me.data?.name, me.data?.email);
 
@@ -116,18 +123,19 @@ export default function ProfilePage() {
 
   return (
     <Layout title="Profile">
-      <div className="mb-6">
-        <h1 className="text-2xl font-semibold">Profile & preferences</h1>
+      <div className="min-w-0 max-w-full">
+      <div className="mb-5 sm:mb-6">
+        <h1 className="text-xl font-semibold sm:text-2xl">Profile & preferences</h1>
         <p className="text-sm text-slate-500">
           Manage your personal information
         </p>
       </div>
 
-      <div className="mb-4 inline-flex rounded-lg bg-slate-100 p-1">
+      <div className="mb-4 grid w-full max-w-2xl grid-cols-3 gap-1 rounded-lg bg-slate-100 p-1">
         <button
           type="button"
           onClick={() => void router.push("/profile")}
-          className={`rounded-md px-3 py-1.5 text-sm font-medium ${
+          className={`rounded-md px-2 py-1.5 text-xs font-medium sm:px-3 sm:text-sm ${
             activeTab === "profile"
               ? "bg-white text-slate-900 shadow-sm"
               : "text-slate-600 hover:text-slate-900"
@@ -138,7 +146,7 @@ export default function ProfilePage() {
         <button
           type="button"
           onClick={() => void router.push("/profile?tab=settings")}
-          className={`rounded-md px-3 py-1.5 text-sm font-medium ${
+          className={`rounded-md px-2 py-1.5 text-xs font-medium sm:px-3 sm:text-sm ${
             activeTab === "settings"
               ? "bg-white text-slate-900 shadow-sm"
               : "text-slate-600 hover:text-slate-900"
@@ -146,10 +154,25 @@ export default function ProfilePage() {
         >
           Settings
         </button>
+        <button
+          type="button"
+          onClick={() => void router.push("/profile?tab=security")}
+          className={`rounded-md px-2 py-1.5 text-xs font-medium sm:px-3 sm:text-sm ${
+            activeTab === "security"
+              ? "bg-white text-slate-900 shadow-sm"
+              : "text-slate-600 hover:text-slate-900"
+          }`}
+        >
+          Security
+        </button>
       </div>
 
-      {activeTab === "settings" ? (
-        <div className="card max-w-2xl space-y-5">
+      {activeTab === "security" ? (
+        <div className="card w-full max-w-2xl overflow-hidden">
+          <SecurityPanel />
+        </div>
+      ) : activeTab === "settings" ? (
+        <div className="card w-full max-w-2xl space-y-5 overflow-hidden">
           <div>
             <h2 className="text-lg font-semibold">Theme</h2>
             <p className="mt-1 text-sm text-slate-500">
@@ -159,9 +182,9 @@ export default function ProfilePage() {
           <ThemePicker />
         </div>
       ) : (
-        <form onSubmit={submit} className="card max-w-2xl space-y-5">
-        <div className="flex items-center gap-4">
-          <div className="relative" data-photo-menu>
+        <form onSubmit={submit} className="card w-full max-w-2xl space-y-5 overflow-hidden">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
+          <div className="relative shrink-0" data-photo-menu>
             <button
               type="button"
               onClick={() => setPhotoMenuOpen((prev) => !prev)}
@@ -180,7 +203,7 @@ export default function ProfilePage() {
               )}
             </button>
             {photoMenuOpen && (
-              <div className="absolute left-0 top-[72px] z-20 w-60 rounded-md border border-slate-200 bg-white p-1 shadow-lg">
+              <div className="absolute left-0 top-[72px] z-20 w-[min(15rem,calc(100vw-2.5rem))] rounded-md border border-slate-200 bg-white p-1 shadow-lg sm:w-60">
                 <button
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
@@ -230,8 +253,8 @@ export default function ProfilePage() {
               }}
             />
           </div>
-          <div>
-            <p className="text-sm font-medium">{me.data?.email}</p>
+          <div className="min-w-0 flex-1">
+            <p className="break-all text-sm font-medium">{me.data?.email}</p>
             <p className="text-xs text-slate-500">
               Email is used for sign-in and cannot be changed
             </p>
@@ -315,6 +338,7 @@ export default function ProfilePage() {
         </div>
         </form>
       )}
+      </div>
     </Layout>
   );
 }

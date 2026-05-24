@@ -120,7 +120,14 @@ export const authOptions: NextAuthOptions = {
 
   events: {
     signIn: async ({ user, account }) => {
-      if (account?.provider === "credentials" || !user.id) return;
+      if (!user.id) return;
+
+      const method = account?.provider ?? "credentials";
+      await db.loginAudit.create({
+        data: { userId: user.id, method },
+      });
+
+      if (account?.provider === "credentials") return;
       await db.user.update({
         where: { id: user.id },
         data: { emailVerified: new Date() },

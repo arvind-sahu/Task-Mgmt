@@ -39,7 +39,8 @@ export const env = createEnv({
   },
 
   client: {
-    // No public envs yet — placeholder kept for future use.
+    NEXT_PUBLIC_GA_ID: z.string().min(1).optional(),
+    NEXT_PUBLIC_HOTJAR_ID: z.string().min(1).optional(),
   },
 
   runtimeEnv: {
@@ -59,6 +60,8 @@ export const env = createEnv({
     AUTH_GITHUB_ID: process.env.AUTH_GITHUB_ID ?? process.env.GITHUB_ID,
     AUTH_GITHUB_SECRET:
       process.env.AUTH_GITHUB_SECRET ?? process.env.GITHUB_SECRET,
+    NEXT_PUBLIC_GA_ID: process.env.NEXT_PUBLIC_GA_ID,
+    NEXT_PUBLIC_HOTJAR_ID: process.env.NEXT_PUBLIC_HOTJAR_ID,
   },
 
   skipValidation: !!process.env.SKIP_ENV_VALIDATION,

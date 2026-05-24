@@ -4,8 +4,10 @@ import { useState, type FormEvent } from "react";
 import type { GetServerSidePropsContext } from "next";
 import { useRouter } from "next/router";
 
+import { AuthShell } from "~/components/auth/AuthShell";
 import { getServerAuthSession } from "~/server/auth";
 import { api } from "~/utils/api";
+import { getTrpcMutationErrorMessage } from "~/utils/trpcError";
 
 const PASSWORD_RULES =
   /^(?=.*[A-Za-z])(?=.*\d)(?=.*[ !"#$%&'()*+,\-./:;<=>?@[\\\]^_`{|}~]).{8,72}$/;
@@ -36,7 +38,12 @@ export default function ForgotPasswordPage() {
       setOtpSent(true);
       setInfo(res.message);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to send OTP");
+      setError(
+        getTrpcMutationErrorMessage(
+          err,
+          "Could not send the verification code. Please try again.",
+        ),
+      );
     }
   }
 
@@ -49,7 +56,7 @@ export default function ForgotPasswordPage() {
       setOtpVerified(true);
       setInfo("OTP verified. Set your new password below.");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Invalid OTP");
+      setError(getTrpcMutationErrorMessage(err, "Invalid or expired verification code"));
     }
   }
 
@@ -76,7 +83,7 @@ export default function ForgotPasswordPage() {
         void router.push("/auth/signin");
       }, 1000);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to reset password");
+      setError(getTrpcMutationErrorMessage(err, "Failed to reset password"));
     }
   }
 
@@ -85,20 +92,15 @@ export default function ForgotPasswordPage() {
       <Head>
         <title>Forgot password · Tasker</title>
       </Head>
-      <div className="auth-bg grid min-h-screen place-items-center px-4 py-8">
-        <div className="w-full max-w-md">
-          <div className="mb-8 text-center">
-            <div className="mx-auto mb-3 grid h-12 w-12 place-items-center rounded-xl bg-gradient-to-br from-indigo-500 to-fuchsia-500 text-lg font-bold text-white shadow-lg shadow-indigo-500/30">
-              T
-            </div>
-            <h1 className="text-2xl font-semibold">Reset your password</h1>
-            <p className="mt-1 text-sm text-slate-600">
-              Verify OTP from email, then set your new password
-            </p>
-          </div>
-
+      <AuthShell
+        title="Reset your password"
+        subtitle="Verify the OTP from your email, then set a new secure password."
+      >
           {!otpSent && (
-            <form onSubmit={handleSendOtp} className="card glass-card space-y-4">
+            <form
+              onSubmit={handleSendOtp}
+              className="space-y-5 rounded-[2rem] border border-white/80 bg-white/90 p-6 shadow-2xl shadow-blue-200/60 backdrop-blur-xl"
+            >
               <div>
                 <label className="label" htmlFor="email">
                   Email
@@ -106,20 +108,23 @@ export default function ForgotPasswordPage() {
                 <input
                   id="email"
                   type="email"
-                  className="input mt-1"
+                  className="brand-input mt-2"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
                 />
               </div>
-              <button className="btn-primary w-full" disabled={sendOtp.isPending}>
+              <button className="brand-button-primary w-full" disabled={sendOtp.isPending}>
                 {sendOtp.isPending ? "Sending OTP..." : "Send OTP"}
               </button>
             </form>
           )}
 
           {otpSent && !otpVerified && (
-            <form onSubmit={handleVerifyOtp} className="card glass-card space-y-4">
+            <form
+              onSubmit={handleVerifyOtp}
+              className="space-y-5 rounded-[2rem] border border-white/80 bg-white/90 p-6 shadow-2xl shadow-blue-200/60 backdrop-blur-xl"
+            >
               <div>
                 <label className="label" htmlFor="otp">
                   OTP
@@ -127,7 +132,7 @@ export default function ForgotPasswordPage() {
                 <input
                   id="otp"
                   type="text"
-                  className="input mt-1 tracking-[0.25em]"
+                  className="brand-input mt-2 tracking-[0.25em]"
                   value={otp}
                   onChange={(e) => setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
                   inputMode="numeric"
@@ -135,14 +140,17 @@ export default function ForgotPasswordPage() {
                   required
                 />
               </div>
-              <button className="btn-primary w-full" disabled={verifyOtp.isPending}>
+              <button className="brand-button-primary w-full" disabled={verifyOtp.isPending}>
                 {verifyOtp.isPending ? "Verifying..." : "Verify OTP"}
               </button>
             </form>
           )}
 
           {otpVerified && (
-            <form onSubmit={handleResetPassword} className="card glass-card space-y-4">
+            <form
+              onSubmit={handleResetPassword}
+              className="space-y-5 rounded-[2rem] border border-white/80 bg-white/90 p-6 shadow-2xl shadow-blue-200/60 backdrop-blur-xl"
+            >
               <div>
                 <label className="label" htmlFor="password">
                   New password
@@ -151,7 +159,7 @@ export default function ForgotPasswordPage() {
                   <input
                     id="password"
                     type={showPassword ? "text" : "password"}
-                    className="input pr-10"
+                    className="brand-input pr-12"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     required
@@ -159,11 +167,11 @@ export default function ForgotPasswordPage() {
                   />
                   <button
                     type="button"
-                    className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-slate-500 hover:bg-slate-100"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 rounded-lg px-2 py-1 text-xs font-bold text-slate-500 transition hover:bg-blue-50 hover:text-blue-600"
                     onClick={() => setShowPassword((prev) => !prev)}
                     aria-label={showPassword ? "Hide password" : "Show password"}
                   >
-                    {showPassword ? "🙈" : "👁️"}
+                    {showPassword ? "Hide" : "Show"}
                   </button>
                 </div>
                 <p className="mt-1 text-xs text-slate-500">
@@ -178,7 +186,7 @@ export default function ForgotPasswordPage() {
                   <input
                     id="confirm-password"
                     type={showConfirmPassword ? "text" : "password"}
-                    className="input pr-10"
+                    className="brand-input pr-12"
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
                     required
@@ -186,18 +194,18 @@ export default function ForgotPasswordPage() {
                   />
                   <button
                     type="button"
-                    className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-slate-500 hover:bg-slate-100"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 rounded-lg px-2 py-1 text-xs font-bold text-slate-500 transition hover:bg-blue-50 hover:text-blue-600"
                     onClick={() => setShowConfirmPassword((prev) => !prev)}
                     aria-label={
                       showConfirmPassword ? "Hide confirm password" : "Show confirm password"
                     }
                   >
-                    {showConfirmPassword ? "🙈" : "👁️"}
+                    {showConfirmPassword ? "Hide" : "Show"}
                   </button>
                 </div>
               </div>
               <button
-                className="btn-primary w-full"
+                className="brand-button-primary w-full"
                 disabled={resetPassword.isPending}
               >
                 {resetPassword.isPending ? "Resetting..." : "Reset password"}
@@ -206,24 +214,23 @@ export default function ForgotPasswordPage() {
           )}
 
           {info && (
-            <p className="mt-4 rounded-md bg-emerald-50 px-3 py-2 text-sm text-emerald-700 ring-1 ring-emerald-200">
+            <p className="mt-4 rounded-xl bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700 ring-1 ring-emerald-200">
               {info}
             </p>
           )}
           {error && (
-            <p className="mt-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700 ring-1 ring-red-200">
+            <p className="mt-4 rounded-xl bg-red-50 px-4 py-3 text-sm font-semibold text-red-700 ring-1 ring-red-200">
               {error}
             </p>
           )}
 
           <p className="mt-6 text-center text-sm text-slate-600">
             Back to{" "}
-            <Link href="/auth/signin" className="font-medium text-indigo-600 hover:underline">
+            <Link href="/auth/signin" className="font-bold text-purple-600 underline-offset-4 hover:underline">
               Sign in
             </Link>
           </p>
-        </div>
-      </div>
+      </AuthShell>
     </>
   );
 }

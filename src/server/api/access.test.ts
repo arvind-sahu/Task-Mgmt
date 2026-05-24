@@ -2,13 +2,8 @@ import { describe, expect, it, vi } from "vitest";
 import { TRPCError } from "@trpc/server";
 import { ProjectRole, type PrismaClient } from "@prisma/client";
 
-import { assertProjectAccess } from "./access";
+import { assertProjectAccess, canManageProject } from "./access";
 
-/**
- * Tiny helper: build a `PrismaClient`-shaped object with just the
- * `project.findUnique` method mocked. Casting through `unknown` is fine here
- * because `assertProjectAccess` only touches that one method.
- */
 function makeDb(impl: ReturnType<typeof vi.fn>): PrismaClient {
   return {
     project: { findUnique: impl },
@@ -50,7 +45,6 @@ describe("assertProjectAccess", () => {
   });
 
   it("enforces the required role hierarchy", async () => {
-    // A MEMBER cannot pass an ADMIN-required check.
     const memberDb = makeDb(
       vi.fn().mockResolvedValue({
         ownerId: "u2",
@@ -61,7 +55,6 @@ describe("assertProjectAccess", () => {
       assertProjectAccess(memberDb, "p1", "u1", ProjectRole.ADMIN),
     ).rejects.toMatchObject({ code: "FORBIDDEN" });
 
-    // An ADMIN can pass an ADMIN-required check.
     const adminDb = makeDb(
       vi.fn().mockResolvedValue({
         ownerId: "u2",
@@ -72,12 +65,22 @@ describe("assertProjectAccess", () => {
       await assertProjectAccess(adminDb, "p1", "u1", ProjectRole.ADMIN),
     ).toBe("ADMIN");
 
-    // The OWNER short-circuit works regardless of `required`.
     const ownerDb = makeDb(
       vi.fn().mockResolvedValue({ ownerId: "u1", members: [] }),
     );
     expect(
       await assertProjectAccess(ownerDb, "p1", "u1", ProjectRole.ADMIN),
     ).toBe("OWNER");
+  });
+});
+
+describe("canManageProject", () => {
+  it("allows OWNER and ADMIN", () => {
+    expect(canManageProject("OWNER")).toBe(true);
+    expect(canManageProject("ADMIN")).toBe(true);
+  });
+
+  it("denies MEMBER", () => {
+    expect(canManageProject("MEMBER")).toBe(false);
   });
 });

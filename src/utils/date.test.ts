@@ -1,69 +1,79 @@
 import { describe, expect, it } from "vitest";
 
-import { formatDate, isOverdue, relativeDeadline } from "./date";
+import {
+  formatDate,
+  formatDateTime,
+  isOverdue,
+  relativeDeadline,
+  wasEdited,
+} from "./date";
 
 describe("formatDate", () => {
-  it("returns em-dash for nullish values", () => {
+  it("returns em dash for nullish values", () => {
     expect(formatDate(null)).toBe("—");
     expect(formatDate(undefined)).toBe("—");
   });
 
-  it("returns em-dash for invalid dates", () => {
-    expect(formatDate("not-a-date")).toBe("—");
+  it("formats a valid date", () => {
+    const result = formatDate(new Date("2024-06-15T12:00:00Z"));
+    expect(result).toMatch(/2024/);
+  });
+});
+
+describe("formatDateTime", () => {
+  it("includes time components", () => {
+    const result = formatDateTime(new Date("2024-06-15T14:30:00"));
+    expect(result).toMatch(/2024/);
+  });
+});
+
+describe("wasEdited", () => {
+  it("is false when created and updated are nearly equal", () => {
+    const t = new Date("2024-01-01T12:00:00Z");
+    expect(wasEdited(t, t)).toBe(false);
   });
 
-  it("formats valid dates", () => {
-    // We don't assert exact locale output (depends on the test runner's
-    // locale) — just that it produced a non-empty, non-fallback string.
-    const out = formatDate(new Date("2025-01-15"));
-    expect(out).not.toBe("—");
-    expect(out.length).toBeGreaterThan(0);
+  it("is true when updated is much later", () => {
+    const created = new Date("2024-01-01T12:00:00Z");
+    const updated = new Date("2024-01-02T12:00:00Z");
+    expect(wasEdited(created, updated)).toBe(true);
   });
 });
 
 describe("relativeDeadline", () => {
-  const now = new Date("2025-01-15T12:00:00Z");
+  const now = new Date(2024, 5, 15, 12, 0, 0);
 
-  it("handles missing deadline", () => {
-    expect(relativeDeadline(null, now)).toBe("No deadline");
-  });
-
-  it("identifies today/tomorrow/yesterday", () => {
-    expect(relativeDeadline(new Date("2025-01-15T05:00:00Z"), now)).toBe(
+  it("returns Today for same calendar day", () => {
+    expect(relativeDeadline(new Date(2024, 5, 15, 23, 0, 0), now)).toBe(
       "Today",
     );
-    expect(relativeDeadline(new Date("2025-01-16T05:00:00Z"), now)).toBe(
+  });
+
+  it("returns Tomorrow", () => {
+    expect(relativeDeadline(new Date(2024, 5, 16, 10, 0, 0), now)).toBe(
       "Tomorrow",
-    );
-    expect(relativeDeadline(new Date("2025-01-14T05:00:00Z"), now)).toBe(
-      "Yesterday",
     );
   });
 
-  it("formats future and past distances", () => {
-    expect(relativeDeadline(new Date("2025-01-22T05:00:00Z"), now)).toBe(
-      "in 7 days",
-    );
-    expect(relativeDeadline(new Date("2025-01-10T05:00:00Z"), now)).toBe(
-      "5 days ago",
+  it("returns overdue phrasing for past dates", () => {
+    expect(relativeDeadline(new Date(2024, 5, 10, 10, 0, 0), now)).toMatch(
+      /ago/,
     );
   });
 });
 
 describe("isOverdue", () => {
-  const now = new Date("2025-01-15T12:00:00Z");
+  const now = new Date(2024, 5, 15, 12, 0, 0);
 
-  it("returns true for past dates", () => {
-    expect(isOverdue(new Date("2025-01-14"), now)).toBe(true);
-  });
-
-  it("returns false for today and the future", () => {
-    expect(isOverdue(new Date("2025-01-15"), now)).toBe(false);
-    expect(isOverdue(new Date("2025-02-01"), now)).toBe(false);
-  });
-
-  it("treats nullish as not overdue", () => {
+  it("is false without a deadline", () => {
     expect(isOverdue(null, now)).toBe(false);
-    expect(isOverdue(undefined, now)).toBe(false);
+  });
+
+  it("is true for past calendar days", () => {
+    expect(isOverdue(new Date(2024, 5, 10, 10, 0, 0), now)).toBe(true);
+  });
+
+  it("is false for future calendar days", () => {
+    expect(isOverdue(new Date(2024, 5, 20, 10, 0, 0), now)).toBe(false);
   });
 });

@@ -2,7 +2,7 @@ import { TRPCError } from "@trpc/server";
 import { db } from "~/server/db";
 
 type DbClient = typeof db;
-type ProjectRole = "OWNER" | "ADMIN" | "MEMBER";
+export type ProjectRole = "OWNER" | "ADMIN" | "MEMBER";
 
 const roleRank: Record<ProjectRole, number> = {
   MEMBER: 1,
@@ -60,4 +60,9 @@ export async function assertProjectAccess(
   }
 
   return membership.role;
+}
+
+/** Owners and admins can manage members, invites, and project settings. */
+export function canManageProject(role: ProjectRole): boolean {
+  return role === "OWNER" || role === "ADMIN";
 }

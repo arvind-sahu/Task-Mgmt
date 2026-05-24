@@ -1,4 +1,7 @@
+import { attachmentRouter } from "~/server/api/routers/attachment";
 import { commentRouter } from "~/server/api/routers/comment";
+import { dashboardRouter } from "~/server/api/routers/dashboard";
+import { notificationRouter } from "~/server/api/routers/notification";
 import { projectRouter } from "~/server/api/routers/project";
 import { tagRouter } from "~/server/api/routers/tag";
 import { taskRouter } from "~/server/api/routers/task";
@@ -19,6 +22,9 @@ export const appRouter = createTRPCRouter({
   task: taskRouter,
   tag: tagRouter,
   comment: commentRouter,
+  attachment: attachmentRouter,
+  notification: notificationRouter,
+  dashboard: dashboardRouter,
 });
 
 export type AppRouter = typeof appRouter;

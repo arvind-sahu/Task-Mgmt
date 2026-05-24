@@ -3,13 +3,22 @@ import { useRouter } from "next/router";
 import { useState, type FormEvent } from "react";
 import type { GetServerSidePropsContext } from "next";
 
+import { AttachmentList } from "~/components/AttachmentList";
 import EmptyState from "~/components/EmptyState";
+import { FileUploadButton } from "~/components/FileUploadButton";
 import Layout from "~/components/Layout";
 import TaskForm, { type TaskFormValues } from "~/components/TaskForm";
-import { PriorityBadge, StatusBadge } from "~/components/Badges";
+import { PriorityBadge } from "~/components/Badges";
+import { StatusSelect } from "~/components/StatusSelect";
 import { requireAuth } from "~/server/auth";
 import { api } from "~/utils/api";
-import { formatDate, isOverdue, relativeDeadline } from "~/utils/date";
+import {
+  formatDate,
+  formatDateTime,
+  isOverdue,
+  relativeDeadline,
+  wasEdited,
+} from "~/utils/date";
 
 /**
  * Task detail page. Shows the full task body, metadata, and a comment thread,
@@ -23,6 +32,8 @@ export default function TaskDetail() {
 
   const [editing, setEditing] = useState(false);
   const [comment, setComment] = useState("");
+  const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
+  const [editingCommentBody, setEditingCommentBody] = useState("");
 
   const update = api.task.update.useMutation({
     onSuccess: async () => {
@@ -45,6 +56,30 @@ export default function TaskDetail() {
     },
   });
   const delComment = api.comment.delete.useMutation({
+    onSuccess: () => utils.task.byId.invalidate({ id }),
+  });
+  const updateComment = api.comment.update.useMutation({
+    onSuccess: async () => {
+      await utils.task.byId.invalidate({ id });
+      setEditingCommentId(null);
+      setEditingCommentBody("");
+    },
+  });
+  const setStatus = api.task.setStatus.useMutation({
+    onSuccess: async () => {
+      await utils.task.byId.invalidate({ id });
+      if (task.data) {
+        await utils.task.list.invalidate({ projectId: task.data.projectId });
+      }
+    },
+  });
+  const addTaskAttachment = api.attachment.createForTask.useMutation({
+    onSuccess: () => utils.task.byId.invalidate({ id }),
+  });
+  const addCommentAttachment = api.attachment.createForComment.useMutation({
+    onSuccess: () => utils.task.byId.invalidate({ id }),
+  });
+  const delAttachment = api.attachment.delete.useMutation({
     onSuccess: () => utils.task.byId.invalidate({ id }),
   });
 
@@ -153,8 +188,12 @@ export default function TaskDetail() {
                 </div>
               </div>
 
-              <div className="mt-3 flex flex-wrap gap-2">
-                <StatusBadge status={t.status} />
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <StatusSelect
+                  status={t.status}
+                  disabled={setStatus.isPending}
+                  onChange={(status) => setStatus.mutate({ id, status })}
+                />
                 <PriorityBadge priority={t.priority} />
                 {t.tags.map((tg) => (
                   <span
@@ -180,6 +219,30 @@ export default function TaskDetail() {
                   No description yet.
                 </p>
               )}
+
+              <div className="mt-4 border-t border-slate-100 pt-4">
+                <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                  Attachments
+                </p>
+                <AttachmentList
+                  items={t.attachments}
+                  onDelete={(attId) => delAttachment.mutate({ id: attId })}
+                  deletingId={
+                    delAttachment.isPending
+                      ? delAttachment.variables?.id
+                      : null
+                  }
+                />
+                <FileUploadButton
+                  disabled={addTaskAttachment.isPending}
+                  onUploaded={async (file) => {
+                    await addTaskAttachment.mutateAsync({
+                      taskId: id,
+                      ...file,
+                    });
+                  }}
+                />
+              </div>
             </div>
 
             {/* Comments */}
@@ -196,23 +259,110 @@ export default function TaskDetail() {
                         .toUpperCase()}
                     </span>
                     <div className="flex-1 rounded-md bg-slate-50 p-3">
-                      <div className="flex items-center justify-between">
+                      <div className="flex flex-wrap items-start justify-between gap-2">
                         <p className="text-sm font-medium text-slate-900">
                           {c.author.name ?? c.author.email}
                         </p>
-                        <p className="text-xs text-slate-500">
-                          {formatDate(c.createdAt)}
-                        </p>
+                        <div className="text-right text-xs text-slate-500">
+                          <p>{formatDateTime(c.createdAt)}</p>
+                          {wasEdited(c.createdAt, c.updatedAt) && (
+                            <p className="text-slate-400">
+                              Edited {formatDateTime(c.updatedAt)}
+                            </p>
+                          )}
+                        </div>
                       </div>
-                      <p className="mt-1 whitespace-pre-wrap text-sm text-slate-700">
-                        {c.body}
-                      </p>
-                      <button
-                        className="mt-2 text-xs text-red-600 hover:underline"
-                        onClick={() => delComment.mutate({ id: c.id })}
-                      >
-                        Delete
-                      </button>
+
+                      {editingCommentId === c.id ? (
+                        <form
+                          className="mt-2 space-y-2"
+                          onSubmit={(e) => {
+                            e.preventDefault();
+                            updateComment.mutate({
+                              id: c.id,
+                              body: editingCommentBody,
+                            });
+                          }}
+                        >
+                          <textarea
+                            className="input"
+                            rows={3}
+                            value={editingCommentBody}
+                            onChange={(e) =>
+                              setEditingCommentBody(e.target.value)
+                            }
+                            required
+                            maxLength={2000}
+                          />
+                          <div className="flex gap-2">
+                            <button
+                              type="submit"
+                              className="btn-primary"
+                              disabled={updateComment.isPending}
+                            >
+                              Save
+                            </button>
+                            <button
+                              type="button"
+                              className="btn-ghost"
+                              onClick={() => {
+                                setEditingCommentId(null);
+                                setEditingCommentBody("");
+                              }}
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </form>
+                      ) : (
+                        <p className="mt-1 whitespace-pre-wrap text-sm text-slate-700">
+                          {c.body}
+                        </p>
+                      )}
+
+                      <AttachmentList
+                        items={c.attachments}
+                        onDelete={(attId) =>
+                          delAttachment.mutate({ id: attId })
+                        }
+                        deletingId={
+                          delAttachment.isPending
+                            ? delAttachment.variables?.id
+                            : null
+                        }
+                      />
+
+                      {editingCommentId !== c.id && (
+                        <div className="mt-2 flex flex-wrap items-center gap-3">
+                          <FileUploadButton
+                            label="Attach file"
+                            disabled={addCommentAttachment.isPending}
+                            onUploaded={async (file) => {
+                              await addCommentAttachment.mutateAsync({
+                                commentId: c.id,
+                                ...file,
+                              });
+                            }}
+                          />
+                          <button
+                            type="button"
+                            className="text-xs text-indigo-600 hover:underline"
+                            onClick={() => {
+                              setEditingCommentId(c.id);
+                              setEditingCommentBody(c.body);
+                            }}
+                          >
+                            Edit
+                          </button>
+                          <button
+                            type="button"
+                            className="text-xs text-red-600 hover:underline"
+                            onClick={() => delComment.mutate({ id: c.id })}
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      )}
                     </div>
                   </li>
                 ))}
@@ -233,6 +383,9 @@ export default function TaskDetail() {
                   required
                   maxLength={2000}
                 />
+                <p className="text-xs text-slate-500">
+                  You can attach images or PDFs to comments after posting.
+                </p>
                 <div className="flex justify-end">
                   <button
                     className="btn-primary"

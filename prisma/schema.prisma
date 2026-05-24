@@ -83,7 +83,11 @@ model User {
     memberships       ProjectMember[]
     createdTasks      Task[]          @relation("TaskCreator")
     assignedTasks     Task[]          @relation("TaskAssignees")
-    comments          Comment[]
+    comments            Comment[]
+    uploadedAttachments TaskAttachment[]
+    notifications       Notification[]
+    loginAudits         LoginAudit[]
+    invitesSent         ProjectInvite[] @relation("InvitesSent")
 }
 
 /// Top-level container that groups tasks. Owned by a single user but can have
@@ -102,6 +106,7 @@ model Project {
     members ProjectMember[]
     tasks   Task[]
     tags    Tag[]
+    invites ProjectInvite[]
 
     @@index([ownerId])
 }
@@ -148,6 +153,20 @@ enum EmailOtpPurpose {
     SIGNUP_VERIFY
 }
 
+enum NotificationType {
+    TASK_ASSIGNED
+    TASK_COMMENT
+    TASK_DUE
+    PROJECT_INVITE
+}
+
+enum InviteStatus {
+    PENDING
+    ACCEPTED
+    DECLINED
+    EXPIRED
+}
+
 /// Core unit of work. Belongs to a Project, optionally has a deadline, can be
 /// assigned to many users, and can be tagged.
 model Task {
@@ -167,7 +186,8 @@ model Task {
 
     assignees User[]    @relation("TaskAssignees")
     tags      Tag[]
-    comments  Comment[]
+    comments    Comment[]
+    attachments TaskAttachment[]
 
     @@index([projectId])
     @@index([creatorId])
@@ -202,7 +222,29 @@ model Comment {
     authorId String
     author   User   @relation(fields: [authorId], references: [id], onDelete: Cascade)
 
+    attachments TaskAttachment[]
+
     @@index([taskId])
+}
+
+/// Files (images, PDFs) attached to a task description or a comment.
+model TaskAttachment {
+    id        String   @id @default(cuid())
+    fileName  String
+    mimeType  String
+    dataUrl   String   @db.Text
+    createdAt DateTime @default(now())
+
+    taskId    String?
+    task      Task?    @relation(fields: [taskId], references: [id], onDelete: Cascade)
+    commentId String?
+    comment   Comment? @relation(fields: [commentId], references: [id], onDelete: Cascade)
+
+    uploaderId String
+    uploader   User   @relation(fields: [uploaderId], references: [id], onDelete: Cascade)
+
+    @@index([taskId])
+    @@index([commentId])
 }
 
 /// One-time-passwords sent via email for 2FA and password reset flows.
@@ -217,4 +259,48 @@ model EmailOtp {
 
     @@index([email, purpose])
     @@index([expiresAt])
+}
+
+model Notification {
+    id        String           @id @default(cuid())
+    userId    String
+    user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+    type      NotificationType
+    title     String
+    message   String
+    link      String?
+    readAt    DateTime?
+    createdAt DateTime         @default(now())
+
+    @@index([userId, readAt])
+    @@index([userId, createdAt])
+}
+
+model ProjectInvite {
+    id          String       @id @default(cuid())
+    email       String
+    role        ProjectRole  @default(MEMBER)
+    status      InviteStatus @default(PENDING)
+    token       String       @unique @default(cuid())
+    expiresAt   DateTime
+    createdAt   DateTime     @default(now())
+    respondedAt DateTime?
+
+    projectId   String
+    project     Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+    invitedById String
+    invitedBy   User    @relation("InvitesSent", fields: [invitedById], references: [id], onDelete: Cascade)
+
+    @@index([email, status])
+    @@index([projectId])
+}
+
+model LoginAudit {
+    id        String   @id @default(cuid())
+    userId    String
+    user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+    method    String
+    createdAt DateTime @default(now())
+
+    @@index([userId, createdAt])
 }

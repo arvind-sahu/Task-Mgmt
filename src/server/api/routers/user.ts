@@ -7,7 +7,9 @@ import {
   protectedProcedure,
   publicProcedure,
 } from "~/server/api/trpc";
+import { EmailDeliveryError } from "~/server/emailErrors";
 import { issueEmailOtp, verifyEmailOtp } from "~/server/otp";
+import { EMAIL_DELIVERY_FAILED_MESSAGE } from "~/utils/emailErrors";
 
 // Reusable input shapes — exported so tests can import the same schemas.
 export const registerInput = z.object({
@@ -93,7 +95,17 @@ export const userRouter = createTRPCRouter({
           message: "An account with this email already exists",
         });
       }
-      await issueEmailOtp(email, "SIGNUP_VERIFY");
+      try {
+        await issueEmailOtp(email, "SIGNUP_VERIFY");
+      } catch (err) {
+        if (err instanceof EmailDeliveryError) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: err.message,
+          });
+        }
+        throw err;
+      }
       return { message: "OTP sent to your email for signup verification." };
     }),
 
@@ -167,7 +179,17 @@ export const userRouter = createTRPCRouter({
           message: "Invalid email or password",
         });
       }
-      await issueEmailOtp(email, "LOGIN_2FA");
+      try {
+        await issueEmailOtp(email, "LOGIN_2FA");
+      } catch (err) {
+        if (err instanceof EmailDeliveryError) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: err.message,
+          });
+        }
+        throw err;
+      }
       return { email, message: "OTP sent to your email" };
     }),
 
@@ -203,7 +225,18 @@ export const userRouter = createTRPCRouter({
       });
       // Keep this endpoint response generic to prevent account enumeration.
       if (user) {
-        await issueEmailOtp(email, "FORGOT_PASSWORD");
+        try {
+          await issueEmailOtp(email, "FORGOT_PASSWORD");
+        } catch (err) {
+          console.error("[forgot-password] Failed to send OTP email:", err);
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message:
+              err instanceof EmailDeliveryError
+                ? err.message
+                : EMAIL_DELIVERY_FAILED_MESSAGE,
+          });
+        }
       }
       return { message: "If an account exists, OTP has been sent to email." };
     }),
@@ -322,5 +355,70 @@ export const userRouter = createTRPCRouter({
         select: { id: true, name: true, email: true, image: true },
         take: 20,
       });
+    }),
+
+  security: protectedProcedure.query(async ({ ctx }) => {
+    const userId = ctx.session.user.id;
+    const [accounts, loginAudits, user] = await Promise.all([
+      ctx.db.account.findMany({
+        where: { userId },
+        select: { id: true, provider: true, type: true },
+      }),
+      ctx.db.loginAudit.findMany({
+        where: { userId },
+        orderBy: { createdAt: "desc" },
+        take: 10,
+      }),
+      ctx.db.user.findUnique({
+        where: { id: userId },
+        select: { password: true },
+      }),
+    ]);
+
+    return {
+      accounts,
+      loginAudits,
+      hasPassword: !!user?.password,
+      sessionNote:
+        "You are signed in on this browser. JWT sessions are not listed individually.",
+    };
+  }),
+
+  disconnectAccount: protectedProcedure
+    .input(z.object({ provider: z.string().min(1) }))
+    .mutation(async ({ ctx, input }) => {
+      const userId = ctx.session.user.id;
+      const accounts = await ctx.db.account.findMany({
+        where: { userId },
+        select: { provider: true },
+      });
+      const user = await ctx.db.user.findUnique({
+        where: { id: userId },
+        select: { password: true },
+      });
+
+      const target = accounts.find((a) => a.provider === input.provider);
+      if (!target) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Account not linked",
+        });
+      }
+
+      const remainingOAuth = accounts.filter(
+        (a) => a.provider !== input.provider,
+      ).length;
+      if (!user?.password && remainingOAuth === 0) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message:
+            "Add a password before disconnecting your only sign-in method",
+        });
+      }
+
+      await ctx.db.account.deleteMany({
+        where: { userId, provider: input.provider },
+      });
+      return { ok: true };
     }),
 });

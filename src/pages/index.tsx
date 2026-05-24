@@ -1,24 +1,41 @@
-import type { GetServerSidePropsContext } from "next";
+import { MarketingLayout } from "~/components/marketing/MarketingLayout";
+import {
+  CaseStudies,
+  FeatureGrid,
+  HomeHero,
+  InteractiveDemo,
+  LeadCaptureForms,
+  MarketingCta,
+  PricingSection,
+  SectionDivider,
+  SocialProof,
+  SolutionsSection,
+  TeamSection,
+} from "~/components/marketing/MarketingSections";
 
-import { getServerAuthSession } from "~/server/auth";
-
-/**
- * Root entry. Always redirects:
- *  - signed in   → /dashboard
- *  - signed out  → /auth/signin
- *
- * Keeping the redirect server-side avoids any flash of placeholder content.
- */
 export default function Home() {
-  return null;
-}
-
-export async function getServerSideProps(ctx: GetServerSidePropsContext) {
-  const session = await getServerAuthSession(ctx);
-  return {
-    redirect: {
-      destination: session ? "/dashboard" : "/auth/signin",
-      permanent: false,
-    },
-  };
+  return (
+    <MarketingLayout
+      title="Tasker · AI Project Management and Jira Alternative"
+      description="Tasker is a Jira-style project management platform with AI task intelligence, sprint planning, analytics, collaboration, and end-to-end full-stack delivery services."
+    >
+      <HomeHero />
+      <FeatureGrid />
+      <SectionDivider />
+      <InteractiveDemo />
+      <SectionDivider />
+      <SocialProof />
+      <SectionDivider />
+      <PricingSection />
+      <SectionDivider />
+      <SolutionsSection />
+      <SectionDivider />
+      <CaseStudies />
+      <SectionDivider />
+      <TeamSection />
+      <SectionDivider />
+      <LeadCaptureForms />
+      <MarketingCta />
+    </MarketingLayout>
+  );
 }

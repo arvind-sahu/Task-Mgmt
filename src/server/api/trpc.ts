@@ -15,6 +15,7 @@ import { ZodError } from "zod";
 
 import { getServerAuthSession } from "~/server/auth";
 import { db } from "~/server/db";
+import { sanitizeEmailErrorForDisplay } from "~/utils/emailErrors";
 
 /**
  * 1. CONTEXT
@@ -75,6 +76,7 @@ const t = initTRPC.context<typeof createTRPCContext>().create({
   errorFormatter({ shape, error }) {
     return {
       ...shape,
+      message: sanitizeEmailErrorForDisplay(shape.message),
       data: {
         ...shape.data,
         zodError:
