@@ -59,7 +59,7 @@ export default function Layout({ title, children }: LayoutProps) {
 
       <div className="flex min-h-screen min-w-0 flex-col">
         <header className="shrink-0 border-b border-slate-200 bg-white">
-          <div className="mx-auto flex w-full max-w-6xl min-w-0 items-center justify-between gap-2 px-3 py-3 sm:px-4">
+          <div className="mx-auto flex w-full max-w-7xl min-w-0 items-center justify-between gap-2 px-4 py-3 sm:px-6 lg:px-8">
             <Link
               href="/dashboard"
               className="flex min-w-0 shrink-0 items-center gap-2"
@@ -176,7 +176,7 @@ export default function Layout({ title, children }: LayoutProps) {
           </div>
         </header>
 
-        <main className="mx-auto w-full min-w-0 max-w-6xl flex-1 px-3 py-6 sm:px-4 sm:py-8">
+        <main className="mx-auto w-full min-w-0 max-w-7xl flex-1 px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
           {children}
         </main>
       </div>

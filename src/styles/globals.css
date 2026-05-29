@@ -15,29 +15,13 @@
     --auth-blob-2: rgba(217, 70, 239, 0.26);
   }
   [data-theme="sunset"] {
-    --bg-color: #1e0f0a;
-    --text-color: #fff4ea;
-    --bg-layer-1: rgba(249, 115, 22, 0.25);
-    --bg-layer-2: rgba(236, 72, 153, 0.2);
-    --bg-layer-3: rgba(245, 158, 11, 0.2);
-    --auth-blob-1: rgba(249, 115, 22, 0.35);
-    --auth-blob-2: rgba(236, 72, 153, 0.3);
-  }
-  [data-theme="sunset"] .label,
-  [data-theme="sunset"] h1,
-  [data-theme="sunset"] h2,
-  [data-theme="sunset"] h3,
-  [data-theme="sunset"] p,
-  [data-theme="sunset"] span,
-  [data-theme="sunset"] a,
-  [data-theme="sunset"] li {
-    color: #ffe8d6;
-  }
-  [data-theme="sunset"] .card,
-  [data-theme="sunset"] .glass-card {
-    background: rgba(30, 20, 17, 0.8);
-    border-color: rgba(251, 146, 60, 0.35);
-    box-shadow: 0 10px 30px rgba(249, 115, 22, 0.12);
+    --bg-color: #fff7ed;
+    --text-color: #431407;
+    --bg-layer-1: rgba(249, 115, 22, 0.18);
+    --bg-layer-2: rgba(236, 72, 153, 0.12);
+    --bg-layer-3: rgba(245, 158, 11, 0.12);
+    --auth-blob-1: rgba(249, 115, 22, 0.25);
+    --auth-blob-2: rgba(236, 72, 153, 0.2);
   }
   [data-theme="sunset"] .input {
     background: rgba(17, 24, 39, 0.7);
@@ -51,10 +35,6 @@
     background: rgba(31, 41, 55, 0.75);
     color: #ffe8d6;
     border-color: rgba(251, 146, 60, 0.4);
-  }
-  [data-theme="sunset"] header {
-    background: rgba(30, 20, 17, 0.86);
-    border-color: rgba(251, 146, 60, 0.25);
   }
   html {
     overflow-x: clip;

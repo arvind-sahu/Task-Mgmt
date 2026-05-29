@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { TRPCError } from "@trpc/server";
 import { NotificationType, TaskPriority, TaskStatus } from "@prisma/client";
 
 import { assertProjectAccess } from "~/server/api/access";
@@ -128,15 +129,33 @@ export const taskRouter = createTRPCRouter({
   create: protectedProcedure
     .input(createInput)
     .mutation(async ({ ctx, input }) => {
-      await assertProjectAccess(ctx.db, input.projectId, ctx.session.user.id);
-
-      const { projectId, assigneeIds, tagIds, ...rest } = input;
+      const {
+        projectId,
+        assigneeIds,
+        tagIds,
+        title,
+        description,
+        status,
+        priority,
+        deadline,
+      } = input;
+      if (!projectId || !title) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Missing required task fields",
+        });
+      }
+      await assertProjectAccess(ctx.db, projectId, ctx.session.user.id);
 
       const task = await ctx.db.task.create({
         data: {
-          ...rest,
-          projectId,
-          creatorId: ctx.session.user.id,
+          title,
+          description,
+          status,
+          priority,
+          deadline,
+          project: { connect: { id: projectId } },
+          creator: { connect: { id: ctx.session.user.id } },
           assignees: assigneeIds
             ? { connect: assigneeIds.map((id) => ({ id })) }
             : undefined,

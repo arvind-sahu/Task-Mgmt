@@ -162,10 +162,10 @@ export function MarketingLayout({ title, description, children }: MarketingLayou
                 <div className="mt-6 rounded-2xl border border-white/10 bg-white/5 p-5">
                   <p className="text-sm font-black text-white">Address</p>
                   <p className="mt-2 text-sm leading-6 text-slate-400">
-                    Innovation Tower, Business District, New Delhi, India
+                    BTM Layout Bengaluru, Karnataka, India
                   </p>
                   <p className="mt-2 text-sm leading-6 text-slate-400">
-                    hello@tasker.example · +91 98765 43210
+                    hello@tasker.example · +91 93258 60577
                   </p>
                 </div>
               </div>

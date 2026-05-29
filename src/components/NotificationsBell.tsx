@@ -1,8 +1,11 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
+import { type RouterOutputs } from "~/utils/api";
 import { api } from "~/utils/api";
 import { formatDateTime } from "~/utils/date";
+
+type NotificationListItem = RouterOutputs["notification"]["list"][number];
 
 export function NotificationsBell() {
   const [open, setOpen] = useState(false);
@@ -160,17 +163,14 @@ export function NotificationsBell() {
 function NotificationRow({
   n,
 }: {
-  n: {
-    title: string;
-    message: string;
-    createdAt: Date;
-    synthetic?: boolean;
-  };
+  n: NotificationListItem;
 }) {
   return (
     <>
-      <p className="text-sm font-medium text-slate-800">{n.title}</p>
-      <p className="text-xs text-slate-600">{n.message}</p>
+      <p className="text-sm font-medium text-slate-800">
+        {n.title ?? "Notification"}
+      </p>
+      <p className="text-xs text-slate-600">{n.message ?? ""}</p>
       <p className="mt-0.5 text-[10px] text-slate-400">
         {formatDateTime(n.createdAt)}
         {n.synthetic ? " · reminder" : ""}

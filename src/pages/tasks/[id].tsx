@@ -3,7 +3,7 @@ import { useRouter } from "next/router";
 import { useState, type FormEvent } from "react";
 import type { GetServerSidePropsContext } from "next";
 
-import { AttachmentList } from "~/components/AttachmentList";
+import { AttachmentList, type AttachmentItem } from "~/components/AttachmentList";
 import EmptyState from "~/components/EmptyState";
 import { FileUploadButton } from "~/components/FileUploadButton";
 import Layout from "~/components/Layout";
@@ -82,6 +82,10 @@ export default function TaskDetail() {
   const delAttachment = api.attachment.delete.useMutation({
     onSuccess: () => utils.task.byId.invalidate({ id }),
   });
+  const deletingAttachmentId =
+    delAttachment.variables && typeof delAttachment.variables === "object"
+      ? delAttachment.variables.id
+      : null;
 
   if (task.isLoading) {
     return (
@@ -109,6 +113,7 @@ export default function TaskDetail() {
   }
 
   const t = task.data;
+  const taskAttachments = normalizeAttachments(t.attachments);
 
   function handleEdit(values: TaskFormValues) {
     update.mutate({
@@ -225,13 +230,9 @@ export default function TaskDetail() {
                   Attachments
                 </p>
                 <AttachmentList
-                  items={t.attachments}
+                  items={taskAttachments}
                   onDelete={(attId) => delAttachment.mutate({ id: attId })}
-                  deletingId={
-                    delAttachment.isPending
-                      ? delAttachment.variables?.id
-                      : null
-                  }
+                  deletingId={delAttachment.isPending ? deletingAttachmentId : null}
                 />
                 <FileUploadButton
                   disabled={addTaskAttachment.isPending}
@@ -321,14 +322,12 @@ export default function TaskDetail() {
                       )}
 
                       <AttachmentList
-                        items={c.attachments}
+                        items={normalizeAttachments(c.attachments)}
                         onDelete={(attId) =>
                           delAttachment.mutate({ id: attId })
                         }
                         deletingId={
-                          delAttachment.isPending
-                            ? delAttachment.variables?.id
-                            : null
+                          delAttachment.isPending ? deletingAttachmentId : null
                         }
                       />
 
@@ -472,4 +471,28 @@ function Field({
 
 export function getServerSideProps(ctx: GetServerSidePropsContext) {
   return requireAuth(ctx);
+}
+
+function normalizeAttachments(
+  attachments: Array<{
+    id?: string;
+    fileName?: string;
+    mimeType?: string;
+    dataUrl?: string;
+  }>,
+): AttachmentItem[] {
+  return attachments.filter(
+    (
+      att,
+    ): att is {
+      id: string;
+      fileName: string;
+      mimeType: string;
+      dataUrl: string;
+    } =>
+      Boolean(att.id) &&
+      Boolean(att.fileName) &&
+      Boolean(att.mimeType) &&
+      Boolean(att.dataUrl),
+  );
 }

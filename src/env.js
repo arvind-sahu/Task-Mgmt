@@ -30,6 +30,7 @@ export const env = createEnv({
     SMTP_USER: z.string().min(1).optional(),
     SMTP_PASS: z.string().min(1).optional(),
     SMTP_FROM: z.string().email().optional(),
+    LEAD_INBOX_EMAIL: z.string().email().optional(),
 
     // Optional OAuth — buttons appear only when both id and secret are set.
     GOOGLE_CLIENT_ID: z.string().min(1).optional(),
@@ -55,6 +56,7 @@ export const env = createEnv({
     SMTP_USER: process.env.SMTP_USER,
     SMTP_PASS: process.env.SMTP_PASS,
     SMTP_FROM: process.env.SMTP_FROM,
+    LEAD_INBOX_EMAIL: process.env.LEAD_INBOX_EMAIL,
     GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID,
     GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET,
     AUTH_GITHUB_ID: process.env.AUTH_GITHUB_ID ?? process.env.GITHUB_ID,
