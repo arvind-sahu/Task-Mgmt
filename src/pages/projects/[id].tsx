@@ -39,7 +39,10 @@ export default function ProjectDetail() {
 
   const setStatus = api.task.setStatus.useMutation({
     // Optimistic UI: update the cached list immediately, roll back on error.
-    onMutate: async ({ id: taskId, status }) => {
+    onMutate: async (variables) => {
+      if (!variables || typeof variables !== "object") return;
+      const { id: taskId, status } = variables;
+      if (!taskId || !status) return;
       await utils.task.list.cancel({ projectId: id });
       const prev = utils.task.list.getData({ projectId: id });
       utils.task.list.setData({ projectId: id }, (old) =>
@@ -54,6 +57,10 @@ export default function ProjectDetail() {
       void utils.task.list.invalidate({ projectId: id });
     },
   });
+  const pendingStatusTaskId =
+    setStatus.variables && typeof setStatus.variables === "object"
+      ? setStatus.variables.id
+      : undefined;
 
   function handleCreate(values: TaskFormValues) {
     createTask.mutate({
@@ -96,6 +103,20 @@ export default function ProjectDetail() {
   }
 
   const canManage = canManageProject(project.data.currentUserRole);
+  const pendingInvites: PendingInvite[] =
+    canManage && "invites" in project.data
+      ? project.data.invites
+          .filter(
+            (inv): inv is typeof inv & { id: string; email: string } =>
+              Boolean(inv.id) && Boolean(inv.email),
+          )
+          .map((inv) => ({
+            id: inv.id,
+            email: inv.email,
+            role: inv.role ?? "MEMBER",
+            createdAt: inv.createdAt ? new Date(inv.createdAt) : new Date(),
+          }))
+      : [];
 
   return (
     <Layout title={project.data.name}>
@@ -184,8 +205,7 @@ export default function ProjectDetail() {
                           setStatus.mutate({ id: taskId, status })
                         }
                         statusUpdating={
-                          setStatus.isPending &&
-                          setStatus.variables?.id === t.id
+                          setStatus.isPending && pendingStatusTaskId === t.id
                         }
                       />
                     </div>
@@ -211,9 +231,7 @@ export default function ProjectDetail() {
           <MembersPanel
             projectId={id}
             canManage={canManage}
-            pendingInvites={
-              canManage && "invites" in project.data ? project.data.invites : []
-            }
+            pendingInvites={pendingInvites}
           />
           <TagsPanel projectId={id} canManage={canManage} />
         </aside>

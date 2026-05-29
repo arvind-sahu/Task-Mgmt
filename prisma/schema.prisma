@@ -167,6 +167,26 @@ enum InviteStatus {
     EXPIRED
 }
 
+enum LeadRequestType {
+    DEMO_REQUEST
+    CONTACT_SALES
+    NEWSLETTER_SIGNUP
+}
+
+enum LeadRequestStatus {
+    NEW
+    IN_PROGRESS
+    CONTACTED
+    CLOSED
+}
+
+enum LeadRequestEmailStatus {
+    QUEUED
+    SENT
+    FAILED
+    SKIPPED
+}
+
 /// Core unit of work. Belongs to a Project, optionally has a deadline, can be
 /// assigned to many users, and can be tagged.
 model Task {
@@ -293,6 +313,28 @@ model ProjectInvite {
 
     @@index([email, status])
     @@index([projectId])
+}
+
+model LeadRequest {
+    id              String                 @id @default(cuid())
+    requestId       String                 @unique @db.VarChar(10)
+    type            LeadRequestType
+    status          LeadRequestStatus      @default(NEW)
+    emailStatus     LeadRequestEmailStatus @default(QUEUED)
+    fullName        String?
+    workEmail       String
+    companyRole     String?
+    companySize     String?
+    message         String?
+    source          String?
+    emailSentAt     DateTime?
+    emailError      String?
+    createdAt       DateTime               @default(now())
+    updatedAt       DateTime               @updatedAt
+
+    @@index([type, createdAt])
+    @@index([status, createdAt])
+    @@index([emailStatus, createdAt])
 }
 
 model LoginAudit {

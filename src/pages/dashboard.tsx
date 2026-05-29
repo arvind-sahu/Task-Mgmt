@@ -19,7 +19,10 @@ export default function Dashboard() {
   const projects = api.project.list.useQuery();
 
   const setStatus = api.task.setStatus.useMutation({
-    onMutate: async ({ id, status }) => {
+    onMutate: async (variables) => {
+      if (!variables || typeof variables !== "object") return;
+      const { id, status } = variables;
+      if (!id || !status) return;
       await utils.task.myUpcoming.cancel();
       const prev = utils.task.myUpcoming.getData();
       utils.task.myUpcoming.setData(undefined, (old) =>
@@ -32,6 +35,10 @@ export default function Dashboard() {
     },
     onSettled: () => void utils.task.myUpcoming.invalidate(),
   });
+  const pendingStatusTaskId =
+    setStatus.variables && typeof setStatus.variables === "object"
+      ? setStatus.variables.id
+      : undefined;
 
   return (
     <Layout title="Dashboard">
@@ -133,9 +140,7 @@ export default function Dashboard() {
                   <PriorityBadge priority={t.priority} />
                   <StatusSelect
                     status={t.status}
-                    disabled={
-                      setStatus.isPending && setStatus.variables?.id === t.id
-                    }
+                    disabled={setStatus.isPending && pendingStatusTaskId === t.id}
                     onChange={(status: TaskStatus) =>
                       setStatus.mutate({ id: t.id, status })
                     }

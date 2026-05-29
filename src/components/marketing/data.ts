@@ -196,42 +196,70 @@ export const pricingFaqs = [
   },
 ];
 
-export const teamMembers = [
+export interface TeamMember {
+  name: string;
+  role: string;
+  initials: string;
+  bio: string;
+  avatarUrl?: string;
+  education?: string;
+  experience?: string;
+  email?: string;
+  linkedin?: string;
+}
+
+export const teamMembers: TeamMember[] = [
   {
-    name: "Aarav Mehta",
-    role: "CEO / Founder",
-    initials: "AM",
-    bio: "Leads product strategy, customer outcomes, and end-to-end delivery partnerships.",
+    name: "Arvind Kumar Sahu",
+    role: "Founder",
+    initials: "AS",
+    bio: "Leads product strategy, engineering delivery, and customer outcomes end to end.",
+    education: "IIIT Nagpur, CSE",
+    experience: "6 years of experience",
+    linkedin: "https://www.linkedin.com/in/gopherarvind/",
   },
   {
-    name: "Neha Kapoor",
-    role: "CTO",
-    initials: "NK",
-    bio: "Owns platform architecture, security, cloud operations, and engineering excellence.",
+    name: "Manish Kumar Purohit",
+    role: "Co-founder",
+    initials: "MP",
+    bio: "Drives product execution, partnerships, and cross-functional delivery planning.",
+    linkedin: "https://www.linkedin.com/in/manish-rajpurohit/",
   },
   {
-    name: "Rohan Sinha",
-    role: "Lead Developer",
-    initials: "RS",
-    bio: "Builds full-stack workflows, APIs, dashboards, and scalable SaaS foundations.",
+    name: "Ranjan Kumar",
+    role: "Software Engineer 2",
+    initials: "RK",
+    bio: "Builds and scales APIs, workflows, and core product features for reliability.",
+    linkedin: "https://www.linkedin.com/in/ranjankumarrk/",
   },
   {
-    name: "Maya Iyer",
-    role: "AI Specialist",
-    initials: "MI",
-    bio: "Designs AI copilots, automation flows, data pipelines, and insight experiences.",
+    name: "Ashish Kumar",
+    role: "UI/UX Engineer",
+    initials: "AK",
+    bio: "Designs polished, accessible interfaces with strong product usability and visual clarity.",
+    linkedin: "https://www.linkedin.com/in/ashishkumaruiux/",
   },
   {
-    name: "Kabir Rao",
-    role: "UX Designer",
-    initials: "KR",
-    bio: "Creates polished product experiences, design systems, and accessible interfaces.",
-  },
-  {
-    name: "Ananya Bose",
+    name: "Raju J",
     role: "Sales Director",
-    initials: "AB",
-    bio: "Helps teams choose the right plan, engagement model, and implementation roadmap.",
+    initials: "RJ",
+    bio: "Leads enterprise conversations, requirement gathering, and solution positioning.",
+    linkedin: "https://www.linkedin.com/in/raju-janagani/",
+  },
+  {
+    name: "Pranay Fating",
+    role: "Advisor",
+    initials: "PF",
+    bio: "Advises on strategy, technology direction, and long-term product growth.",
+    education: "IIIT Nagpur, CSE",
+    linkedin: "https://www.linkedin.com/in/pranay-fating-453a5914b/",
+  },
+  {
+    name: "Purna Chandra",
+    role: "Business Analyst",
+    initials: "PC",
+    bio: "Owns business requirement analysis, prioritization, and stakeholder alignment.",
+    linkedin: "https://www.linkedin.com/in/purnachandar-vanga/",
   },
 ];
 

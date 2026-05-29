@@ -2,6 +2,7 @@ import Link from "next/link";
 import { useState, type FormEvent } from "react";
 
 import { trackMarketingEvent } from "~/lib/analytics";
+import { LeadershipTeamSection } from "~/components/team/TeamSection";
 import {
   blogPosts,
   caseStudies,
@@ -112,7 +113,7 @@ export function ProductMockup() {
 export function HomeHero() {
   return (
     <section className="relative isolate">
-      <div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_20%_10%,rgba(37,99,235,0.5),transparent_30%),radial-gradient(circle_at_78%_8%,rgba(124,58,237,0.35),transparent_28%),linear-gradient(180deg,#020617_0%,#0f172a_56%,#f8fafc_56%,#f8fafc_100%)]" />
+      <div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_20%_10%,rgba(37,99,235,0.5),transparent_30%),radial-gradient(circle_at_78%_8%,rgba(124,58,237,0.35),transparent_28%),linear-gradient(180deg,#020617_0%,#0f172a_72%,#f8fafc_72%,#f8fafc_100%)]" />
       <div className="mx-auto grid max-w-7xl items-center gap-12 px-5 pb-20 pt-14 sm:px-8 lg:grid-cols-[0.94fr_1.06fr] lg:pb-28 lg:pt-20">
         <div className="max-w-3xl">
           <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-cyan-300/30 bg-cyan-300/10 px-4 py-2 text-sm font-semibold text-cyan-100 shadow-2xl shadow-cyan-950/40">
@@ -142,9 +143,12 @@ export function HomeHero() {
               Watch demo
             </a>
           </div>
-          <div className="mt-8 flex flex-wrap gap-3 text-xs font-bold uppercase tracking-[0.18em] text-slate-300">
+          <div className="mt-8 flex flex-wrap gap-3 text-xs font-bold uppercase tracking-[0.18em] text-slate-200">
             {["GDPR compliant", "SOC2 Type II", "SSO ready", "99.9% uptime"].map((badge) => (
-              <span key={badge} className="rounded-full border border-white/10 bg-white/5 px-3 py-2">
+              <span
+                key={badge}
+                className="rounded-full border border-cyan-200/35 bg-slate-950/70 px-3 py-2 text-cyan-100 shadow-lg shadow-slate-950/30 backdrop-blur"
+              >
                 {badge}
               </span>
             ))}
@@ -445,30 +449,7 @@ export function FaqSection() {
 }
 
 export function TeamSection() {
-  return (
-    <section className="marketing-section pattern-dots bg-slate-50 px-5 text-slate-950 sm:px-8">
-      <div className="relative mx-auto max-w-7xl">
-        <SectionIntro
-          eyebrow="People behind the work"
-          title="Meet the team working with you."
-          description="A cross-functional group covering product, engineering, AI, UX, quality, launch, and long-term growth."
-        />
-        <div className="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-          {teamMembers.map((member) => (
-            <article key={member.name} className="group rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm transition hover:-translate-y-2 hover:shadow-2xl hover:shadow-blue-100">
-              <div className="relative mb-6 grid h-24 w-24 place-items-center rounded-[2rem] bg-gradient-to-br from-cyan-300 via-blue-500 to-purple-600 text-2xl font-black text-white shadow-xl shadow-blue-200 transition group-hover:rotate-3">
-                {member.initials}
-                <span className="absolute -right-2 -top-2 h-6 w-6 rounded-full border-4 border-white bg-emerald-400" />
-              </div>
-              <h3 className="text-xl font-black">{member.name}</h3>
-              <p className="mt-1 text-sm font-bold text-blue-600">{member.role}</p>
-              <p className="mt-4 text-sm leading-6 text-slate-600">{member.bio}</p>
-            </article>
-          ))}
-        </div>
-      </div>
-    </section>
-  );
+  return <LeadershipTeamSection />;
 }
 
 export function SolutionsSection() {
@@ -560,12 +541,130 @@ export function CaseStudies() {
 }
 
 export function LeadCaptureForms({ mode = "all" }: { mode?: "all" | "contact" }) {
-  const [submitted, setSubmitted] = useState<string | null>(null);
+  const [submitted, setSubmitted] = useState<{ type: "newsletter_signup" | "demo_request" | "contact_sales"; requestId: string } | null>(null);
+  const [submissionError, setSubmissionError] = useState<string | null>(null);
+  const [newsletterEmail, setNewsletterEmail] = useState("");
+  const [demoForm, setDemoForm] = useState({
+    fullName: "",
+    workEmail: "",
+    companyRole: "",
+    message: "",
+  });
+  const [salesForm, setSalesForm] = useState({
+    fullName: "",
+    workEmail: "",
+    companyRole: "",
+    companySize: "business",
+    message: "",
+  });
 
-  const handleSubmit = (event: FormEvent<HTMLFormElement>, type: "newsletter_signup" | "demo_request" | "contact_sales") => {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const createLeadRequest = async (payload: {
+    type: "DEMO_REQUEST" | "CONTACT_SALES" | "NEWSLETTER_SIGNUP";
+    fullName?: string;
+    workEmail: string;
+    companyRole?: string;
+    companySize?: string;
+    message?: string;
+    source?: string;
+  }) => {
+    const response = await fetch("/api/lead-request", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+
+    const data = (await response.json()) as { requestId?: string; error?: string };
+    if (!response.ok || !data.requestId) {
+      throw new Error(data.error || "Unable to submit your request right now. Please try again.");
+    }
+    return data;
+  };
+
+  const handleDemoSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    setSubmitted(type);
-    trackMarketingEvent(type, { source: "marketing_form" });
+    trackMarketingEvent("demo_request", { source: "marketing_form" });
+    setIsSubmitting(true);
+    void createLeadRequest({
+        type: "DEMO_REQUEST",
+        fullName: demoForm.fullName,
+        workEmail: demoForm.workEmail,
+        companyRole: demoForm.companyRole,
+        message: demoForm.message,
+        source: "marketing-form-demo",
+      })
+      .then(({ requestId }) => {
+        setSubmitted({ type: "demo_request", requestId });
+        setSubmissionError(null);
+        setDemoForm({ fullName: "", workEmail: "", companyRole: "", message: "" });
+      })
+      .catch((error: unknown) => {
+        setSubmissionError(
+          error instanceof Error
+            ? error.message
+            : "Unable to submit your request right now. Please try again.",
+        );
+      })
+      .finally(() => setIsSubmitting(false));
+  };
+
+  const handleNewsletterSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    trackMarketingEvent("newsletter_signup", { source: "marketing_form" });
+    setIsSubmitting(true);
+    void createLeadRequest({
+        type: "NEWSLETTER_SIGNUP",
+        workEmail: newsletterEmail,
+        source: "marketing-form-newsletter",
+      })
+      .then(({ requestId }) => {
+        setSubmitted({ type: "newsletter_signup", requestId });
+        setSubmissionError(null);
+        setNewsletterEmail("");
+      })
+      .catch((error: unknown) => {
+        setSubmissionError(
+          error instanceof Error
+            ? error.message
+            : "Unable to submit your request right now. Please try again.",
+        );
+      })
+      .finally(() => setIsSubmitting(false));
+  };
+
+  const handleSalesSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    trackMarketingEvent("contact_sales", { source: "marketing_form" });
+    setIsSubmitting(true);
+    void createLeadRequest({
+        type: "CONTACT_SALES",
+        fullName: salesForm.fullName,
+        workEmail: salesForm.workEmail,
+        companyRole: salesForm.companyRole,
+        companySize: salesForm.companySize,
+        message: salesForm.message,
+        source: "marketing-form-sales",
+      })
+      .then(({ requestId }) => {
+        setSubmitted({ type: "contact_sales", requestId });
+        setSubmissionError(null);
+        setSalesForm({
+          fullName: "",
+          workEmail: "",
+          companyRole: "",
+          companySize: "business",
+          message: "",
+        });
+      })
+      .catch((error: unknown) => {
+        setSubmissionError(
+          error instanceof Error
+            ? error.message
+            : "Unable to submit your request right now. Please try again.",
+        );
+      })
+      .finally(() => setIsSubmitting(false));
   };
 
   return (
@@ -578,54 +677,121 @@ export function LeadCaptureForms({ mode = "all" }: { mode?: "all" | "contact" })
             Tell us about your team, use case, and delivery goals. We will follow up with a tailored plan,
             pricing recommendation, and implementation roadmap.
           </p>
-          <form className="mt-8 grid gap-4" onSubmit={(event) => handleSubmit(event, "demo_request")}>
-            <input className="rounded-xl border border-white/10 bg-white/10 px-4 py-3 text-sm text-white placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-cyan-300" placeholder="Full name" required />
-            <input className="rounded-xl border border-white/10 bg-white/10 px-4 py-3 text-sm text-white placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-cyan-300" type="email" placeholder="Work email" required />
-            <input className="rounded-xl border border-white/10 bg-white/10 px-4 py-3 text-sm text-white placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-cyan-300" placeholder="Company and role" required />
-            <textarea className="min-h-28 rounded-xl border border-white/10 bg-white/10 px-4 py-3 text-sm text-white placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-cyan-300" placeholder="What do you want to build or improve?" />
-            <button className="rounded-full bg-white px-6 py-3 text-sm font-black text-slate-950" type="submit">
-              Request demo
+          <form className="mt-8 grid gap-4" onSubmit={handleDemoSubmit}>
+            <input
+              className="rounded-xl border border-white/10 bg-white/10 px-4 py-3 text-sm text-white placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-cyan-300"
+              placeholder="Full name"
+              required
+              value={demoForm.fullName}
+              onChange={(event) => setDemoForm((prev) => ({ ...prev, fullName: event.target.value }))}
+            />
+            <input
+              className="rounded-xl border border-white/10 bg-white/10 px-4 py-3 text-sm text-white placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-cyan-300"
+              type="email"
+              placeholder="Work email"
+              required
+              value={demoForm.workEmail}
+              onChange={(event) => setDemoForm((prev) => ({ ...prev, workEmail: event.target.value }))}
+            />
+            <input
+              className="rounded-xl border border-white/10 bg-white/10 px-4 py-3 text-sm text-white placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-cyan-300"
+              placeholder="Company and role"
+              required
+              value={demoForm.companyRole}
+              onChange={(event) => setDemoForm((prev) => ({ ...prev, companyRole: event.target.value }))}
+            />
+            <textarea
+              className="min-h-28 rounded-xl border border-white/10 bg-white/10 px-4 py-3 text-sm text-white placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-cyan-300"
+              placeholder="What do you want to build or improve?"
+              value={demoForm.message}
+              onChange={(event) => setDemoForm((prev) => ({ ...prev, message: event.target.value }))}
+            />
+            <button className="rounded-full bg-white px-6 py-3 text-sm font-black text-slate-950 disabled:cursor-not-allowed disabled:opacity-70" type="submit" disabled={isSubmitting}>
+              {isSubmitting ? "Submitting..." : "Request demo"}
             </button>
           </form>
         </div>
 
         <div className="grid gap-6">
           {mode === "all" && (
-            <form className="rounded-[2rem] border border-slate-200 bg-slate-50 p-8 shadow-sm" onSubmit={(event) => handleSubmit(event, "newsletter_signup")}>
+            <form className="rounded-[2rem] border border-slate-200 bg-slate-50 p-8 shadow-sm" onSubmit={handleNewsletterSubmit}>
               <h3 className="text-2xl font-black">Get the free AI project checklist.</h3>
               <p className="mt-3 text-sm leading-6 text-slate-600">
                 Join the newsletter for project management playbooks, AI workflow ideas, and delivery templates.
               </p>
               <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-                <input className="min-w-0 flex-1 rounded-full border border-slate-300 px-5 py-3 text-sm outline-none focus:ring-2 focus:ring-blue-500" type="email" placeholder="Email address" required />
-                <button className="rounded-full bg-slate-950 px-6 py-3 text-sm font-black text-white" type="submit">
-                  Subscribe
+                <input
+                  className="min-w-0 flex-1 rounded-full border border-slate-300 px-5 py-3 text-sm outline-none focus:ring-2 focus:ring-blue-500"
+                  type="email"
+                  placeholder="Email address"
+                  required
+                  value={newsletterEmail}
+                  onChange={(event) => setNewsletterEmail(event.target.value)}
+                />
+                <button className="rounded-full bg-slate-950 px-6 py-3 text-sm font-black text-white disabled:cursor-not-allowed disabled:opacity-70" type="submit" disabled={isSubmitting}>
+                  {isSubmitting ? "Submitting..." : "Subscribe"}
                 </button>
               </div>
             </form>
           )}
 
-          <form className="rounded-[2rem] border border-slate-200 bg-white p-8 shadow-sm" onSubmit={(event) => handleSubmit(event, "contact_sales")}>
+          <form className="rounded-[2rem] border border-slate-200 bg-white p-8 shadow-sm" onSubmit={handleSalesSubmit}>
             <h3 className="text-2xl font-black">Contact sales</h3>
             <p className="mt-3 text-sm leading-6 text-slate-600">
               Need enterprise security, SSO, procurement, or delivery services? Send requirements and we will respond.
             </p>
             <div className="mt-6 grid gap-3">
-              <input className="rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-blue-500" placeholder="Company size" required />
-              <select className="rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-blue-500" defaultValue="business">
+              <input
+                className="rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="Full name"
+                required
+                value={salesForm.fullName}
+                onChange={(event) => setSalesForm((prev) => ({ ...prev, fullName: event.target.value }))}
+              />
+              <input
+                className="rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-blue-500"
+                type="email"
+                placeholder="Work email"
+                required
+                value={salesForm.workEmail}
+                onChange={(event) => setSalesForm((prev) => ({ ...prev, workEmail: event.target.value }))}
+              />
+              <input
+                className="rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="Company and role"
+                required
+                value={salesForm.companyRole}
+                onChange={(event) => setSalesForm((prev) => ({ ...prev, companyRole: event.target.value }))}
+              />
+              <select
+                className="rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-blue-500"
+                value={salesForm.companySize}
+                onChange={(event) => setSalesForm((prev) => ({ ...prev, companySize: event.target.value }))}
+              >
                 <option value="startup">Startup</option>
                 <option value="business">Business</option>
                 <option value="enterprise">Enterprise</option>
               </select>
-              <button className="rounded-full bg-blue-600 px-6 py-3 text-sm font-black text-white" type="submit">
-                Send requirements
+              <textarea
+                className="min-h-24 rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="Tell us your requirement"
+                value={salesForm.message}
+                onChange={(event) => setSalesForm((prev) => ({ ...prev, message: event.target.value }))}
+              />
+              <button className="rounded-full bg-blue-600 px-6 py-3 text-sm font-black text-white disabled:cursor-not-allowed disabled:opacity-70" type="submit" disabled={isSubmitting}>
+                {isSubmitting ? "Submitting..." : "Send requirements"}
               </button>
             </div>
           </form>
 
           {submitted && (
             <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-5 text-sm font-bold text-emerald-800">
-              Thanks. Your {submitted.replace("_", " ")} request was captured for this demo build.
+              Thanks. Your {submitted.type.replace("_", " ")} request was captured with request id #{submitted.requestId}.
+            </div>
+          )}
+          {submissionError && (
+            <div className="rounded-2xl border border-red-200 bg-red-50 p-5 text-sm font-semibold text-red-700">
+              {submissionError}
             </div>
           )}
         </div>

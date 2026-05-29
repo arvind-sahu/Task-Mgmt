@@ -7,7 +7,6 @@
 import { httpBatchLink, loggerLink } from "@trpc/client";
 import { createTRPCNext } from "@trpc/next";
 import { type inferRouterInputs, type inferRouterOutputs } from "@trpc/server";
-import superjson from "superjson";
 
 import { type AppRouter } from "~/server/api/root";
 
@@ -38,7 +37,6 @@ export const api = createTRPCNext<AppRouter>({
            *
            * @see https://trpc.io/docs/data-transformers
            */
-          transformer: superjson,
           url: `${getBaseUrl()}/api/trpc`,
         }),
       ],
@@ -50,7 +48,6 @@ export const api = createTRPCNext<AppRouter>({
    * @see https://trpc.io/docs/nextjs#ssr-boolean-default-false
    */
   ssr: false,
-  transformer: superjson,
 });
 
 /**

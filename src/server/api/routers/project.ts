@@ -215,7 +215,16 @@ export const projectRouter = createTRPCRouter({
         role: z.nativeEnum(ProjectRole).default(ProjectRole.MEMBER),
       }),
     )
-    .mutation(({ ctx, input }) => inviteMemberByEmail(ctx, input)),
+    .mutation(({ ctx, input }) => {
+      const { projectId, email, role } = input;
+      if (!projectId || !email || !role) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Missing required invite fields",
+        });
+      }
+      return inviteMemberByEmail(ctx, { projectId, email, role });
+    }),
 
   addMember: protectedProcedure
     .input(
@@ -225,7 +234,16 @@ export const projectRouter = createTRPCRouter({
         role: z.nativeEnum(ProjectRole).default(ProjectRole.MEMBER),
       }),
     )
-    .mutation(({ ctx, input }) => inviteMemberByEmail(ctx, input)),
+    .mutation(({ ctx, input }) => {
+      const { projectId, email, role } = input;
+      if (!projectId || !email || !role) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Missing required member fields",
+        });
+      }
+      return inviteMemberByEmail(ctx, { projectId, email, role });
+    }),
 
   acceptInvite: protectedProcedure
     .input(z.object({ inviteId: z.string().cuid() }))
