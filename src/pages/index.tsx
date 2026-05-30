@@ -11,6 +11,7 @@ import {
   SocialProof,
   SolutionsSection,
   TeamSection,
+  TrustSecuritySection,
 } from "~/components/marketing/MarketingSections";
 
 export default function Home() {
@@ -25,6 +26,8 @@ export default function Home() {
       <InteractiveDemo />
       <SectionDivider />
       <SocialProof />
+      <SectionDivider />
+      <TrustSecuritySection />
       <SectionDivider />
       <PricingSection />
       <SectionDivider />

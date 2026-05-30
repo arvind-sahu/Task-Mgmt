@@ -6,9 +6,11 @@ import {
   type NextAuthOptions,
   type Session,
 } from "next-auth";
+import AzureADProvider from "next-auth/providers/azure-ad";
 import CredentialsProvider from "next-auth/providers/credentials";
 import GitHubProvider from "next-auth/providers/github";
 import GoogleProvider from "next-auth/providers/google";
+import LinkedInProvider from "next-auth/providers/linkedin";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
 
@@ -64,11 +66,32 @@ function buildOAuthProviders() {
       }),
     );
   }
+  if (getEnabledOAuthProviders().includes("microsoft")) {
+    providers.push(
+      AzureADProvider({
+        id: "microsoft",
+        name: "Microsoft",
+        clientId: env.MICROSOFT_CLIENT_ID!,
+        clientSecret: env.MICROSOFT_CLIENT_SECRET!,
+        tenantId: env.MICROSOFT_TENANT_ID ?? "common",
+        allowDangerousEmailAccountLinking: true,
+      }),
+    );
+  }
   if (getEnabledOAuthProviders().includes("github")) {
     providers.push(
       GitHubProvider({
         clientId: env.AUTH_GITHUB_ID!,
         clientSecret: env.AUTH_GITHUB_SECRET!,
+        allowDangerousEmailAccountLinking: true,
+      }),
+    );
+  }
+  if (getEnabledOAuthProviders().includes("linkedin")) {
+    providers.push(
+      LinkedInProvider({
+        clientId: env.LINKEDIN_CLIENT_ID!,
+        clientSecret: env.LINKEDIN_CLIENT_SECRET!,
         allowDangerousEmailAccountLinking: true,
       }),
     );
@@ -145,11 +168,19 @@ export const authOptions: NextAuthOptions = {
         token.email = user.email;
         token.picture = user.image ?? null;
       }
-      if (account?.provider !== "credentials" && profile && "picture" in profile) {
+      if (
+        account?.provider !== "credentials" &&
+        profile &&
+        "picture" in profile
+      ) {
         const pic = profile.picture;
         if (typeof pic === "string") token.picture = pic;
       }
-      if (account?.provider === "github" && profile && "avatar_url" in profile) {
+      if (
+        account?.provider === "github" &&
+        profile &&
+        "avatar_url" in profile
+      ) {
         const avatar = profile.avatar_url;
         if (typeof avatar === "string") token.picture = avatar;
       }
@@ -178,7 +209,9 @@ export const getServerAuthSession = (ctx: {
 };
 
 /** Protected pages: redirect guests and pass `session` for client hydration. */
-export async function requireAuth(ctx: GetServerSidePropsContext): Promise<
+export async function requireAuth(
+  ctx: GetServerSidePropsContext,
+): Promise<
   | { redirect: { destination: string; permanent: false } }
   | { props: { session: Session } }
 > {

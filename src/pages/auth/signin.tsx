@@ -74,7 +74,10 @@ export default function SignInPage({ oauthProviders }: SignInPageProps) {
     } catch (err) {
       setLoading(false);
       setError(
-        getTrpcMutationErrorMessage(err, "Invalid or expired verification code"),
+        getTrpcMutationErrorMessage(
+          err,
+          "Invalid or expired verification code",
+        ),
       );
       return;
     }
@@ -100,13 +103,28 @@ export default function SignInPage({ oauthProviders }: SignInPageProps) {
       <AuthShell
         title="Sign in to continue"
         subtitle="Access your secure Tasker workspace with email OTP or a connected account."
+        compact
+        titleHelp={
+          <p className="text-sm font-black text-slate-700">            
+            <Link
+              href="/contact"
+              className="text-emerald-600 underline-offset-4 transition hover:text-emerald-700 hover:underline"
+            >
+              Need help?
+            </Link>
+          </p>
+        }
       >
-        <div className="rounded-[2rem] border border-white/80 bg-white/90 p-6 shadow-2xl shadow-blue-200/60 backdrop-blur-xl">
-          <div className="mb-5 flex flex-wrap gap-2">
-            {["Secure sign-in", "SSO available", "No public workspace data"].map((badge) => (
+        <div className="rounded-[1.75rem] border border-white/80 bg-white/95 p-4 shadow-2xl shadow-blue-200/60 ring-1 ring-blue-100/50 backdrop-blur-xl">
+          <div className="mb-3 flex flex-wrap gap-2">
+            {[
+              "Secure sign-in",
+              "SSO available",
+              "No public workspace data",
+            ].map((badge) => (
               <span
                 key={badge}
-                className="rounded-full bg-blue-50 px-3 py-1 text-xs font-black text-blue-700 ring-1 ring-blue-100"
+                className="rounded-full bg-blue-50 px-2.5 py-1 text-[11px] font-black text-blue-700 ring-1 ring-blue-100"
               >
                 {badge}
               </span>
@@ -115,7 +133,7 @@ export default function SignInPage({ oauthProviders }: SignInPageProps) {
 
           <form
             onSubmit={otpRequested ? handleOtpSubmit : handlePasswordSubmit}
-            className="space-y-4"
+            className="space-y-3"
           >
             <div>
               <label className="label" htmlFor="email">
@@ -124,7 +142,7 @@ export default function SignInPage({ oauthProviders }: SignInPageProps) {
               <input
                 id="email"
                 type="email"
-                className="brand-input mt-2"
+                className="brand-input mt-1.5 h-11 text-sm"
                 value={email}
                 onBlur={() => setEmailTouched(true)}
                 onChange={(e) => setEmail(e.target.value)}
@@ -135,7 +153,10 @@ export default function SignInPage({ oauthProviders }: SignInPageProps) {
                 aria-describedby={emailInvalid ? "email-error" : undefined}
               />
               {emailInvalid && (
-                <p id="email-error" className="mt-2 text-sm font-semibold text-red-600">
+                <p
+                  id="email-error"
+                  className="mt-2 text-sm font-semibold text-red-600"
+                >
                   Enter a valid work email address.
                 </p>
               )}
@@ -148,7 +169,7 @@ export default function SignInPage({ oauthProviders }: SignInPageProps) {
                 <input
                   id="password"
                   type={showPassword ? "text" : "password"}
-                  className="brand-input pr-12"
+                  className="brand-input h-11 pr-12 text-sm"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
@@ -166,7 +187,7 @@ export default function SignInPage({ oauthProviders }: SignInPageProps) {
               </div>
             </div>
 
-            <div className="flex flex-col gap-3 rounded-2xl bg-slate-50 p-4 text-sm sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-col gap-2 rounded-2xl bg-slate-50 px-3 py-2.5 text-sm sm:flex-row sm:items-center sm:justify-between">
               <label className="flex items-center gap-2 font-semibold text-slate-700">
                 <input
                   type="checkbox"
@@ -192,9 +213,11 @@ export default function SignInPage({ oauthProviders }: SignInPageProps) {
                 <input
                   id="otp"
                   type="text"
-                  className="brand-input mt-2 tracking-[0.25em]"
+                  className="brand-input mt-1.5 h-11 text-sm tracking-[0.25em]"
                   value={otp}
-                  onChange={(e) => setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                  onChange={(e) =>
+                    setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))
+                  }
                   required
                   inputMode="numeric"
                   maxLength={6}
@@ -216,34 +239,33 @@ export default function SignInPage({ oauthProviders }: SignInPageProps) {
 
             <button
               type="submit"
-              disabled={loading || sendLoginOtp.isPending || verifyLoginOtp.isPending}
-              className="brand-button-primary w-full"
+              disabled={
+                loading || sendLoginOtp.isPending || verifyLoginOtp.isPending
+              }
+              className="brand-button-primary h-11 w-full bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 shadow-blue-600/25 hover:from-blue-700 hover:via-indigo-700 hover:to-purple-700"
             >
-              {!otpRequested
-                ? sendLoginOtp.isPending
-                  ? (
-                    <span className="inline-flex items-center gap-2">
-                      <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />
-                      Sending OTP...
-                    </span>
-                  )
-                  : "Continue with OTP"
-                : loading
-                  ? (
-                    <span className="inline-flex items-center gap-2">
-                      <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />
-                      Signing in...
-                    </span>
-                  )
-                  : "Verify OTP & sign in"}
+              {!otpRequested ? (
+                sendLoginOtp.isPending ? (
+                  <span className="inline-flex items-center gap-2">
+                    <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />
+                    Sending OTP...
+                  </span>
+                ) : (
+                  "Send OTP"
+                )
+              ) : loading ? (
+                <span className="inline-flex items-center gap-2">
+                  <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />
+                  Signing in...
+                </span>
+              ) : (
+                "Verify OTP & sign in"
+              )}
             </button>
-            <p className="text-center text-xs font-medium text-slate-500">
-              Rate limiting is active to protect your account. Multiple failed attempts may pause sign-in briefly.
-            </p>
             {otpRequested && (
               <button
                 type="button"
-                className="brand-button-secondary w-full"
+                className="brand-button-secondary h-11 w-full"
                 onClick={() => {
                   setOtpRequested(false);
                   setOtp("");
@@ -256,9 +278,13 @@ export default function SignInPage({ oauthProviders }: SignInPageProps) {
             )}
           </form>
 
-          <OAuthButtons providers={oauthProviders} callbackUrl={callbackUrl} />
+          <OAuthButtons
+            providers={oauthProviders}
+            callbackUrl={callbackUrl}
+            compact
+          />
 
-          <div className="mt-5 space-y-1 text-center text-sm text-slate-600">
+          <div className="mt-3 space-y-2 text-center text-sm text-slate-600">
             <p>
               Don&apos;t have an account?{" "}
               <Link
@@ -268,15 +294,6 @@ export default function SignInPage({ oauthProviders }: SignInPageProps) {
                 Create one
               </Link>
             </p>
-            <details className="mt-3 rounded-2xl bg-slate-50 p-4 text-left">
-              <summary className="cursor-pointer text-sm font-black text-slate-800">
-                Need help signing in?
-              </summary>
-              <p className="mt-2 text-sm leading-6 text-slate-600">
-                Check your email for the OTP, verify OAuth keys are configured, or contact
-                support at hello@tasker.example.
-              </p>
-            </details>
           </div>
         </div>
       </AuthShell>

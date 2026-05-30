@@ -18,8 +18,8 @@ export default function ContactPage() {
             Tell us what you want to build.
           </h1>
           <p className="mt-6 max-w-3xl text-lg leading-8 text-slate-300">
-            Request a product demo, ask about pricing, or share requirements for web,
-            SaaS, cloud, automation, or AI-enabled product delivery.
+            Request a product demo, raise a sign-in support query, ask about pricing,
+            or share requirements for web, SaaS, cloud, automation, or AI-enabled product delivery.
           </p>
         </div>
       </section>

@@ -339,6 +339,61 @@ export function SocialProof() {
   );
 }
 
+export function TrustSecuritySection() {
+  const trustHighlights = [
+    {
+      title: "Encrypted by default",
+      description:
+        "Sensitive workspace data is protected with encrypted connections, secure sessions, and access controls designed for business-critical collaboration.",
+    },
+    {
+      title: "Privacy-first governance",
+      description:
+        "Our handling practices are guided by European data protection principles, including purpose limitation, consent-aware workflows, and responsible retention.",
+    },
+    {
+      title: "India-ready data practices",
+      description:
+        "We design our processes with India’s Digital Personal Data Protection expectations in mind, including transparency, accountability, and user trust.",
+    },
+  ];
+
+  return (
+    <section className="marketing-section bg-slate-950 px-5 text-white sm:px-8">
+      <div className="mx-auto grid max-w-7xl gap-10 lg:grid-cols-[0.9fr_1.1fr] lg:items-center">
+        <div>
+          <p className="text-sm font-black uppercase tracking-[0.28em] text-cyan-200">
+            Security and trust
+          </p>
+          <h2 className="mt-4 text-4xl font-black tracking-tight sm:text-5xl">
+            Your data is treated like business-critical infrastructure.
+          </h2>
+          <p className="mt-5 text-lg leading-8 text-slate-300">
+            Tasker is built to protect customer information with encryption, controlled access,
+            and privacy-aware operating practices inspired by leading European standards and
+            India’s evolving data protection framework.
+          </p>
+        </div>
+
+        <div className="grid gap-4">
+          {trustHighlights.map((item) => (
+            <article
+              key={item.title}
+              className="rounded-3xl border border-white/10 bg-white/[0.06] p-6 shadow-2xl shadow-slate-950/20"
+            >
+              <div className="mb-4 inline-flex rounded-full bg-cyan-300/10 px-3 py-1 text-xs font-black uppercase tracking-[0.18em] text-cyan-200">
+                Trust layer
+              </div>
+              <h3 className="text-xl font-black text-white">{item.title}</h3>
+              <p className="mt-3 text-sm leading-7 text-slate-300">{item.description}</p>
+            </article>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
 export function PricingSection() {
   const [yearly, setYearly] = useState(true);
 

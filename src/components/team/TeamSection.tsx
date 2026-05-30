@@ -63,7 +63,7 @@ export function LeadershipTeamSection() {
             </p>
           </div>
           <Link
-            href="/about#leadership-team"
+            href="/team"
             className="self-start rounded-full border border-blue-200 bg-white px-5 py-2.5 text-sm font-semibold text-blue-700 transition hover:border-blue-300 hover:bg-blue-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500"
           >
             View All Team
