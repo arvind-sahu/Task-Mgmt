@@ -4,6 +4,7 @@ import { TaskPriority, TaskStatus } from "@prisma/client";
 // avoids string-typed switches scattered across pages.
 
 const statusStyles: Record<TaskStatus, string> = {
+  BACKLOG: "bg-violet-50 text-violet-700 ring-violet-200",
   TODO: "bg-slate-100 text-slate-700 ring-slate-200",
   IN_PROGRESS: "bg-blue-50 text-blue-700 ring-blue-200",
   IN_REVIEW: "bg-amber-50 text-amber-700 ring-amber-200",
@@ -11,6 +12,7 @@ const statusStyles: Record<TaskStatus, string> = {
 };
 
 const statusLabel: Record<TaskStatus, string> = {
+  BACKLOG: "Backlog",
   TODO: "To do",
   IN_PROGRESS: "In progress",
   IN_REVIEW: "In review",
@@ -45,6 +47,7 @@ export function PriorityBadge({ priority }: { priority: TaskPriority }) {
 }
 
 export const TASK_STATUSES: TaskStatus[] = [
+  TaskStatus.BACKLOG,
   TaskStatus.TODO,
   TaskStatus.IN_PROGRESS,
   TaskStatus.IN_REVIEW,
@@ -57,5 +60,14 @@ export const TASK_PRIORITIES: TaskPriority[] = [
   TaskPriority.HIGH,
   TaskPriority.URGENT,
 ];
+
+/** Card border + glow used on kanban task cards. */
+export const priorityCardStyles: Record<TaskPriority, string> = {
+  LOW: "border border-slate-200",
+  MEDIUM: "border border-slate-300",
+  HIGH: "border border-orange-400 shadow-[0_0_0_0.5px_rgba(251,146,60,0.35)]",
+  URGENT:
+    "border border-red-500 shadow-[0_0_0_1px_rgba(239,68,68,0.5),0_2px_12px_rgba(239,68,68,0.22)]",
+};
 
 export { statusLabel };

@@ -5,6 +5,7 @@ import { z } from "zod";
 import { assertProjectAccess } from "~/server/api/access";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { notifyUsers } from "~/server/notifications";
+import { sanitizePlainText } from "~/server/security/sanitize";
 
 export const commentRouter = createTRPCRouter({
   create: protectedProcedure
@@ -28,7 +29,7 @@ export const commentRouter = createTRPCRouter({
 
       const comment = await ctx.db.comment.create({
         data: {
-          body: input.body,
+          body: sanitizePlainText(input.body),
           taskId: input.taskId,
           authorId: ctx.session.user.id,
         },
@@ -81,7 +82,7 @@ export const commentRouter = createTRPCRouter({
 
       return ctx.db.comment.update({
         where: { id: input.id },
-        data: { body: input.body },
+        data: { body: sanitizePlainText(input.body) },
         include: {
           author: { select: { id: true, name: true, email: true, image: true } },
           attachments: true,

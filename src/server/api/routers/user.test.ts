@@ -47,9 +47,25 @@ function makeCtx(opts: DbMocks) {
       }),
       update: vi.fn().mockResolvedValue({ id: "otp_1", consumedAt: new Date() }),
     },
+    $transaction: vi.fn(async (fn: (tx: unknown) => Promise<unknown>) =>
+      fn({
+        rateLimitHit: {
+          count: vi.fn().mockResolvedValue(0),
+          create: vi.fn().mockResolvedValue({ id: "hit-1" }),
+        },
+      }),
+    ),
+    rateLimitHit: {
+      deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
+    },
   } as unknown as PrismaClient;
 
-  return { db, session: null, mocks: { findUnique, create, update } };
+  return {
+    db,
+    session: null,
+    clientIp: "127.0.0.1",
+    mocks: { findUnique, create, update },
+  };
 }
 
 describe("user.register", () => {

@@ -5,6 +5,10 @@ import { NotificationType, TaskPriority, TaskStatus } from "@prisma/client";
 import { assertProjectAccess } from "~/server/api/access";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { notifyUsers } from "~/server/notifications";
+import {
+  sanitizeOptionalPlainText,
+  sanitizePlainText,
+} from "~/server/security/sanitize";
 
 const baseInput = {
   title: z.string().min(1).max(200),
@@ -12,6 +16,7 @@ const baseInput = {
   status: z.nativeEnum(TaskStatus).optional(),
   priority: z.nativeEnum(TaskPriority).optional(),
   deadline: z.coerce.date().nullable().optional(),
+  sprintId: z.string().cuid().nullable().optional(),
   assigneeIds: z.array(z.string().cuid()).optional(),
   tagIds: z.array(z.string().cuid()).optional(),
 };
@@ -31,6 +36,9 @@ const listInput = z.object({
   status: z.nativeEnum(TaskStatus).optional(),
   priority: z.nativeEnum(TaskPriority).optional(),
   assigneeId: z.string().cuid().optional(),
+  tagId: z.string().cuid().optional(),
+  sprintId: z.string().cuid().nullable().optional(),
+  backlog: z.boolean().optional(),
   search: z.string().optional(),
 });
 
@@ -42,8 +50,40 @@ const includeShape = {
   creator: {
     select: { id: true, name: true, email: true, image: true },
   },
+  sprint: true,
   _count: { select: { comments: true } },
 } as const;
+
+async function assertAssigneesBelongToProject(
+  db: Parameters<typeof assertProjectAccess>[0],
+  projectId: string,
+  assigneeIds?: string[],
+) {
+  if (!assigneeIds?.length) return;
+
+  const project = await db.project.findUniqueOrThrow({
+    where: { id: projectId },
+    select: {
+      ownerId: true,
+      members: {
+        where: { userId: { in: assigneeIds } },
+        select: { userId: true },
+      },
+    },
+  });
+  const projectUserIds = new Set([
+    project.ownerId,
+    ...project.members.map((member) => member.userId),
+  ]);
+  const invalidAssignee = assigneeIds.find((id) => !projectUserIds.has(id));
+
+  if (invalidAssignee) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: "Tasks can only be assigned to project members",
+    });
+  }
+}
 
 export const taskRouter = createTRPCRouter({
   list: protectedProcedure.input(listInput).query(async ({ ctx, input }) => {
@@ -54,9 +94,16 @@ export const taskRouter = createTRPCRouter({
         projectId: input.projectId,
         status: input.status,
         priority: input.priority,
+        sprintId:
+          input.backlog === true
+            ? null
+            : input.sprintId === undefined
+              ? undefined
+              : input.sprintId,
         assignees: input.assigneeId
           ? { some: { id: input.assigneeId } }
           : undefined,
+        tags: input.tagId ? { some: { id: input.tagId } } : undefined,
         OR: input.search
           ? [
               { title: { contains: input.search, mode: "insensitive" } },
@@ -138,6 +185,7 @@ export const taskRouter = createTRPCRouter({
         status,
         priority,
         deadline,
+        sprintId,
       } = input;
       if (!projectId || !title) {
         throw new TRPCError({
@@ -146,14 +194,29 @@ export const taskRouter = createTRPCRouter({
         });
       }
       await assertProjectAccess(ctx.db, projectId, ctx.session.user.id);
+      await assertAssigneesBelongToProject(ctx.db, projectId, assigneeIds);
+      if (sprintId) {
+        const sprint = await ctx.db.sprint.findUniqueOrThrow({
+          where: { id: sprintId },
+          select: { projectId: true },
+        });
+        if (sprint.projectId !== projectId) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "Sprint does not belong to this project",
+          });
+        }
+      }
+      const resolvedStatus = status ?? TaskStatus.BACKLOG;
 
       const task = await ctx.db.task.create({
         data: {
-          title,
-          description,
-          status,
+          title: sanitizePlainText(title),
+          description: sanitizeOptionalPlainText(description),
+          status: sprintId ? resolvedStatus : TaskStatus.BACKLOG,
           priority,
           deadline,
+          sprint: sprintId ? { connect: { id: sprintId } } : undefined,
           project: { connect: { id: projectId } },
           creator: { connect: { id: ctx.session.user.id } },
           assignees: assigneeIds
@@ -193,13 +256,43 @@ export const taskRouter = createTRPCRouter({
         existing.projectId,
         ctx.session.user.id,
       );
+      const { id, assigneeIds, tagIds, sprintId, ...rest } = input;
+      await assertAssigneesBelongToProject(
+        ctx.db,
+        existing.projectId,
+        assigneeIds,
+      );
 
-      const { id, assigneeIds, tagIds, ...rest } = input;
+      const sanitizedRest = {
+        ...rest,
+        title: rest.title ? sanitizePlainText(rest.title) : undefined,
+        description: sanitizeOptionalPlainText(rest.description),
+      };
+
+      if (sprintId) {
+        const sprint = await ctx.db.sprint.findUniqueOrThrow({
+          where: { id: sprintId },
+          select: { projectId: true },
+        });
+        if (sprint.projectId !== existing.projectId) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "Sprint does not belong to this project",
+          });
+        }
+      }
 
       const updated = await ctx.db.task.update({
         where: { id },
         data: {
-          ...rest,
+          ...sanitizedRest,
+          status: sprintId === null ? TaskStatus.BACKLOG : sanitizedRest.status,
+          sprint:
+            sprintId === undefined
+              ? undefined
+              : sprintId
+                ? { connect: { id: sprintId } }
+                : { disconnect: true },
           // `set` (rather than connect) so updates fully replace the lists,
           // matching what a typical "edit task" UI expects.
           assignees: assigneeIds
@@ -245,7 +338,9 @@ export const taskRouter = createTRPCRouter({
       );
       return ctx.db.task.update({
         where: { id: input.id },
-        data: { status: input.status },
+        data: {
+          status: input.status,
+        },
       });
     }),
 

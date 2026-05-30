@@ -14,6 +14,8 @@ import { ZodError } from "zod";
 
 import { getServerAuthSession } from "~/server/auth";
 import { db } from "~/server/db";
+import { assertRateLimit, toRateLimitTrpcError } from "~/server/rateLimit";
+import { getClientIp } from "~/server/security/clientIp";
 import { sanitizeEmailErrorForDisplay } from "~/utils/emailErrors";
 
 /**
@@ -26,6 +28,7 @@ import { sanitizeEmailErrorForDisplay } from "~/utils/emailErrors";
 
 interface CreateContextOptions {
   session: Session | null;
+  clientIp: string;
 }
 
 /**
@@ -42,6 +45,7 @@ const createInnerTRPCContext = (opts: CreateContextOptions) => {
   return {
     session: opts.session,
     db,
+    clientIp: opts.clientIp,
   };
 };
 
@@ -59,6 +63,7 @@ export const createTRPCContext = async (opts: CreateNextContextOptions) => {
 
   return createInnerTRPCContext({
     session,
+    clientIp: getClientIp(req),
   });
 };
 
@@ -123,6 +128,18 @@ const timingMiddleware = t.middleware(async ({ next, path }) => {
   return result;
 });
 
+const rateLimitMiddleware = t.middleware(async ({ ctx, next }) => {
+  const key = ctx.session?.user?.id
+    ? `api:user:${ctx.session.user.id}`
+    : `api:ip:${ctx.clientIp}`;
+  try {
+    await assertRateLimit(ctx.db, key);
+  } catch (error) {
+    toRateLimitTrpcError(error);
+  }
+  return next();
+});
+
 /**
  * Public (unauthenticated) procedure
  *
@@ -130,7 +147,9 @@ const timingMiddleware = t.middleware(async ({ next, path }) => {
  * guarantee that a user querying is authorized, but you can still access user session data if they
  * are logged in.
  */
-export const publicProcedure = t.procedure.use(timingMiddleware);
+export const publicProcedure = t.procedure
+  .use(timingMiddleware)
+  .use(rateLimitMiddleware);
 
 /**
  * Protected (authenticated) procedure
@@ -142,6 +161,7 @@ export const publicProcedure = t.procedure.use(timingMiddleware);
  */
 export const protectedProcedure = t.procedure
   .use(timingMiddleware)
+  .use(rateLimitMiddleware)
   .use(({ ctx, next }) => {
     if (!ctx.session?.user) {
       throw new TRPCError({ code: "UNAUTHORIZED" });

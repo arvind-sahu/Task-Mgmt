@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { assertProjectAccess } from "~/server/api/access";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
+import { sanitizePlainText } from "~/server/security/sanitize";
 import { isAllowedAttachmentType } from "~/utils/attachments";
 
 const dataUrlSchema = z
@@ -49,7 +50,7 @@ export const attachmentRouter = createTRPCRouter({
       return ctx.db.taskAttachment.create({
         data: {
           taskId: input.taskId,
-          fileName: input.fileName,
+          fileName: sanitizePlainText(input.fileName),
           mimeType: input.mimeType,
           dataUrl: input.dataUrl,
           uploaderId: ctx.session.user.id,
@@ -82,7 +83,7 @@ export const attachmentRouter = createTRPCRouter({
       return ctx.db.taskAttachment.create({
         data: {
           commentId: input.commentId,
-          fileName: input.fileName,
+          fileName: sanitizePlainText(input.fileName),
           mimeType: input.mimeType,
           dataUrl: input.dataUrl,
           uploaderId: ctx.session.user.id,

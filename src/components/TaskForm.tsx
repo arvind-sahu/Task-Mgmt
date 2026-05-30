@@ -3,6 +3,7 @@ import { useState, type FormEvent } from "react";
 
 import { TASK_PRIORITIES, TASK_STATUSES, statusLabel } from "./Badges";
 import { api } from "~/utils/api";
+import { initialsFromName } from "~/utils/avatar";
 
 export interface TaskFormValues {
   title: string;
@@ -10,17 +11,29 @@ export interface TaskFormValues {
   status: TaskStatus;
   priority: TaskPriority;
   deadline?: string; // YYYY-MM-DD
+  sprintId?: string | null;
   assigneeIds: string[];
   tagIds: string[];
 }
 
+type SprintOption = {
+  id: string;
+  name: string;
+  startDate: Date | string;
+  endDate: Date | string;
+};
+
 interface Props {
   projectId: string;
   initial?: Partial<TaskFormValues>;
+  sprintOptions?: SprintOption[];
   onSubmit: (values: TaskFormValues) => void;
   onCancel?: () => void;
   submitting?: boolean;
   submitLabel?: string;
+  hideTitle?: boolean;
+  hideSprint?: boolean;
+  descriptionRows?: number;
 }
 
 /**
@@ -30,10 +43,14 @@ interface Props {
 export default function TaskForm({
   projectId,
   initial,
+  sprintOptions = [],
   onSubmit,
   onCancel,
   submitting,
   submitLabel = "Save",
+  hideTitle = false,
+  hideSprint = false,
+  descriptionRows = 4,
 }: Props) {
   const project = api.project.byId.useQuery({ id: projectId });
   const tags = api.tag.list.useQuery({ projectId });
@@ -41,12 +58,15 @@ export default function TaskForm({
   const [title, setTitle] = useState(initial?.title ?? "");
   const [description, setDescription] = useState(initial?.description ?? "");
   const [status, setStatus] = useState<TaskStatus>(
-    initial?.status ?? TaskStatus.TODO,
+    initial?.status ?? TaskStatus.BACKLOG,
   );
   const [priority, setPriority] = useState<TaskPriority>(
     initial?.priority ?? TaskPriority.MEDIUM,
   );
   const [deadline, setDeadline] = useState(initial?.deadline ?? "");
+  const [sprintId, setSprintId] = useState<string | null | undefined>(
+    initial?.sprintId,
+  );
   const [assigneeIds, setAssigneeIds] = useState<string[]>(
     initial?.assigneeIds ?? [],
   );
@@ -64,6 +84,7 @@ export default function TaskForm({
       status,
       priority,
       deadline: deadline || undefined,
+      sprintId,
       assigneeIds,
       tagIds,
     });
@@ -71,23 +92,52 @@ export default function TaskForm({
 
   return (
     <form onSubmit={submit} className="space-y-4">
-      <div>
-        <label className="label">Title</label>
-        <input
-          className="input mt-1"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          required
-          maxLength={200}
-          autoFocus
-        />
-      </div>
+      {!hideTitle && (
+        <div>
+          <label className="label">Title</label>
+          <input
+            className="input mt-1"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            required
+            maxLength={200}
+            autoFocus
+          />
+        </div>
+      )}
+
+      {!hideSprint && sprintOptions.length > 0 && (
+        <div>
+          <label className="label">Sprint</label>
+          <select
+            className="input mt-1"
+            value={sprintId ?? ""}
+            onChange={(e) => {
+              const nextSprintId = e.target.value || null;
+              setSprintId(nextSprintId);
+              const sprint = sprintOptions.find((item) => item.id === nextSprintId);
+              setDeadline(
+                sprint
+                  ? new Date(sprint.endDate).toISOString().slice(0, 10)
+                  : "",
+              );
+            }}
+          >
+            <option value="">Backlog</option>
+            {sprintOptions.map((sprint) => (
+              <option key={sprint.id} value={sprint.id}>
+                {sprint.name}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
 
       <div>
         <label className="label">Description</label>
         <textarea
           className="input mt-1"
-          rows={4}
+          rows={descriptionRows}
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           maxLength={5000}
@@ -150,8 +200,20 @@ export default function TaskForm({
                     : "bg-white text-slate-700 ring-slate-200 hover:bg-slate-50"
                 }`}
               >
-                <span className="grid h-5 w-5 place-items-center rounded-full bg-indigo-100 text-[10px] font-semibold text-indigo-700">
-                  {(m.user.name ?? m.user.email).charAt(0).toUpperCase()}
+                <span className="grid h-5 w-5 place-items-center overflow-hidden rounded-full bg-indigo-100 text-[10px] font-semibold text-indigo-700 ring-1 ring-indigo-200">
+                  {m.user.image ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={m.user.image}
+                      alt={m.user.name ?? m.user.email}
+                      loading="lazy"
+                      decoding="async"
+                      referrerPolicy="no-referrer"
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    initialsFromName(m.user.name, m.user.email)
+                  )}
                 </span>
                 {m.user.name ?? m.user.email}
               </button>

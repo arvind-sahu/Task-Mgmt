@@ -5,6 +5,10 @@ import { z } from "zod";
 import { assertProjectAccess } from "~/server/api/access";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { createNotification } from "~/server/notifications";
+import {
+  sanitizeOptionalPlainText,
+  sanitizePlainText,
+} from "~/server/security/sanitize";
 
 const INVITE_TTL_DAYS = 14;
 
@@ -99,6 +103,7 @@ const createInput = z.object({
     .string()
     .regex(/^#[0-9A-Fa-f]{6}$/, "Must be a hex color, e.g. #6366F1")
     .optional(),
+  sprintDurationWeeks: z.union([z.literal(1), z.literal(2)]).optional(),
 });
 
 const updateInput = createInput.partial().extend({ id: z.string().cuid() });
@@ -160,9 +165,10 @@ export const projectRouter = createTRPCRouter({
       return ctx.db.$transaction(async (tx) => {
         const project = await tx.project.create({
           data: {
-            name: input.name,
-            description: input.description,
+            name: sanitizePlainText(input.name),
+            description: sanitizeOptionalPlainText(input.description),
             color: input.color,
+            sprintDurationWeeks: input.sprintDurationWeeks,
             ownerId: userId,
           },
         });
@@ -183,7 +189,12 @@ export const projectRouter = createTRPCRouter({
         ProjectRole.ADMIN,
       );
       const { id, ...data } = input;
-      return ctx.db.project.update({ where: { id }, data });
+      const sanitized = {
+        ...data,
+        name: data.name ? sanitizePlainText(data.name) : undefined,
+        description: sanitizeOptionalPlainText(data.description),
+      };
+      return ctx.db.project.update({ where: { id }, data: sanitized });
     }),
 
   delete: protectedProcedure

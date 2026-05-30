@@ -4,6 +4,7 @@ import { dashboardRouter } from "~/server/api/routers/dashboard";
 import { leadRequestRouter } from "~/server/api/routers/leadRequest";
 import { notificationRouter } from "~/server/api/routers/notification";
 import { projectRouter } from "~/server/api/routers/project";
+import { sprintRouter } from "~/server/api/routers/sprint";
 import { tagRouter } from "~/server/api/routers/tag";
 import { taskRouter } from "~/server/api/routers/task";
 import { userRouter } from "~/server/api/routers/user";
@@ -20,6 +21,7 @@ import { createCallerFactory, createTRPCRouter } from "~/server/api/trpc";
 export const appRouter = createTRPCRouter({
   user: userRouter,
   project: projectRouter,
+  sprint: sprintRouter,
   task: taskRouter,
   tag: tagRouter,
   comment: commentRouter,

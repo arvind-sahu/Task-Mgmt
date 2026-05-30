@@ -9,6 +9,10 @@ import {
 } from "~/server/api/trpc";
 import { EmailDeliveryError } from "~/server/emailErrors";
 import { issueEmailOtp, verifyEmailOtp } from "~/server/otp";
+import {
+  sanitizeOptionalPlainText,
+  sanitizePlainText,
+} from "~/server/security/sanitize";
 import { EMAIL_DELIVERY_FAILED_MESSAGE } from "~/utils/emailErrors";
 
 // Reusable input shapes — exported so tests can import the same schemas.
@@ -69,7 +73,7 @@ export const userRouter = createTRPCRouter({
 
       const user = await ctx.db.user.create({
         data: {
-          name: input.name,
+          name: sanitizePlainText(input.name),
           email,
           password: passwordHash,
         },
@@ -144,7 +148,7 @@ export const userRouter = createTRPCRouter({
       const passwordHash = await bcrypt.hash(input.password, 10);
       const user = await ctx.db.user.create({
         data: {
-          name: input.name,
+          name: sanitizePlainText(input.name),
           email,
           password: passwordHash,
         },
@@ -325,7 +329,11 @@ export const userRouter = createTRPCRouter({
     .mutation(({ ctx, input }) => {
       return ctx.db.user.update({
         where: { id: ctx.session.user.id },
-        data: input,
+        data: {
+          ...input,
+          name: input.name ? sanitizePlainText(input.name) : undefined,
+          bio: sanitizeOptionalPlainText(input.bio),
+        },
         select: {
           id: true,
           name: true,

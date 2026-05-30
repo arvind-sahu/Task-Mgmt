@@ -62,6 +62,31 @@ export function relativeDeadline(
   return `in ${days} days`;
 }
 
+/**
+ * Compact day-based label for task cards: "Today", "1 day", "2 days", "7 days ago".
+ */
+export function deadlineDayLabel(
+  value: Date | string | null | undefined,
+  now: Date = new Date(),
+): string {
+  if (!value) return "";
+  const d = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(d.getTime())) return "";
+
+  const startOfDay = (x: Date) =>
+    new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+
+  const diffMs = startOfDay(d) - startOfDay(now);
+  const day = 24 * 60 * 60 * 1000;
+  const days = Math.round(diffMs / day);
+
+  if (days === 0) return "Today";
+  const count = Math.abs(days);
+  const unit = count === 1 ? "day" : "days";
+  if (days > 0) return `${count} ${unit}`;
+  return `${count} ${unit} ago`;
+}
+
 /** True if `value` is a date strictly before `now` (calendar-day precision). */
 export function isOverdue(
   value: Date | string | null | undefined,
