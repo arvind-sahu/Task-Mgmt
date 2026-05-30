@@ -1,8 +1,13 @@
 import { env } from "~/env";
 
-export type OAuthProviderId = "google" | "github";
+export type OAuthProviderId = "google" | "microsoft" | "github" | "linkedin";
 
-export const OAUTH_PROVIDER_IDS: OAuthProviderId[] = ["google", "github"];
+export const OAUTH_PROVIDER_IDS: OAuthProviderId[] = [
+  "google",
+  "microsoft",
+  "github",
+  "linkedin",
+];
 
 export type OAuthProviderOption = {
   id: OAuthProviderId;
@@ -13,8 +18,12 @@ function isConfigured(id: OAuthProviderId): boolean {
   switch (id) {
     case "google":
       return !!(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET);
+    case "microsoft":
+      return !!(env.MICROSOFT_CLIENT_ID && env.MICROSOFT_CLIENT_SECRET);
     case "github":
       return !!(env.AUTH_GITHUB_ID && env.AUTH_GITHUB_SECRET);
+    case "linkedin":
+      return !!(env.LINKEDIN_CLIENT_ID && env.LINKEDIN_CLIENT_SECRET);
   }
 }
 

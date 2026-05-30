@@ -65,6 +65,7 @@ export const leadershipTeamMembers: LeadershipTeamMember[] = [
     name: "Raju J",
     title: "Sales Director",
     bio: "Owns enterprise sales, requirement discovery, and customer communication to align business goals with product delivery outcomes.",
+    photoUrl: "/images/team/raju-janani.png",
     department: "Go-to-market",
     socialLinks: {
       linkedin: "https://www.linkedin.com/in/raju-janagani/",
@@ -75,6 +76,7 @@ export const leadershipTeamMembers: LeadershipTeamMember[] = [
     name: "Pranay Fating",
     title: "Advisor",
     bio: "IIIT Nagpur CSE advisor helping shape product strategy, technology direction, and sustainable scaling decisions.",
+    photoUrl: "/images/team/pranay-fating.jpeg",
     department: "AI",
     socialLinks: {
       linkedin: "https://www.linkedin.com/in/pranay-fating-453a5914b/",

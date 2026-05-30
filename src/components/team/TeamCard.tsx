@@ -15,12 +15,11 @@ function clampText(text: string, maxLength: number) {
 }
 
 function initialsFromName(name: string) {
-  return name
-    .split(" ")
-    .map((part) => part[0] ?? "")
-    .join("")
-    .slice(0, 2)
-    .toUpperCase();
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  const first = parts[0]?.[0] ?? "";
+  const last = (parts.length > 1 ? parts[parts.length - 1]?.[0] : parts[0]?.[1]) ?? "";
+
+  return `${first}${last}`.toUpperCase();
 }
 
 function SocialIcon({
