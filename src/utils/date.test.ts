@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   formatDate,
   formatDateTime,
+  deadlineDayLabel,
   isOverdue,
   relativeDeadline,
   wasEdited,
@@ -58,6 +59,31 @@ describe("relativeDeadline", () => {
   it("returns overdue phrasing for past dates", () => {
     expect(relativeDeadline(new Date(2024, 5, 10, 10, 0, 0), now)).toMatch(
       /ago/,
+    );
+  });
+});
+
+describe("deadlineDayLabel", () => {
+  const now = new Date(2024, 5, 15, 12, 0, 0);
+
+  it("returns Today for same calendar day", () => {
+    expect(deadlineDayLabel(new Date(2024, 5, 15, 23, 0, 0), now)).toBe(
+      "Today",
+    );
+  });
+
+  it("returns day counts for future deadlines", () => {
+    expect(deadlineDayLabel(new Date(2024, 5, 16, 10, 0, 0), now)).toBe(
+      "1 day",
+    );
+    expect(deadlineDayLabel(new Date(2024, 5, 22, 10, 0, 0), now)).toBe(
+      "7 days",
+    );
+  });
+
+  it("returns day counts for past deadlines", () => {
+    expect(deadlineDayLabel(new Date(2024, 5, 10, 10, 0, 0), now)).toBe(
+      "5 days ago",
     );
   });
 });

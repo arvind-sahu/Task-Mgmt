@@ -3,6 +3,7 @@ import { ProjectRole } from "@prisma/client";
 
 import { assertProjectAccess } from "~/server/api/access";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
+import { sanitizePlainText } from "~/server/security/sanitize";
 
 export const tagRouter = createTRPCRouter({
   list: protectedProcedure
@@ -36,7 +37,7 @@ export const tagRouter = createTRPCRouter({
       return ctx.db.tag.create({
         data: {
           projectId: input.projectId,
-          name: input.name,
+          name: sanitizePlainText(input.name),
           color: input.color,
         },
       });

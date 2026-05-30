@@ -28,6 +28,73 @@ export default $config({
     };
   },
   async run() {
+    // CloudFront WAF ACLs must be created in us-east-1.
+    const usEast1 = new aws.Provider("us-east-1", { region: "us-east-1" });
+
+    const webAcl = new aws.wafv2.WebAcl(
+      "WebAcl",
+      {
+        scope: "CLOUDFRONT",
+        defaultAction: { allow: {} },
+        visibilityConfig: {
+          cloudwatchMetricsEnabled: true,
+          metricName: "tasker-web-acl",
+          sampledRequestsEnabled: true,
+        },
+        rules: [
+          {
+            name: "RateLimitRule",
+            priority: 0,
+            action: { block: {} },
+            statement: {
+              rateBasedStatement: {
+                limit: 2000,
+                aggregateKeyType: "IP",
+              },
+            },
+            visibilityConfig: {
+              cloudwatchMetricsEnabled: true,
+              metricName: "tasker-rate-limit",
+              sampledRequestsEnabled: true,
+            },
+          },
+          {
+            name: "AWSManagedRulesCommon",
+            priority: 1,
+            overrideAction: { none: {} },
+            statement: {
+              managedRuleGroupStatement: {
+                vendorName: "AWS",
+                name: "AWSManagedRulesCommonRuleSet",
+              },
+            },
+            visibilityConfig: {
+              cloudwatchMetricsEnabled: true,
+              metricName: "tasker-common-rules",
+              sampledRequestsEnabled: true,
+            },
+          },
+          {
+            name: "AWSManagedRulesKnownBadInputs",
+            priority: 2,
+            overrideAction: { none: {} },
+            statement: {
+              managedRuleGroupStatement: {
+                vendorName: "AWS",
+                name: "AWSManagedRulesKnownBadInputsRuleSet",
+              },
+            },
+            visibilityConfig: {
+              cloudwatchMetricsEnabled: true,
+              metricName: "tasker-known-bad-inputs",
+              sampledRequestsEnabled: true,
+            },
+          },
+        ],
+      },
+      { provider: usEast1 },
+    );
+
     // The Next.js component handles bundling, image optimization, and
     // CloudFront distribution. Env vars are forwarded to the Lambda.
     new sst.aws.Nextjs("Web", {
@@ -50,6 +117,15 @@ export default $config({
         SMTP_USER: process.env.SMTP_USER ?? "",
         SMTP_PASS: process.env.SMTP_PASS ?? "",
         SMTP_FROM: process.env.SMTP_FROM ?? "",
+      },
+      transform: {
+        cdn: {
+          transform: {
+            distribution(args) {
+              args.webAclId = webAcl.arn;
+            },
+          },
+        },
       },
       // Add a custom domain by uncommenting and pointing your DNS at the
       // generated CloudFront distribution:

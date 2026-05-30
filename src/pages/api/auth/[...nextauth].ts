@@ -1,5 +1,8 @@
 import NextAuth from "next-auth";
 
+import { withApiRateLimit } from "~/server/api/withApiRateLimit";
 import { authOptions } from "~/server/auth";
 
-export default NextAuth(authOptions);
+const handler = NextAuth(authOptions);
+
+export default withApiRateLimit(handler, "auth");

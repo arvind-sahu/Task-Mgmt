@@ -1,7 +1,12 @@
 import { type NextApiRequest, type NextApiResponse } from "next";
 import { z } from "zod";
 
+import { withApiRateLimit } from "~/server/api/withApiRateLimit";
 import { createLeadRequest } from "~/server/leadRequest";
+import {
+  sanitizeOptionalPlainText,
+  sanitizePlainText,
+} from "~/server/security/sanitize";
 
 const leadRequestInputSchema = z.object({
   type: z.enum(["DEMO_REQUEST", "CONTACT_SALES", "NEWSLETTER_SIGNUP"]),
@@ -13,7 +18,7 @@ const leadRequestInputSchema = z.object({
   source: z.string().max(100).optional(),
 });
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
   }
@@ -32,12 +37,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   try {
     const lead = await createLeadRequest({
       type,
-      workEmail,
-      fullName,
-      companyRole,
-      companySize,
-      message,
-      source,
+      workEmail: sanitizePlainText(workEmail),
+      fullName: sanitizeOptionalPlainText(fullName),
+      companyRole: sanitizeOptionalPlainText(companyRole),
+      companySize: sanitizeOptionalPlainText(companySize),
+      message: sanitizeOptionalPlainText(message),
+      source: sanitizeOptionalPlainText(source),
     });
     return res.status(201).json({
       requestId: lead.requestId,
@@ -50,3 +55,5 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(500).json({ error: "Failed to create lead request" });
   }
 }
+
+export default withApiRateLimit(handler, "lead-request");

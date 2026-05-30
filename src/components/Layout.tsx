@@ -11,6 +11,9 @@ import { initialsFromName } from "~/utils/avatar";
 interface LayoutProps {
   title?: string;
   children: ReactNode;
+  contentClassName?: string;
+  headerTitle?: string;
+  compactBrand?: boolean;
 }
 
 /**
@@ -18,7 +21,13 @@ interface LayoutProps {
  * page so the navigation experience is consistent. Auth pages render their
  * own minimal shell (see /auth/*).
  */
-export default function Layout({ title, children }: LayoutProps) {
+export default function Layout({
+  title,
+  children,
+  contentClassName,
+  headerTitle,
+  compactBrand = false,
+}: LayoutProps) {
   const { data: session, status } = useSession();
   const router = useRouter();
   const me = api.user.me.useQuery(undefined, { enabled: !!session });
@@ -67,9 +76,21 @@ export default function Layout({ title, children }: LayoutProps) {
               <div className="grid h-8 w-8 shrink-0 place-items-center rounded-md bg-indigo-600 text-sm font-bold text-white">
                 T
               </div>
-              <span className="truncate text-base font-semibold sm:text-lg">
-                Tasker
-              </span>
+              {!compactBrand && (
+                <span className="truncate text-base font-semibold sm:text-lg">
+                  Tasker
+                </span>
+              )}
+              {headerTitle && (
+                <span className="flex min-w-0 items-center gap-2 border-l border-slate-200 pl-3">
+                  <span className="truncate text-sm font-semibold text-slate-800 sm:text-base">
+                    {headerTitle}
+                  </span>
+                  <span className="inline-flex shrink-0 items-center rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase leading-none tracking-wide text-indigo-700 ring-1 ring-indigo-200 bg-indigo-50">
+                    Project
+                  </span>
+                </span>
+              )}
             </Link>
 
             {isAuthed && (
@@ -176,7 +197,12 @@ export default function Layout({ title, children }: LayoutProps) {
           </div>
         </header>
 
-        <main className="mx-auto w-full min-w-0 max-w-7xl flex-1 px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
+        <main
+          className={
+            contentClassName ??
+            "mx-auto w-full min-w-0 max-w-7xl flex-1 px-4 py-6 sm:px-6 sm:py-8 lg:px-8"
+          }
+        >
           {children}
         </main>
       </div>

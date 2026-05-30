@@ -97,6 +97,7 @@ model Project {
     name        String
     description String?
     color       String   @default("#6366F1") // indigo-500 default
+    sprintDurationWeeks Int      @default(1)
     createdAt   DateTime @default(now())
     updatedAt   DateTime @updatedAt
 
@@ -105,6 +106,7 @@ model Project {
 
     members ProjectMember[]
     tasks   Task[]
+    sprints Sprint[]
     tags    Tag[]
     invites ProjectInvite[]
 
@@ -141,6 +143,7 @@ enum TaskPriority {
 }
 
 enum TaskStatus {
+    BACKLOG
     TODO
     IN_PROGRESS
     IN_REVIEW
@@ -201,6 +204,8 @@ model Task {
 
     projectId   String
     project     Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+    sprintId    String?
+    sprint      Sprint?      @relation(fields: [sprintId], references: [id], onDelete: SetNull)
     creatorId   String
     creator     User         @relation("TaskCreator", fields: [creatorId], references: [id])
 
@@ -210,8 +215,25 @@ model Task {
     attachments TaskAttachment[]
 
     @@index([projectId])
+    @@index([sprintId])
     @@index([creatorId])
     @@index([status])
+}
+
+model Sprint {
+    id        String   @id @default(cuid())
+    name      String
+    startDate DateTime
+    endDate   DateTime
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    projectId String
+    project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+    tasks     Task[]
+
+    @@index([projectId, startDate])
+    @@index([projectId, endDate])
 }
 
 /// Per-project, color-coded label. Names are unique within a project.
@@ -345,4 +367,12 @@ model LoginAudit {
     createdAt DateTime @default(now())
 
     @@index([userId, createdAt])
+}
+
+model RateLimitHit {
+    id        String   @id @default(cuid())
+    key       String
+    createdAt DateTime @default(now())
+
+    @@index([key, createdAt])
 }
