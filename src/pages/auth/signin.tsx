@@ -2,10 +2,11 @@ import { signIn } from "next-auth/react";
 import Head from "next/head";
 import Link from "next/link";
 import { useRouter } from "next/router";
-import { useState, type FormEvent } from "react";
+import { useCallback, useRef, useState, type FormEvent } from "react";
 import type { GetServerSidePropsContext } from "next";
 
 import { AuthShell } from "~/components/auth/AuthShell";
+import { OtpInput } from "~/components/auth/OtpInput";
 import { OAuthButtons } from "~/components/auth/OAuthButtons";
 import { getServerAuthSession } from "~/server/auth";
 import {
@@ -41,6 +42,7 @@ export default function SignInPage({ oauthProviders }: SignInPageProps) {
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const verifyingRef = useRef(false);
 
   const sendLoginOtp = api.user.sendLoginOtp.useMutation();
   const verifyLoginOtp = api.user.verifyLoginOtp.useMutation();
@@ -52,8 +54,8 @@ export default function SignInPage({ oauthProviders }: SignInPageProps) {
     setError(null);
     try {
       await sendLoginOtp.mutateAsync({ email, password });
+      setOtp("");
       setOtpRequested(true);
-      setInfo("OTP sent to your email. Enter it below to continue.");
     } catch (err) {
       setError(
         getTrpcMutationErrorMessage(
@@ -64,35 +66,78 @@ export default function SignInPage({ oauthProviders }: SignInPageProps) {
     }
   }
 
+  const submitOtp = useCallback(
+    async (code: string) => {
+      if (code.length !== 6 || verifyingRef.current) return;
+
+      verifyingRef.current = true;
+      setInfo(null);
+      setError(null);
+      setLoading(true);
+
+      try {
+        await verifyLoginOtp.mutateAsync({ email, otp: code });
+      } catch (err) {
+        setLoading(false);
+        verifyingRef.current = false;
+        setError(
+          getTrpcMutationErrorMessage(
+            err,
+            "Invalid or expired verification code",
+          ),
+        );
+        return;
+      }
+
+      const res = await signIn("credentials", {
+        email,
+        password,
+        redirect: false,
+        callbackUrl,
+      });
+
+      setLoading(false);
+      verifyingRef.current = false;
+
+      if (!res || res.error) {
+        setError("Invalid email or password");
+        return;
+      }
+
+      void router.push(res.url ?? callbackUrl);
+    },
+    [callbackUrl, email, password, router, verifyLoginOtp],
+  );
+
   async function handleOtpSubmit(e: FormEvent) {
     e.preventDefault();
+    await submitOtp(otp);
+  }
+
+  async function handleResendOtp() {
     setInfo(null);
     setError(null);
-    setLoading(true);
+    setOtp("");
+    verifyingRef.current = false;
     try {
-      await verifyLoginOtp.mutateAsync({ email, otp });
+      await sendLoginOtp.mutateAsync({ email, password });
+      setInfo("A new verification code was sent to your email.");
     } catch (err) {
-      setLoading(false);
       setError(
         getTrpcMutationErrorMessage(
           err,
-          "Invalid or expired verification code",
+          "Could not resend the verification code. Please try again.",
         ),
       );
-      return;
     }
-    const res = await signIn("credentials", {
-      email,
-      password,
-      redirect: false,
-      callbackUrl,
-    });
-    setLoading(false);
-    if (!res || res.error) {
-      setError("Invalid email or password");
-      return;
-    }
-    void router.push(res.url ?? callbackUrl);
+  }
+
+  function handleEditEmail() {
+    setOtpRequested(false);
+    setOtp("");
+    setInfo(null);
+    setError(null);
+    verifyingRef.current = false;
   }
 
   return (
@@ -101,11 +146,15 @@ export default function SignInPage({ oauthProviders }: SignInPageProps) {
         <title>Sign in · Tasker</title>
       </Head>
       <AuthShell
-        title="Sign in to continue"
-        subtitle="Access your secure Tasker workspace with email OTP or a connected account."
+        title={otpRequested ? "Enter the verification code" : "Sign in to continue"}
+        subtitle={
+          otpRequested
+            ? "Check your inbox for the 6-digit code."
+            : "Access your secure Tasker workspace with email OTP or a connected account."
+        }
         compact
         titleHelp={
-          <p className="text-sm font-black text-slate-700">            
+          <p className="text-sm font-black text-slate-700">
             <Link
               href="/contact"
               className="text-emerald-600 underline-offset-4 transition hover:text-emerald-700 hover:underline"
@@ -115,186 +164,202 @@ export default function SignInPage({ oauthProviders }: SignInPageProps) {
           </p>
         }
       >
-        <div className="rounded-[1.75rem] border border-white/80 bg-white/95 p-4 shadow-2xl shadow-blue-200/60 ring-1 ring-blue-100/50 backdrop-blur-xl">
-          <div className="mb-3 flex flex-wrap gap-2">
-            {[
-              "Secure sign-in",
-              "SSO available",
-              "No public workspace data",
-            ].map((badge) => (
-              <span
-                key={badge}
-                className="rounded-full bg-blue-50 px-2.5 py-1 text-[11px] font-black text-blue-700 ring-1 ring-blue-100"
-              >
-                {badge}
-              </span>
-            ))}
-          </div>
+        <div className="rounded-[1.75rem] border border-white/80 bg-white/95 p-4 shadow-2xl shadow-blue-200/60 ring-1 ring-blue-100/50 backdrop-blur-xl sm:p-5">
+          {!otpRequested ? (
+            <>
+              <div className="mb-3 flex flex-wrap gap-2">
+                {[
+                  "Secure sign-in",
+                  "SSO available",
+                  "No public workspace data",
+                ].map((badge) => (
+                  <span
+                    key={badge}
+                    className="rounded-full bg-blue-50 px-2.5 py-1 text-[11px] font-black text-blue-700 ring-1 ring-blue-100"
+                  >
+                    {badge}
+                  </span>
+                ))}
+              </div>
 
-          <form
-            onSubmit={otpRequested ? handleOtpSubmit : handlePasswordSubmit}
-            className="space-y-3"
-          >
-            <div>
-              <label className="label" htmlFor="email">
-                Email
-              </label>
-              <input
-                id="email"
-                type="email"
-                className="brand-input mt-1.5 h-11 text-sm"
-                value={email}
-                onBlur={() => setEmailTouched(true)}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                autoComplete="email"
-                disabled={otpRequested}
-                aria-invalid={emailInvalid}
-                aria-describedby={emailInvalid ? "email-error" : undefined}
-              />
-              {emailInvalid && (
-                <p
-                  id="email-error"
-                  className="mt-2 text-sm font-semibold text-red-600"
+              <form onSubmit={handlePasswordSubmit} className="space-y-3">
+                <div>
+                  <label className="label" htmlFor="email">
+                    Email
+                  </label>
+                  <input
+                    id="email"
+                    type="email"
+                    className="brand-input mt-1.5 h-11 text-sm"
+                    value={email}
+                    onBlur={() => setEmailTouched(true)}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                    autoComplete="email"
+                    aria-invalid={emailInvalid}
+                    aria-describedby={emailInvalid ? "email-error" : undefined}
+                  />
+                  {emailInvalid && (
+                    <p
+                      id="email-error"
+                      className="mt-2 text-sm font-semibold text-red-600"
+                    >
+                      Enter a valid work email address.
+                    </p>
+                  )}
+                </div>
+
+                <div>
+                  <label className="label" htmlFor="password">
+                    Password
+                  </label>
+                  <div className="relative mt-1">
+                    <input
+                      id="password"
+                      type={showPassword ? "text" : "password"}
+                      className="brand-input h-11 pr-12 text-sm"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      required
+                      autoComplete="current-password"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword((prev) => !prev)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 rounded-lg px-2 py-1 text-xs font-bold text-slate-500 transition hover:bg-blue-50 hover:text-blue-600"
+                      aria-label={showPassword ? "Hide password" : "Show password"}
+                    >
+                      {showPassword ? "Hide" : "Show"}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-2 rounded-2xl bg-slate-50 px-3 py-2.5 text-sm sm:flex-row sm:items-center sm:justify-between">
+                  <label className="flex items-center gap-2 font-semibold text-slate-700">
+                    <input
+                      type="checkbox"
+                      checked={rememberDevice}
+                      onChange={(event) => setRememberDevice(event.target.checked)}
+                      className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                    />
+                    Remember this device for 30 days
+                  </label>
+                  <Link
+                    href="/auth/forgot-password"
+                    className="font-bold text-purple-600 underline-offset-4 hover:underline"
+                  >
+                    Forgot password?
+                  </Link>
+                </div>
+
+                {error && (
+                  <p className="rounded-xl bg-red-50 px-4 py-3 text-sm font-semibold text-red-700 ring-1 ring-red-200">
+                    {error}
+                  </p>
+                )}
+
+                <button
+                  type="submit"
+                  disabled={sendLoginOtp.isPending}
+                  className="brand-button-primary h-11 w-full bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 shadow-blue-600/25 hover:from-blue-700 hover:via-indigo-700 hover:to-purple-700"
                 >
-                  Enter a valid work email address.
+                  {sendLoginOtp.isPending ? (
+                    <span className="inline-flex items-center gap-2">
+                      <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />
+                      Sending code...
+                    </span>
+                  ) : (
+                    "Send verification code"
+                  )}
+                </button>
+              </form>
+
+              <OAuthButtons
+                providers={oauthProviders}
+                callbackUrl={callbackUrl}
+                compact
+              />
+
+              <div className="mt-3 space-y-2 text-center text-sm text-slate-600">
+                <p>
+                  Don&apos;t have an account?{" "}
+                  <Link
+                    href="/auth/signup"
+                    className="font-bold text-purple-600 underline-offset-4 hover:underline"
+                  >
+                    Create one
+                  </Link>
                 </p>
-              )}
-            </div>
-            <div>
-              <label className="label" htmlFor="password">
-                Password
-              </label>
-              <div className="relative mt-1">
-                <input
-                  id="password"
-                  type={showPassword ? "text" : "password"}
-                  className="brand-input h-11 pr-12 text-sm"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  autoComplete="current-password"
-                  disabled={otpRequested}
-                />
+              </div>
+            </>
+          ) : (
+            <form onSubmit={handleOtpSubmit} className="space-y-4">
+              <div className="rounded-2xl bg-slate-50 px-4 py-3 text-center">
+                <p className="text-sm text-slate-600">We sent a 6-digit code to</p>
+                <p className="mt-1 break-all text-sm font-black text-slate-900">{email}</p>
                 <button
                   type="button"
-                  onClick={() => setShowPassword((prev) => !prev)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 rounded-lg px-2 py-1 text-xs font-bold text-slate-500 transition hover:bg-blue-50 hover:text-blue-600"
-                  aria-label={showPassword ? "Hide password" : "Show password"}
+                  onClick={handleEditEmail}
+                  className="mt-2 text-sm font-bold text-blue-600 underline-offset-4 hover:underline"
                 >
-                  {showPassword ? "Hide" : "Show"}
+                  Edit email
                 </button>
               </div>
-            </div>
 
-            <div className="flex flex-col gap-2 rounded-2xl bg-slate-50 px-3 py-2.5 text-sm sm:flex-row sm:items-center sm:justify-between">
-              <label className="flex items-center gap-2 font-semibold text-slate-700">
-                <input
-                  type="checkbox"
-                  checked={rememberDevice}
-                  onChange={(event) => setRememberDevice(event.target.checked)}
-                  className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-                />
-                Remember this device for 30 days
-              </label>
-              <Link
-                href="/auth/forgot-password"
-                className="font-bold text-purple-600 underline-offset-4 hover:underline"
-              >
-                Forgot password?
-              </Link>
-            </div>
-
-            {otpRequested && (
               <div>
-                <label className="label" htmlFor="otp">
-                  Email OTP
-                </label>
-                <input
-                  id="otp"
-                  type="text"
-                  className="brand-input mt-1.5 h-11 text-sm tracking-[0.25em]"
-                  value={otp}
-                  onChange={(e) =>
-                    setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))
-                  }
-                  required
-                  inputMode="numeric"
-                  maxLength={6}
-                  placeholder="123456"
-                />
+                <p id="otp-label" className="label text-center">
+                  Verification code
+                </p>
+                <div className="mt-3">
+                  <OtpInput
+                    id="otp"
+                    value={otp}
+                    onChange={setOtp}
+                    onComplete={(code) => void submitOtp(code)}
+                    disabled={loading || verifyLoginOtp.isPending}
+                  />
+                </div>
               </div>
-            )}
 
-            {info && (
-              <p className="rounded-xl bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700 ring-1 ring-emerald-200">
-                {info}
-              </p>
-            )}
-            {error && (
-              <p className="rounded-xl bg-red-50 px-4 py-3 text-sm font-semibold text-red-700 ring-1 ring-red-200">
-                {error}
-              </p>
-            )}
+              {info && (
+                <p className="rounded-xl bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700 ring-1 ring-emerald-200">
+                  {info}
+                </p>
+              )}
+              {error && (
+                <p className="rounded-xl bg-red-50 px-4 py-3 text-sm font-semibold text-red-700 ring-1 ring-red-200">
+                  {error}
+                </p>
+              )}
 
-            <button
-              type="submit"
-              disabled={
-                loading || sendLoginOtp.isPending || verifyLoginOtp.isPending
-              }
-              className="brand-button-primary h-11 w-full bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 shadow-blue-600/25 hover:from-blue-700 hover:via-indigo-700 hover:to-purple-700"
-            >
-              {!otpRequested ? (
-                sendLoginOtp.isPending ? (
+              <button
+                type="submit"
+                disabled={loading || verifyLoginOtp.isPending || otp.length !== 6}
+                className="brand-button-primary h-11 w-full bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 shadow-blue-600/25 hover:from-blue-700 hover:via-indigo-700 hover:to-purple-700"
+              >
+                {loading || verifyLoginOtp.isPending ? (
                   <span className="inline-flex items-center gap-2">
                     <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />
-                    Sending OTP...
+                    Verifying...
                   </span>
                 ) : (
-                  "Send OTP"
-                )
-              ) : loading ? (
-                <span className="inline-flex items-center gap-2">
-                  <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />
-                  Signing in...
-                </span>
-              ) : (
-                "Verify OTP & sign in"
-              )}
-            </button>
-            {otpRequested && (
-              <button
-                type="button"
-                className="brand-button-secondary h-11 w-full"
-                onClick={() => {
-                  setOtpRequested(false);
-                  setOtp("");
-                  setInfo(null);
-                  setError(null);
-                }}
-              >
-                Change email/password
+                  "Verify & sign in"
+                )}
               </button>
-            )}
-          </form>
 
-          <OAuthButtons
-            providers={oauthProviders}
-            callbackUrl={callbackUrl}
-            compact
-          />
-
-          <div className="mt-3 space-y-2 text-center text-sm text-slate-600">
-            <p>
-              Don&apos;t have an account?{" "}
-              <Link
-                href="/auth/signup"
-                className="font-bold text-purple-600 underline-offset-4 hover:underline"
-              >
-                Create one
-              </Link>
-            </p>
-          </div>
+              <p className="text-center text-sm text-slate-600">
+                Didn&apos;t receive the code?{" "}
+                <button
+                  type="button"
+                  onClick={() => void handleResendOtp()}
+                  disabled={sendLoginOtp.isPending}
+                  className="font-bold text-purple-600 underline-offset-4 hover:underline disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {sendLoginOtp.isPending ? "Sending..." : "Resend OTP"}
+                </button>
+              </p>
+            </form>
+          )}
         </div>
       </AuthShell>
     </>
