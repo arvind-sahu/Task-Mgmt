@@ -1,10 +1,11 @@
 import Head from "next/head";
 import Link from "next/link";
-import { useState, type FormEvent } from "react";
+import { useCallback, useRef, useState, type FormEvent } from "react";
 import type { GetServerSidePropsContext } from "next";
 import { useRouter } from "next/router";
 
 import { AuthShell } from "~/components/auth/AuthShell";
+import { OtpInput } from "~/components/auth/OtpInput";
 import { getServerAuthSession } from "~/server/auth";
 import { api } from "~/utils/api";
 import { getTrpcMutationErrorMessage } from "~/utils/trpcError";
@@ -24,6 +25,8 @@ export default function ForgotPasswordPage() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const verifyingRef = useRef(false);
 
   const sendOtp = api.user.sendForgotPasswordOtp.useMutation();
   const verifyOtp = api.user.verifyForgotPasswordOtp.useMutation();
@@ -34,9 +37,9 @@ export default function ForgotPasswordPage() {
     setError(null);
     setInfo(null);
     try {
-      const res = await sendOtp.mutateAsync({ email });
+      await sendOtp.mutateAsync({ email });
+      setOtp("");
       setOtpSent(true);
-      setInfo(res.message);
     } catch (err) {
       setError(
         getTrpcMutationErrorMessage(
@@ -47,17 +50,64 @@ export default function ForgotPasswordPage() {
     }
   }
 
+  const submitOtp = useCallback(
+    async (code: string) => {
+      if (code.length !== 6 || verifyingRef.current) return;
+
+      verifyingRef.current = true;
+      setError(null);
+      setInfo(null);
+      setLoading(true);
+
+      try {
+        await verifyOtp.mutateAsync({ email, otp: code });
+        setOtp(code);
+        setOtpVerified(true);
+        setInfo("Code verified. Set your new password below.");
+      } catch (err) {
+        setError(
+          getTrpcMutationErrorMessage(err, "Invalid or expired verification code"),
+        );
+      } finally {
+        setLoading(false);
+        verifyingRef.current = false;
+      }
+    },
+    [email, verifyOtp],
+  );
+
   async function handleVerifyOtp(e: FormEvent) {
     e.preventDefault();
+    await submitOtp(otp);
+  }
+
+  async function handleResendOtp() {
     setError(null);
     setInfo(null);
+    setOtp("");
+    verifyingRef.current = false;
     try {
-      await verifyOtp.mutateAsync({ email, otp });
-      setOtpVerified(true);
-      setInfo("OTP verified. Set your new password below.");
+      await sendOtp.mutateAsync({ email });
+      setInfo("A new verification code was sent to your email.");
     } catch (err) {
-      setError(getTrpcMutationErrorMessage(err, "Invalid or expired verification code"));
+      setError(
+        getTrpcMutationErrorMessage(
+          err,
+          "Could not resend the verification code. Please try again.",
+        ),
+      );
     }
+  }
+
+  function handleEditEmail() {
+    setOtpSent(false);
+    setOtpVerified(false);
+    setOtp("");
+    setPassword("");
+    setConfirmPassword("");
+    setInfo(null);
+    setError(null);
+    verifyingRef.current = false;
   }
 
   async function handleResetPassword(e: FormEvent) {
@@ -87,20 +137,27 @@ export default function ForgotPasswordPage() {
     }
   }
 
+  const shellTitle = otpVerified
+    ? "Set a new password"
+    : otpSent
+      ? "Enter the verification code"
+      : "Reset your password";
+
+  const shellSubtitle = otpVerified
+    ? "Choose a strong password for your account."
+    : otpSent
+      ? "Check your inbox for the 6-digit code."
+      : "We will email you a verification code to reset your password.";
+
   return (
     <>
       <Head>
         <title>Forgot password · Tasker</title>
       </Head>
-      <AuthShell
-        title="Reset your password"
-        subtitle="Verify the OTP from your email, then set a new secure password."
-      >
+      <AuthShell title={shellTitle} subtitle={shellSubtitle} compact={otpSent || otpVerified}>
+        <div className="rounded-[1.75rem] border border-white/80 bg-white/95 p-4 shadow-2xl shadow-blue-200/60 ring-1 ring-blue-100/50 backdrop-blur-xl sm:p-5">
           {!otpSent && (
-            <form
-              onSubmit={handleSendOtp}
-              className="space-y-5 rounded-[2rem] border border-white/80 bg-white/90 p-6 shadow-2xl shadow-blue-200/60 backdrop-blur-xl"
-            >
+            <form onSubmit={handleSendOtp} className="space-y-4">
               <div>
                 <label className="label" htmlFor="email">
                   Email
@@ -108,49 +165,111 @@ export default function ForgotPasswordPage() {
                 <input
                   id="email"
                   type="email"
-                  className="brand-input mt-2"
+                  className="brand-input mt-1.5 h-11 text-sm"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
+                  autoComplete="email"
                 />
               </div>
-              <button className="brand-button-primary w-full" disabled={sendOtp.isPending}>
-                {sendOtp.isPending ? "Sending OTP..." : "Send OTP"}
+
+              {error && (
+                <p className="rounded-xl bg-red-50 px-4 py-3 text-sm font-semibold text-red-700 ring-1 ring-red-200">
+                  {error}
+                </p>
+              )}
+
+              <button
+                className="brand-button-primary h-11 w-full"
+                disabled={sendOtp.isPending}
+              >
+                {sendOtp.isPending ? (
+                  <span className="inline-flex items-center gap-2">
+                    <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />
+                    Sending code...
+                  </span>
+                ) : (
+                  "Send verification code"
+                )}
               </button>
             </form>
           )}
 
           {otpSent && !otpVerified && (
-            <form
-              onSubmit={handleVerifyOtp}
-              className="space-y-5 rounded-[2rem] border border-white/80 bg-white/90 p-6 shadow-2xl shadow-blue-200/60 backdrop-blur-xl"
-            >
-              <div>
-                <label className="label" htmlFor="otp">
-                  OTP
-                </label>
-                <input
-                  id="otp"
-                  type="text"
-                  className="brand-input mt-2 tracking-[0.25em]"
-                  value={otp}
-                  onChange={(e) => setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
-                  inputMode="numeric"
-                  maxLength={6}
-                  required
-                />
+            <form onSubmit={handleVerifyOtp} className="space-y-4">
+              <div className="rounded-2xl bg-slate-50 px-4 py-3 text-center">
+                <p className="text-sm text-slate-600">We sent a 6-digit code to</p>
+                <p className="mt-1 break-all text-sm font-black text-slate-900">{email}</p>
+                <button
+                  type="button"
+                  onClick={handleEditEmail}
+                  className="mt-2 text-sm font-bold text-blue-600 underline-offset-4 hover:underline"
+                >
+                  Edit email
+                </button>
               </div>
-              <button className="brand-button-primary w-full" disabled={verifyOtp.isPending}>
-                {verifyOtp.isPending ? "Verifying..." : "Verify OTP"}
+
+              <div>
+                <p id="otp-label" className="label text-center">
+                  Verification code
+                </p>
+                <div className="mt-3">
+                  <OtpInput
+                    id="otp"
+                    value={otp}
+                    onChange={setOtp}
+                    onComplete={(code) => void submitOtp(code)}
+                    disabled={loading || verifyOtp.isPending}
+                  />
+                </div>
+              </div>
+
+              {info && (
+                <p className="rounded-xl bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700 ring-1 ring-emerald-200">
+                  {info}
+                </p>
+              )}
+              {error && (
+                <p className="rounded-xl bg-red-50 px-4 py-3 text-sm font-semibold text-red-700 ring-1 ring-red-200">
+                  {error}
+                </p>
+              )}
+
+              <button
+                className="brand-button-primary h-11 w-full"
+                disabled={loading || verifyOtp.isPending || otp.length !== 6}
+              >
+                {loading || verifyOtp.isPending ? (
+                  <span className="inline-flex items-center gap-2">
+                    <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />
+                    Verifying...
+                  </span>
+                ) : (
+                  "Verify code"
+                )}
               </button>
+
+              <p className="text-center text-sm text-slate-600">
+                Didn&apos;t receive the code?{" "}
+                <button
+                  type="button"
+                  onClick={() => void handleResendOtp()}
+                  disabled={sendOtp.isPending}
+                  className="font-bold text-purple-600 underline-offset-4 hover:underline disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {sendOtp.isPending ? "Sending..." : "Resend OTP"}
+                </button>
+              </p>
             </form>
           )}
 
           {otpVerified && (
-            <form
-              onSubmit={handleResetPassword}
-              className="space-y-5 rounded-[2rem] border border-white/80 bg-white/90 p-6 shadow-2xl shadow-blue-200/60 backdrop-blur-xl"
-            >
+            <form onSubmit={handleResetPassword} className="space-y-4">
+              <div className="rounded-2xl bg-slate-50 px-4 py-3 text-center">
+                <p className="text-sm text-slate-600">Resetting password for</p>
+                <p className="mt-1 break-all text-sm font-black text-slate-900">{email}</p>
+              </div>
+
               <div>
                 <label className="label" htmlFor="password">
                   New password
@@ -159,11 +278,12 @@ export default function ForgotPasswordPage() {
                   <input
                     id="password"
                     type={showPassword ? "text" : "password"}
-                    className="brand-input pr-12"
+                    className="brand-input h-11 pr-12 text-sm"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     required
                     minLength={8}
+                    autoComplete="new-password"
                   />
                   <button
                     type="button"
@@ -178,6 +298,7 @@ export default function ForgotPasswordPage() {
                   Minimum 8 chars, one letter, one number, one special character.
                 </p>
               </div>
+
               <div>
                 <label className="label" htmlFor="confirm-password">
                   Confirm new password
@@ -186,11 +307,12 @@ export default function ForgotPasswordPage() {
                   <input
                     id="confirm-password"
                     type={showConfirmPassword ? "text" : "password"}
-                    className="brand-input pr-12"
+                    className="brand-input h-11 pr-12 text-sm"
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
                     required
                     minLength={8}
+                    autoComplete="new-password"
                   />
                   <button
                     type="button"
@@ -204,32 +326,37 @@ export default function ForgotPasswordPage() {
                   </button>
                 </div>
               </div>
+
+              {info && (
+                <p className="rounded-xl bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700 ring-1 ring-emerald-200">
+                  {info}
+                </p>
+              )}
+              {error && (
+                <p className="rounded-xl bg-red-50 px-4 py-3 text-sm font-semibold text-red-700 ring-1 ring-red-200">
+                  {error}
+                </p>
+              )}
+
               <button
-                className="brand-button-primary w-full"
+                className="brand-button-primary h-11 w-full"
                 disabled={resetPassword.isPending}
               >
                 {resetPassword.isPending ? "Resetting..." : "Reset password"}
               </button>
             </form>
           )}
+        </div>
 
-          {info && (
-            <p className="mt-4 rounded-xl bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700 ring-1 ring-emerald-200">
-              {info}
-            </p>
-          )}
-          {error && (
-            <p className="mt-4 rounded-xl bg-red-50 px-4 py-3 text-sm font-semibold text-red-700 ring-1 ring-red-200">
-              {error}
-            </p>
-          )}
-
-          <p className="mt-6 text-center text-sm text-slate-600">
-            Back to{" "}
-            <Link href="/auth/signin" className="font-bold text-purple-600 underline-offset-4 hover:underline">
-              Sign in
-            </Link>
-          </p>
+        <p className="mt-4 text-center text-sm text-slate-600">
+          Back to{" "}
+          <Link
+            href="/auth/signin"
+            className="font-bold text-purple-600 underline-offset-4 hover:underline"
+          >
+            Sign in
+          </Link>
+        </p>
       </AuthShell>
     </>
   );
