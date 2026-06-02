@@ -1,18 +1,27 @@
 import { useRouter } from "next/router";
-import { TaskStatus } from "@prisma/client";
-import { useEffect, useRef, useState } from "react";
+import { SprintPlan, TaskStatus } from "@prisma/client";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { GetServerSidePropsContext } from "next";
 
 import EmptyState from "~/components/EmptyState";
 import Layout from "~/components/Layout";
+import { CachedAvatar } from "~/components/CachedAvatar";
 import { ProjectSettingsPanel } from "~/components/ProjectSettingsPanel";
 import TaskCard from "~/components/TaskCard";
+import { TaskCommentsSection } from "~/components/TaskCommentsSection";
+import { TagChip } from "~/components/TagChip";
 import { canManageProject } from "~/utils/projectRole";
 import TaskForm, { type TaskFormValues } from "~/components/TaskForm";
 import { TASK_STATUSES, statusLabel } from "~/components/Badges";
 import { requireAuth } from "~/server/auth";
 import { api, type RouterOutputs } from "~/utils/api";
 import { initialsFromName } from "~/utils/avatar";
+import {
+  dateInputValue,
+  formatSprintEndPreview,
+  sprintPlanLabel,
+} from "~/utils/sprint";
+import { readSprintPanelOpen, writeSprintPanelOpen } from "~/utils/panelPrefs";
 
 /**
  * Project detail page. Layout:
@@ -28,7 +37,27 @@ export default function ProjectDetail() {
 
   const utils = api.useUtils();
   const project = api.project.byId.useQuery({ id }, { enabled: !!id });
-  const sprints = api.sprint.list.useQuery({ projectId: id }, { enabled: !!id });
+  const [showSprintPanel, setShowSprintPanel] = useState(false);
+  const currentSprint = api.sprint.current.useQuery(
+    { projectId: id },
+    { enabled: !!id, staleTime: 60_000 },
+  );
+  const sprints = api.sprint.list.useQuery(
+    { projectId: id },
+    { enabled: !!id && showSprintPanel, staleTime: 60_000 },
+  );
+
+  useEffect(() => {
+    setShowSprintPanel(readSprintPanelOpen());
+  }, []);
+
+  function toggleSprintPanel() {
+    setShowSprintPanel((open) => {
+      const next = !open;
+      writeSprintPanelOpen(next);
+      return next;
+    });
+  }
 
   const [showCreate, setShowCreate] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
@@ -41,33 +70,45 @@ export default function ProjectDetail() {
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const topScrollRef = useRef<HTMLDivElement | null>(null);
   const boardScrollRef = useRef<HTMLDivElement | null>(null);
-  const taskListInput = {
-    projectId: id,
-    sprintId: activeSprintId || null,
-    tagId: selectedTagId || undefined,
-  };
+
+  const resolvedSprintId =
+    activeSprintId || currentSprint.data?.id || null;
+  const taskListInput = useMemo(
+    () => ({
+      projectId: id,
+      sprintId: resolvedSprintId,
+      tagId: selectedTagId || undefined,
+    }),
+    [id, resolvedSprintId, selectedTagId],
+  );
+  const tasksReady =
+    currentSprint.isFetched &&
+    (currentSprint.data == null || resolvedSprintId != null);
 
   const tags = api.tag.list.useQuery({ projectId: id }, { enabled: !!id });
-  const tasks = api.task.list.useQuery(
-    taskListInput,
-    { enabled: !!id },
-  );
+  const tasks = api.task.list.useQuery(taskListInput, {
+    enabled: !!id && tasksReady,
+    staleTime: 30_000,
+  });
   const selectedTask = api.task.byId.useQuery(
     { id: selectedTaskId ?? "" },
     { enabled: !!selectedTaskId },
   );
+  const sprintBrief = api.sprint.listBrief.useQuery(
+    { projectId: id },
+    { enabled: !!id && (showCreate || !!selectedTaskId) },
+  );
+  const sprintOptions = (sprintBrief.data ?? []).map((sprint) => ({
+    id: sprint.id,
+    name: sprint.name,
+    startDate: sprint.startDate,
+    endDate: sprint.endDate,
+  }));
 
   useEffect(() => {
-    if (activeSprintId || !sprints.data?.length) return;
-    const now = Date.now();
-    const current =
-      sprints.data.find((s) => {
-        const start = new Date(s.startDate).getTime();
-        const end = new Date(s.endDate).getTime();
-        return start <= now && end >= now;
-      }) ?? sprints.data[0];
-    setActiveSprintId(current.id);
-  }, [activeSprintId, sprints.data]);
+    if (activeSprintId || !currentSprint.data) return;
+    setActiveSprintId(currentSprint.data.id);
+  }, [activeSprintId, currentSprint.data]);
 
   useEffect(() => {
     setTaskSearch("");
@@ -78,10 +119,18 @@ export default function ProjectDetail() {
     setSelectedTaskId(null);
   }, [taskSearch, selectedTagId, selectedMemberIds]);
 
+  const invalidateSprints = () => {
+    void utils.sprint.current.invalidate({ projectId: id });
+    void utils.sprint.listBrief.invalidate({ projectId: id });
+    if (showSprintPanel) {
+      void utils.sprint.list.invalidate({ projectId: id });
+    }
+  };
+
   const createTask = api.task.create.useMutation({
-    onSuccess: async () => {
-      await utils.task.list.invalidate({ projectId: id });
-      await utils.sprint.backlog.invalidate({ projectId: id });
+    onSuccess: () => {
+      void utils.task.list.invalidate({ projectId: id });
+      void utils.sprint.backlog.invalidate({ projectId: id });
       setShowCreate(false);
     },
   });
@@ -117,19 +166,43 @@ export default function ProjectDetail() {
       }
     },
   });
+  const [createModalCloseSignal, setCreateModalCloseSignal] = useState(0);
   const createSprint = api.sprint.create.useMutation({
     onSuccess: async (sprint) => {
       setActiveSprintId(sprint.id);
-      await utils.sprint.list.invalidate({ projectId: id });
+      invalidateSprints();
+      createSprint.reset();
+      setCreateModalCloseSignal((value) => value + 1);
     },
   });
   const updateSprint = api.sprint.update.useMutation({
     onSuccess: async () => {
-      await utils.sprint.list.invalidate({ projectId: id });
+      invalidateSprints();
+    },
+  });
+  const deleteSprint = api.sprint.delete.useMutation({
+    onSuccess: async (_result, variables) => {
+      const deletedId =
+        variables && typeof variables === "object" ? variables.id : undefined;
+      if (deletedId && activeSprintId === deletedId) {
+        setActiveSprintId("");
+      }
+      invalidateSprints();
+    },
+  });
+  const cleanupInvalidSprints = api.sprint.cleanupInvalid.useMutation({
+    onSuccess: async (result) => {
+      invalidateSprints();
+      if (result.deletedCount > 0) {
+        alert(`Removed ${result.deletedCount} inconsistent sprint(s).`);
+      } else {
+        alert("All sprints already follow the project plan.");
+      }
     },
   });
   const activeSprint =
-    sprints.data?.find((s) => s.id === activeSprintId) ?? null;
+    sprints.data?.find((s) => s.id === activeSprintId) ??
+    (currentSprint.data?.id === activeSprintId ? currentSprint.data : null);
   const sprintTasks = tasks.data ?? [];
   const filteredTasks = sprintTasks.filter(
     (task) =>
@@ -257,12 +330,7 @@ export default function ProjectDetail() {
                 ? dateInputValue(new Date(activeSprint.endDate))
                 : undefined,
             }}
-            sprintOptions={(sprints.data ?? []).map((sprint) => ({
-              id: sprint.id,
-              name: sprint.name,
-              startDate: sprint.startDate,
-              endDate: sprint.endDate,
-            }))}
+            sprintOptions={sprintOptions}
             onSubmit={handleCreate}
             onCancel={() => setShowCreate(false)}
             submitting={createTask.isPending}
@@ -276,50 +344,84 @@ export default function ProjectDetail() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 gap-3 xl:grid-cols-[14rem_minmax(0,1fr)_12.8rem] 2xl:grid-cols-[15rem_minmax(0,1fr)_13.6rem]">
-        <aside className="space-y-4">
-          <SprintSidebar
-            canManage={canManage}
-            durationWeeks={project.data.sprintDurationWeeks}
-            sprints={sprints.data ?? []}
-            activeSprintId={activeSprintId}
-            activeSprint={activeSprint}
-            onSelectSprint={setActiveSprintId}
-            onCreateSprint={(input) =>
-              createSprint.mutate({ projectId: id, ...input })
-            }
-            onUpdateSprint={(input) => updateSprint.mutate(input)}
-            creatingSprint={createSprint.isPending}
-            updatingSprintId={
-              updateSprint.variables && typeof updateSprint.variables === "object"
-                ? updateSprint.variables.id
-                : undefined
-            }
-            createSprintError={createSprint.error?.message}
-            updateSprintError={updateSprint.error?.message}
-          />
-        </aside>
+      <div
+        className={`grid grid-cols-1 gap-3 ${
+          showSprintPanel
+            ? "xl:grid-cols-[14rem_minmax(0,1fr)_12.8rem] 2xl:grid-cols-[15rem_minmax(0,1fr)_13.6rem]"
+            : "xl:grid-cols-[minmax(0,1fr)_12.8rem] 2xl:grid-cols-[minmax(0,1fr)_13.6rem]"
+        }`}
+      >
+        {showSprintPanel ? (
+          <aside className="space-y-4">
+            <SprintSidebar
+              canManage={canManage}
+              sprintPlan={project.data.sprintPlan}
+              sprintStartDayOfWeek={project.data.sprintStartDayOfWeek}
+              durationWeeks={project.data.sprintDurationWeeks}
+              sprints={sprints.data ?? []}
+              sprintsLoading={sprints.isLoading}
+              activeSprintId={activeSprintId}
+              activeSprint={activeSprint}
+              onSelectSprint={setActiveSprintId}
+              onCreateSprint={(input) =>
+                createSprint.mutate({ projectId: id, ...input })
+              }
+              onUpdateSprint={(input) => updateSprint.mutate(input)}
+              onDeleteSprint={(sprintId) => deleteSprint.mutate({ id: sprintId })}
+              onCleanupInvalid={() =>
+                cleanupInvalidSprints.mutate({ projectId: id })
+              }
+              creatingSprint={createSprint.isPending}
+              deletingSprintId={
+                deleteSprint.variables &&
+                typeof deleteSprint.variables === "object"
+                  ? deleteSprint.variables.id
+                  : undefined
+              }
+              cleaningUp={cleanupInvalidSprints.isPending}
+              updatingSprintId={
+                updateSprint.variables && typeof updateSprint.variables === "object"
+                  ? updateSprint.variables.id
+                  : undefined
+              }
+              createSprintError={createSprint.error?.message}
+              updateSprintError={updateSprint.error?.message}
+              createCloseSignal={createModalCloseSignal}
+            />
+          </aside>
+        ) : null}
 
         <section className="min-w-0">
           <div className="mb-3 flex flex-col gap-2 lg:flex-row lg:items-end lg:justify-between">
-            <div className="min-w-0">
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                Task board
-              </p>
-              <h2 className="flex min-w-0 flex-wrap items-baseline gap-x-2 text-lg font-semibold text-slate-900">
-                <span className="truncate">
-                  {activeSprint ? activeSprint.name : "Backlog tasks"}
-                </span>
-                {selectedMemberLabels.length > 0 && (
-                  <span className="text-xs font-normal text-slate-500">
-                    Showing tasks assigned to{" "}
-                    <span className="font-semibold text-slate-700">
-                      {selectedMemberLabels.join(", ")}
-                    </span>
-                    <span className="mx-1.5 text-slate-300">·</span>
+            <div className="flex min-w-0 items-start gap-2">
+              <button
+                type="button"
+                onClick={toggleSprintPanel}
+                className="btn-ghost shrink-0 px-2 py-1.5 text-xs"
+                aria-expanded={showSprintPanel}
+                aria-label={showSprintPanel ? "Hide sprint panel" : "Show sprint panel"}
+              >
+                {showSprintPanel ? "◀ Hide sprints" : "▶ Sprints"}
+              </button>
+              <div className="min-w-0">
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted">
+                  Task board
+                </p>
+                <h2 className="flex min-w-0 flex-wrap items-baseline gap-x-2 text-lg font-semibold text-heading">
+                  <span className="truncate">
+                    {activeSprint ? activeSprint.name : "Backlog tasks"}
                   </span>
-                )}
-              </h2>
+                  {selectedMemberLabels.length > 0 && (
+                    <span className="text-xs font-normal text-muted">
+                      Showing tasks assigned to{" "}
+                      <span className="font-semibold text-heading">
+                        {selectedMemberLabels.join(", ")}
+                      </span>
+                      <span className="mx-1.5 opacity-40">·</span>
+                    </span>
+                  )}
+                </h2>
+              </div>
             </div>
             <div className="flex shrink-0 items-center gap-2">
               <div className="relative w-56 sm:w-64">
@@ -330,7 +432,7 @@ export default function ProjectDetail() {
                   🔍
                 </span>
                 <input
-                  className="h-9 w-full rounded-lg border border-slate-200 bg-white pl-9 pr-[4.5rem] text-xs text-slate-900 shadow-sm outline-none ring-2 ring-transparent transition placeholder:text-slate-400 focus:border-indigo-400 focus:ring-indigo-100"
+                  className="input h-9 pl-9 pr-[4.5rem] text-xs"
                   placeholder="Search tasks..."
                   value={taskSearch}
                   onChange={(event) => setTaskSearch(event.target.value)}
@@ -345,7 +447,7 @@ export default function ProjectDetail() {
                     ×
                   </button>
                 )}
-                <span className="absolute right-2 top-1/2 -translate-y-1/2 rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-600">
+                <span className="chip absolute right-2 top-1/2 -translate-y-1/2 rounded px-1.5 py-0.5 text-[10px] font-semibold">
                   {filteredTasks.length}/{sprintTasks.length}
                 </span>
               </div>
@@ -353,9 +455,7 @@ export default function ProjectDetail() {
                 type="button"
                 onClick={() => setShowCreate((s) => !s)}
                 className={`h-9 shrink-0 rounded-lg border px-3 text-xs font-medium transition ${
-                  showCreate
-                    ? "border-slate-300 bg-slate-100 text-slate-700"
-                    : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50"
+                  showCreate ? "chip-active" : "chip interactive-hover"
                 }`}
               >
                 {showCreate ? "Cancel" : "New task"}
@@ -367,8 +467,8 @@ export default function ProjectDetail() {
               type="button"
               className={`rounded-full px-3 py-1 text-xs font-semibold ring-1 ring-inset transition ${
                 selectedTagId === null
-                  ? "bg-slate-900 text-white ring-slate-900"
-                  : "bg-white text-slate-600 ring-slate-200 hover:bg-slate-50"
+                  ? "chip-active"
+                  : "chip interactive-hover"
               }`}
               onClick={() => setSelectedTagId(null)}
             >
@@ -381,7 +481,7 @@ export default function ProjectDetail() {
                   key={tag.id}
                   type="button"
                   className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold ring-1 ring-inset transition ${
-                    selected ? "ring-2" : "hover:bg-slate-50"
+                    selected ? "ring-2" : "interactive-hover"
                   }`}
                   style={{
                     color: selected ? "white" : tag.color,
@@ -410,12 +510,7 @@ export default function ProjectDetail() {
               task={selectedTask.data}
               loading={selectedTask.isLoading}
               error={selectedTask.error?.message}
-              sprintOptions={(sprints.data ?? []).map((sprint) => ({
-                id: sprint.id,
-                name: sprint.name,
-                startDate: sprint.startDate,
-                endDate: sprint.endDate,
-              }))}
+              sprintOptions={sprintOptions}
               submitting={updateTask.isPending}
               updateError={updateTask.error?.message}
               onBack={() => setSelectedTaskId(null)}
@@ -446,7 +541,7 @@ export default function ProjectDetail() {
                 }}
               >
                 {taskSearch.trim() && filteredTasks.length === 0 && (
-                  <div className="mb-3 rounded-2xl border border-dashed border-slate-300 bg-white p-5 text-center text-sm text-slate-600">
+                  <div className="mb-3 rounded-2xl border border-dashed p-5 text-center text-sm text-muted" style={{ borderColor: "var(--border)" }}>
                     <p className="font-semibold">
                       ✨ No tasks match &quot;{taskSearch.trim()}&quot;.
                     </p>
@@ -461,7 +556,7 @@ export default function ProjectDetail() {
                   return (
                     <div
                       key={s}
-                      className="rounded-xl bg-slate-100 p-3"
+                      className="task-column rounded-xl p-3"
                       onDragOver={(e) => e.preventDefault()}
                       onDrop={(e) => {
                         const taskId = e.dataTransfer.getData("text/plain");
@@ -469,10 +564,10 @@ export default function ProjectDetail() {
                       }}
                     >
                       <div className="mb-3 flex items-center justify-between px-1">
-                        <h3 className="text-sm font-semibold text-slate-700">
+                        <h3 className="text-sm font-semibold text-heading">
                           {statusLabel[s]}
                         </h3>
-                        <span className="rounded-full bg-white px-2 py-0.5 text-xs text-slate-500 ring-1 ring-slate-200">
+                        <span className="chip rounded-full px-2 py-0.5 text-xs">
                           {colTasks.length}
                         </span>
                       </div>
@@ -566,6 +661,8 @@ export default function ProjectDetail() {
                 name: project.data.name,
                 description: project.data.description,
                 color: project.data.color,
+                sprintPlan: project.data.sprintPlan,
+                sprintStartDayOfWeek: project.data.sprintStartDayOfWeek,
                 sprintDurationWeeks: project.data.sprintDurationWeeks,
               }}
             >
@@ -583,6 +680,7 @@ export default function ProjectDetail() {
 // ---------------------------------------------------------------------------
 
 type SprintListItem = RouterOutputs["sprint"]["list"][number];
+type SprintCurrentItem = RouterOutputs["sprint"]["current"];
 type TaskDetailItem = RouterOutputs["task"]["byId"];
 type TaskListItem = RouterOutputs["task"]["list"][number];
 type ProjectDetailData = RouterOutputs["project"]["byId"];
@@ -657,6 +755,12 @@ function matchesTaskSearch(task: TaskListItem, query: string) {
   }
 
   return false;
+}
+
+function isLongDescription(text: string) {
+  if (!text.trim()) return false;
+  if (text.split("\n").length > 5) return true;
+  return text.length > 280;
 }
 
 function TaskDetailPanel({
@@ -850,13 +954,14 @@ function TaskDetailPanel({
   }
 
   return (
-    <div className="card">
+    <>
+      <div className="card">
       <div className="mb-4 flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
         <div className="min-w-0 flex-1">
           <div className="flex items-start gap-3">
             <button
               type="button"
-              className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-slate-200 bg-white text-lg font-semibold text-slate-700 shadow-sm transition hover:border-indigo-300 hover:text-indigo-700"
+              className="btn-ghost grid h-9 w-9 shrink-0 place-items-center rounded-full text-lg font-semibold shadow-sm"
               onClick={onBack}
               aria-label="Back to task board"
             >
@@ -864,7 +969,7 @@ function TaskDetailPanel({
             </button>
             {titleEditing ? (
               <textarea
-                className="min-w-0 flex-1 resize-none rounded-xl border border-indigo-300 bg-white px-2 py-1 text-xl font-semibold leading-7 text-slate-900 outline-none ring-4 ring-indigo-100"
+                className="editable-field-editing min-w-0 flex-1 resize-none rounded-xl px-2 py-1 text-xl font-semibold leading-7 outline-none"
                 value={title}
                 onChange={(event) => setTitle(event.target.value)}
                 onBlur={() => {
@@ -896,7 +1001,7 @@ function TaskDetailPanel({
             ) : (
               <button
                 type="button"
-                className="line-clamp-2 min-w-0 flex-1 rounded-xl px-2 py-1 text-left text-xl font-semibold leading-7 text-slate-900 transition hover:bg-slate-100"
+                className="editable-field line-clamp-2 min-w-0 flex-1 rounded-xl px-2 py-1 text-left text-xl font-semibold leading-7 text-heading"
                 onClick={() => setTitleEditing(true)}
                 title={title}
               >
@@ -906,29 +1011,25 @@ function TaskDetailPanel({
           </div>
           <div className="mt-3 flex flex-wrap items-center gap-2">
             {assigneeIds.length === 0 ? (
-              <span className="text-xs text-slate-500">No assignee</span>
+              <span className="text-xs text-muted">No assignee</span>
             ) : (
               project.data?.members
                 .filter((member) => assigneeIds.includes(member.user.id))
                 .map((member) => (
                   <span
                     key={member.user.id}
-                    className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-700"
+                    className="surface-row inline-flex items-center gap-2 rounded-full px-2 py-1 text-xs font-medium text-heading"
                   >
-                    <span className="grid h-6 w-6 place-items-center overflow-hidden rounded-full bg-indigo-100 text-[10px] font-semibold text-indigo-700 ring-1 ring-indigo-200">
-                      {member.user.image ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={member.user.image}
-                          alt={member.user.name ?? member.user.email}
-                          loading="lazy"
-                          decoding="async"
-                          referrerPolicy="no-referrer"
-                          className="h-full w-full object-cover"
-                        />
-                      ) : (
-                        initialsFromName(member.user.name, member.user.email)
-                      )}
+                    <span className="app-avatar grid h-6 w-6 place-items-center overflow-hidden rounded-full text-[10px] font-semibold">
+                      <CachedAvatar
+                        src={member.user.image}
+                        alt={member.user.name ?? member.user.email}
+                        className="h-full w-full object-cover"
+                        fallback={initialsFromName(
+                          member.user.name,
+                          member.user.email,
+                        )}
+                      />
                     </span>
                     {member.user.name ?? member.user.email}
                   </span>
@@ -957,11 +1058,7 @@ function TaskDetailPanel({
           <label className="label">Description</label>
           {descriptionEditing ? (
             <textarea
-              className={`mt-1 w-full resize-none rounded-xl border border-indigo-300 bg-white px-3 py-2 text-sm leading-6 text-slate-700 outline-none ring-4 ring-indigo-100 ${
-                descriptionExpanded
-                  ? "max-h-72 overflow-y-auto"
-                  : "max-h-36 overflow-hidden"
-              }`}
+              className="input mt-1 min-h-[11rem] max-h-96 w-full resize-y overflow-y-auto rounded-xl px-3 py-2 text-sm leading-6"
               value={description}
               onChange={(event) => setDescription(event.target.value)}
               onBlur={() => {
@@ -987,36 +1084,40 @@ function TaskDetailPanel({
                   event.currentTarget.blur();
                 }
               }}
-              rows={descriptionExpanded ? 10 : 4}
+              rows={7}
               maxLength={5000}
               autoFocus
               placeholder="Add task description..."
             />
           ) : (
-            <button
-              type="button"
-              className={`mt-1 block w-full rounded-xl px-3 py-2 text-left text-sm leading-6 text-slate-700 transition hover:bg-slate-100 ${
-                descriptionExpanded ? "max-h-72 overflow-y-auto" : "line-clamp-5"
-              }`}
-              onClick={() => setDescriptionEditing(true)}
-            >
-              {description ? (
-                <span className="whitespace-pre-wrap">{description}</span>
-              ) : (
-                <span className="italic text-slate-400">
-                  Add task description...
-                </span>
+            <div className="surface-inset mt-1 rounded-xl px-3 py-2">
+              <button
+                type="button"
+                className={`editable-field block w-full text-left text-sm leading-6 text-heading ${
+                  descriptionExpanded || !isLongDescription(description)
+                    ? "whitespace-pre-wrap"
+                    : "line-clamp-5 whitespace-pre-wrap"
+                }`}
+                onClick={() => setDescriptionEditing(true)}
+              >
+                {description ? (
+                  description
+                ) : (
+                  <span className="italic text-muted">
+                    Add task description...
+                  </span>
+                )}
+              </button>
+              {isLongDescription(description) && (
+                <button
+                  type="button"
+                  className="link-accent mt-2 text-xs font-semibold hover:underline"
+                  onClick={() => setDescriptionExpanded((value) => !value)}
+                >
+                  {descriptionExpanded ? "Show less" : "Show more"}
+                </button>
               )}
-            </button>
-          )}
-          {(description.length > 240 || description.split("\n").length > 5) && (
-            <button
-              type="button"
-              className="mt-1 text-xs font-semibold text-indigo-600 hover:underline"
-              onClick={() => setDescriptionExpanded((value) => !value)}
-            >
-              {descriptionExpanded ? "Show less" : "Show more"}
-            </button>
+            </div>
           )}
         </div>
 
@@ -1078,24 +1179,20 @@ function TaskDetailPanel({
                   }
                   className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-sm ring-1 ring-inset transition ${
                     selected
-                      ? "bg-indigo-50 text-indigo-700 ring-indigo-300"
-                      : "bg-white text-slate-700 ring-slate-200 hover:bg-slate-50"
+                      ? "chip-active"
+                      : "chip interactive-hover"
                   }`}
                 >
-                  <span className="grid h-6 w-6 place-items-center overflow-hidden rounded-full bg-indigo-100 text-[10px] font-semibold text-indigo-700">
-                    {member.user.image ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={member.user.image}
-                        alt={member.user.name ?? member.user.email}
-                        loading="lazy"
-                        decoding="async"
-                        referrerPolicy="no-referrer"
-                        className="h-full w-full object-cover"
-                      />
-                    ) : (
-                      initialsFromName(member.user.name, member.user.email)
-                    )}
+                  <span className="app-avatar grid h-6 w-6 place-items-center overflow-hidden rounded-full text-[10px] font-semibold">
+                    <CachedAvatar
+                      src={member.user.image}
+                      alt={member.user.name ?? member.user.email}
+                      className="h-full w-full object-cover"
+                      fallback={initialsFromName(
+                        member.user.name,
+                        member.user.email,
+                      )}
+                    />
                   </span>
                   {member.user.name ?? member.user.email}
                 </button>
@@ -1119,20 +1216,11 @@ function TaskDetailPanel({
                   onClick={() =>
                     setTagIds((current) => toggleValue(current, tag.id))
                   }
-                  className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-sm ring-1 ring-inset transition ${
-                    selected ? "ring-2" : "hover:bg-slate-50"
+                  className={`rounded-full transition ${
+                    selected ? "ring-2 ring-[var(--accent)]" : "interactive-hover opacity-80 hover:opacity-100"
                   }`}
-                  style={{
-                    color: tag.color,
-                    backgroundColor: selected ? `${tag.color}20` : "white",
-                    borderColor: tag.color,
-                  }}
                 >
-                  <span
-                    className="h-2 w-2 rounded-full"
-                    style={{ backgroundColor: tag.color }}
-                  />
-                  {tag.name}
+                  <TagChip name={tag.name} color={tag.color} size="md" />
                 </button>
               );
             })}
@@ -1142,14 +1230,17 @@ function TaskDetailPanel({
       <p className="mt-4 text-xs text-slate-500">
         {submitting ? "Saving changes..." : "Changes auto-save."}
       </p>
-      {updateError && <p className="mt-3 text-sm text-red-600">{updateError}</p>}
-    </div>
+      {updateError && (
+        <p className="mt-3 text-sm" style={{ color: "var(--danger-text)" }}>
+          {updateError}
+        </p>
+      )}
+      </div>
+      <TaskCommentsSection taskId={task.id} comments={task.comments} />
+    </>
   );
 }
 
-function dateInputValue(date: Date) {
-  return date.toISOString().slice(0, 10);
-}
 
 function formatShortDate(value: Date | string) {
   return new Intl.DateTimeFormat(undefined, {
@@ -1170,7 +1261,7 @@ function formatSprintRange(start: Date | string, end: Date | string) {
 type SprintPhase = "current" | "past" | "upcoming";
 
 function getSprintPhase(
-  sprint: SprintListItem,
+  sprint: SprintListItem | SprintCurrentItem,
   now = new Date(),
 ): SprintPhase {
   const start = new Date(sprint.startDate);
@@ -1185,24 +1276,24 @@ function getSprintPhase(
 
 const sprintPhaseMeta: Record<
   SprintPhase,
-  { label: string; card: string; badge: string; accent: string }
+  { label: string; cardClass: string; badgeClass: string; accent: string }
 > = {
   current: {
     label: "Current",
-    card: "border-emerald-300 bg-gradient-to-br from-emerald-50 via-white to-emerald-50/40 shadow-sm ring-1 ring-emerald-200/70",
-    badge: "bg-emerald-100 text-emerald-800 ring-emerald-200",
+    cardClass: "sprint-card--current",
+    badgeClass: "badge-phase-current",
     accent: "bg-emerald-500",
   },
   past: {
     label: "Past",
-    card: "border-slate-200 bg-slate-50/80",
-    badge: "bg-slate-100 text-slate-600 ring-slate-200",
-    accent: "bg-slate-300",
+    cardClass: "sprint-card--past",
+    badgeClass: "badge-phase-past",
+    accent: "bg-slate-400",
   },
   upcoming: {
     label: "Upcoming",
-    card: "border-sky-200 bg-gradient-to-br from-sky-50 via-white to-violet-50/30 ring-1 ring-sky-100",
-    badge: "bg-sky-100 text-sky-800 ring-sky-200",
+    cardClass: "sprint-card--upcoming",
+    badgeClass: "badge-phase-upcoming",
     accent: "bg-sky-400",
   },
 };
@@ -1210,22 +1301,19 @@ const sprintPhaseMeta: Record<
 function sprintCardClassName(phase: SprintPhase, isActive: boolean) {
   const meta = sprintPhaseMeta[phase];
   return [
-    "relative cursor-pointer overflow-hidden rounded-xl border p-2.5 pl-3.5 transition",
-    meta.card,
-    isActive ? "ring-2 ring-indigo-400 ring-offset-1" : "",
+    "sprint-card",
+    meta.cardClass,
+    isActive ? "sprint-card--active" : "",
   ]
     .filter(Boolean)
     .join(" ");
 }
 
-function sprintAnalysis(sprint: SprintListItem) {
-  const total = sprint.tasks.length;
-  const completed = sprint.tasks.filter(
-    (task) => task.status === TaskStatus.DONE,
-  ).length;
-  const todo = sprint.tasks.filter(
-    (task) => task.status === TaskStatus.TODO,
-  ).length;
+function sprintAnalysis(sprint: SprintListItem | SprintCurrentItem) {
+  const breakdown = sprint.statusBreakdown;
+  const total = sprint._count.tasks;
+  const completed = breakdown?.DONE ?? 0;
+  const todo = breakdown?.TODO ?? 0;
   const percent = total > 0 ? Math.round((completed / total) * 100) : 0;
   const now = Date.now();
   const start = new Date(sprint.startDate).getTime();
@@ -1252,80 +1340,119 @@ function sprintAnalysis(sprint: SprintListItem) {
 
 function SprintSidebar({
   canManage,
+  sprintPlan,
+  sprintStartDayOfWeek,
   durationWeeks,
   sprints,
+  sprintsLoading,
   activeSprintId,
   activeSprint,
   onSelectSprint,
   onCreateSprint,
   onUpdateSprint,
+  onDeleteSprint,
+  onCleanupInvalid,
   creatingSprint,
+  deletingSprintId,
+  cleaningUp,
   updatingSprintId,
   createSprintError,
   updateSprintError,
+  createCloseSignal,
 }: {
   canManage: boolean;
+  sprintPlan: SprintPlan;
+  sprintStartDayOfWeek: number | null;
   durationWeeks: number;
   sprints: SprintListItem[];
+  sprintsLoading?: boolean;
   activeSprintId: string;
-  activeSprint: SprintListItem | null;
+  activeSprint: SprintListItem | SprintCurrentItem | null;
   onSelectSprint: (id: string) => void;
-  onCreateSprint: (input: {
-    name?: string;
-    startDate: Date;
-    endDate?: Date;
-  }) => void;
-  onUpdateSprint: (input: {
-    id: string;
-    name?: string;
-    startDate?: Date;
-    endDate?: Date;
-  }) => void;
+  onCreateSprint: (input: { name?: string; startDate: Date }) => void;
+  onUpdateSprint: (input: { id: string; name?: string; startDate?: Date }) => void;
+  onDeleteSprint: (sprintId: string) => void;
+  onCleanupInvalid: () => void;
   creatingSprint: boolean;
+  deletingSprintId?: string;
+  cleaningUp: boolean;
   updatingSprintId?: string;
   createSprintError?: string;
   updateSprintError?: string;
+  createCloseSignal?: number;
 }) {
   const today = dateInputValue(new Date());
   const [name, setName] = useState("");
   const [startDate, setStartDate] = useState(today);
-  const [mode, setMode] = useState<"CONFIGURED" | "CUSTOM">("CONFIGURED");
-  const [endDate, setEndDate] = useState("");
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [menuSprintId, setMenuSprintId] = useState<string | null>(null);
   const [editingSprintId, setEditingSprintId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
   const [editStartDate, setEditStartDate] = useState("");
-  const [editEndDate, setEditEndDate] = useState("");
   const suppressSprintNameBlurRef = useRef(false);
+  const lastHandledCloseSignalRef = useRef(createCloseSignal ?? 0);
+  const planLabel = sprintPlanLabel(sprintPlan, durationWeeks, sprintStartDayOfWeek);
+  const previewEndDate = formatSprintEndPreview(startDate, durationWeeks);
+  const editPreviewEndDate = formatSprintEndPreview(editStartDate, durationWeeks);
+
+  useEffect(() => {
+    if (
+      createCloseSignal == null ||
+      createCloseSignal === lastHandledCloseSignalRef.current
+    ) {
+      return;
+    }
+    lastHandledCloseSignalRef.current = createCloseSignal;
+    setShowCreateModal(false);
+    setName("");
+  }, [createCloseSignal]);
+
+  function closeCreateModal() {
+    setShowCreateModal(false);
+    setName("");
+  }
 
   return (
     <section className="card p-3">
       <div className="flex items-center justify-between gap-2">
         <div className="min-w-0">
-          <p className="text-xs font-semibold uppercase tracking-wide text-indigo-600">
+          <p className="text-xs font-semibold uppercase tracking-wide text-[var(--accent-muted-text)]">
             Sprints
           </p>
-          <h2 className="mt-1 truncate text-base font-semibold text-slate-900">
-            {activeSprint
-              ? activeSprint.name
-              : "Select sprint"}
+          <h2 className="mt-1 truncate text-base font-semibold text-heading">
+            {activeSprint ? activeSprint.name : "Select sprint"}
           </h2>
+          <p className="mt-0.5 text-[10px] text-muted">{planLabel}</p>
         </div>
         {canManage && (
-          <button
-            type="button"
-            className="btn-primary shrink-0 px-3 py-1.5 text-xs"
-            onClick={() => setShowCreateModal(true)}
-          >
-            Create sprint
-          </button>
+          <div className="flex shrink-0 flex-col gap-1">
+            <button
+              type="button"
+              className="btn-primary px-3 py-1.5 text-xs"
+              onClick={() => setShowCreateModal(true)}
+            >
+              Create sprint
+            </button>
+            <button
+              type="button"
+              className="btn-ghost px-2 py-1 text-[10px]"
+              disabled={cleaningUp}
+              onClick={onCleanupInvalid}
+            >
+              {cleaningUp ? "Cleaning…" : "Fix invalid sprints"}
+            </button>
+          </div>
         )}
       </div>
 
       <div className="mt-4 max-h-[calc(100vh-18rem)] space-y-2 overflow-y-auto pr-1">
-        {sprints.length === 0 && (
-          <p className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-500">
+        {sprintsLoading && sprints.length === 0 && (
+          <p className="rounded-2xl border border-dashed p-4 text-sm text-muted" style={{ borderColor: "var(--border)" }}>
+            Loading sprints…
+          </p>
+        )}
+        {!sprintsLoading && sprints.length === 0 && (
+          <p className="rounded-2xl border border-dashed p-4 text-sm text-muted" style={{ borderColor: "var(--border)" }}>
             No sprints yet. Create a sprint to start planning work.
           </p>
         )}
@@ -1348,7 +1475,7 @@ function SprintSidebar({
               <div className="w-full pr-8 text-left">
                 {isEditing ? (
                   <input
-                    className="w-full rounded-lg border border-slate-300 bg-white px-2 py-1 text-sm font-semibold text-slate-900 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+                    className="input text-sm font-semibold"
                     value={editName}
                     onClick={(event) => event.stopPropagation()}
                     onChange={(event) => setEditName(event.target.value)}
@@ -1366,7 +1493,6 @@ function SprintSidebar({
                         id: sprint.id,
                         name: editName,
                         startDate: new Date(editStartDate),
-                        endDate: new Date(editEndDate),
                       });
                       setEditingSprintId(null);
                     }}
@@ -1377,7 +1503,6 @@ function SprintSidebar({
                           id: sprint.id,
                           name: editName,
                           startDate: new Date(editStartDate),
-                          endDate: new Date(editEndDate),
                         });
                         setEditingSprintId(null);
                       }
@@ -1395,16 +1520,13 @@ function SprintSidebar({
                   <div className="flex min-w-0 items-start gap-1.5">
                     <button
                       type="button"
-                      className="min-w-0 flex-1 truncate rounded-md px-1 py-0.5 text-left text-sm font-semibold text-slate-900 transition hover:bg-white/60"
+                      className="app-nav-link min-w-0 flex-1 truncate rounded-md px-1 py-0.5 text-left text-sm font-semibold text-heading"
                       onClick={(event) => {
                         event.stopPropagation();
                         if (canManage) {
                           setEditingSprintId(sprint.id);
                           setEditName(sprint.name);
-                          setEditStartDate(
-                            dateInputValue(new Date(sprint.startDate)),
-                          );
-                          setEditEndDate(dateInputValue(new Date(sprint.endDate)));
+                          setEditStartDate(dateInputValue(new Date(sprint.startDate)));
                         } else {
                           onSelectSprint(sprint.id);
                         }
@@ -1414,16 +1536,16 @@ function SprintSidebar({
                       {sprint.name}
                     </button>
                     <span
-                      className={`mt-0.5 shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase leading-none ring-1 ring-inset ${phaseMeta.badge}`}
+                      className={`mt-0.5 shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase leading-none ${phaseMeta.badgeClass}`}
                     >
                       {phaseMeta.label}
                     </span>
                   </div>
                 )}
-                <p className="mt-1 text-xs text-slate-500">
+                <p className="mt-1 text-xs text-muted">
                   {formatSprintRange(sprint.startDate, sprint.endDate)}
                 </p>
-                <p className="mt-1 text-xs font-medium text-slate-600">
+                <p className="mt-1 text-xs font-medium text-muted">
                   {analysis.total} tasks
                 </p>
               </div>
@@ -1431,7 +1553,7 @@ function SprintSidebar({
                 <div className="absolute right-2 top-2">
                   <button
                     type="button"
-                    className="rounded-full px-2 py-0.5 text-lg leading-none text-slate-500 hover:bg-slate-100 hover:text-slate-900"
+                    className="app-nav-link rounded-full px-2 py-0.5 text-lg leading-none"
                     aria-label={`Open ${sprint.name} sprint menu`}
                     onClick={(event) => {
                       event.stopPropagation();
@@ -1443,20 +1565,38 @@ function SprintSidebar({
                     ...
                   </button>
                   {menuSprintId === sprint.id && (
-                    <div className="absolute right-0 z-20 mt-1 w-32 rounded-lg border border-slate-200 bg-white p-1 shadow-lg">
+                    <div className="app-dropdown absolute right-0 z-20 mt-1 w-36 rounded-lg p-1 shadow-lg">
                       <button
                         type="button"
-                        className="w-full rounded-md px-2 py-1.5 text-left text-xs text-slate-700 hover:bg-slate-50"
+                        className="app-dropdown-item w-full rounded-md px-2 py-1.5 text-left text-xs"
                         onClick={(event) => {
                           event.stopPropagation();
                           setEditingSprintId(sprint.id);
                           setEditName(sprint.name);
                           setEditStartDate(dateInputValue(new Date(sprint.startDate)));
-                          setEditEndDate(dateInputValue(new Date(sprint.endDate)));
                           setMenuSprintId(null);
                         }}
                       >
                         Edit sprint
+                      </button>
+                      <button
+                        type="button"
+                        className="w-full rounded-md px-2 py-1.5 text-left text-xs transition hover:bg-[var(--danger-hover-bg)]"
+                        style={{ color: "var(--danger-text)" }}
+                        disabled={deletingSprintId === sprint.id}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          if (
+                            confirm(
+                              `Delete "${sprint.name}"? Tasks in this sprint move to backlog.`,
+                            )
+                          ) {
+                            onDeleteSprint(sprint.id);
+                          }
+                          setMenuSprintId(null);
+                        }}
+                      >
+                        {deletingSprintId === sprint.id ? "Deleting…" : "Delete sprint"}
                       </button>
                     </div>
                   )}
@@ -1464,14 +1604,14 @@ function SprintSidebar({
               )}
               {isEditing && (
                 <form
-                  className="mt-3 space-y-2 border-t border-slate-200 pt-3"
+                  className="mt-3 space-y-2 border-t pt-3"
+                  style={{ borderColor: "var(--border)" }}
                   onSubmit={(event) => {
                     event.preventDefault();
                     onUpdateSprint({
                       id: sprint.id,
                       name: editName,
                       startDate: new Date(editStartDate),
-                      endDate: new Date(editEndDate),
                     });
                     setEditingSprintId(null);
                   }}
@@ -1480,49 +1620,34 @@ function SprintSidebar({
                     className="input"
                     value={editName}
                     onChange={(event) => setEditName(event.target.value)}
-                    onBlur={() => {
-                      if (!editName.trim()) return;
-                      onUpdateSprint({
-                        id: sprint.id,
-                        name: editName,
-                        startDate: new Date(editStartDate),
-                        endDate: new Date(editEndDate),
-                      });
-                      setEditingSprintId(null);
-                    }}
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter") {
-                        event.preventDefault();
-                        onUpdateSprint({
-                          id: sprint.id,
-                          name: editName,
-                          startDate: new Date(editStartDate),
-                          endDate: new Date(editEndDate),
-                        });
-                        setEditingSprintId(null);
-                      }
-                      if (event.key === "Escape") {
-                        event.preventDefault();
-                        setEditName(sprint.name);
-                        setEditingSprintId(null);
-                      }
-                    }}
                     required
                   />
-                  <input
-                    type="date"
-                    className="input"
-                    value={editStartDate}
-                    onChange={(event) => setEditStartDate(event.target.value)}
-                    required
-                  />
-                  <input
-                    type="date"
-                    className="input"
-                    value={editEndDate}
-                    onChange={(event) => setEditEndDate(event.target.value)}
-                    required
-                  />
+                  <div>
+                    <label className="label">Start date</label>
+                    <input
+                      type="date"
+                      className="input mt-1"
+                      value={editStartDate}
+                      onChange={(event) => setEditStartDate(event.target.value)}
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="label">End date (auto)</label>
+                    <input
+                      type="date"
+                      className="input mt-1 opacity-80"
+                      value={editPreviewEndDate}
+                      readOnly
+                      disabled
+                    />
+                  </div>
+                  {sprintPlan === SprintPlan.CUSTOM_DAY && sprintStartDayOfWeek != null && (
+                    <p className="text-[10px] text-muted">
+                      Must start on{" "}
+                      {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][sprintStartDayOfWeek]}
+                    </p>
+                  )}
                   <div className="flex gap-2">
                     <button
                       className="btn-primary flex-1"
@@ -1539,7 +1664,9 @@ function SprintSidebar({
                     </button>
                   </div>
                   {updateSprintError && updatingSprintId === sprint.id && (
-                    <p className="text-xs text-red-600">{updateSprintError}</p>
+                    <p className="text-xs" style={{ color: "var(--danger-text)" }}>
+                      {updateSprintError}
+                    </p>
                   )}
                 </form>
               )}
@@ -1549,37 +1676,31 @@ function SprintSidebar({
       </div>
 
       {showCreateModal && (
-        <div className="fixed inset-0 z-[80] grid place-items-center bg-slate-950/40 p-4">
+        <div className="modal-overlay fixed inset-0 z-[80] grid place-items-center p-4">
           <form
-            className="w-full max-w-md rounded-2xl bg-white p-5 shadow-2xl"
+            className="modal-panel w-full max-w-md rounded-2xl p-5 shadow-2xl"
             onSubmit={(event) => {
               event.preventDefault();
               onCreateSprint({
                 name: name || undefined,
                 startDate: new Date(startDate),
-                endDate:
-                  mode === "CUSTOM" && endDate ? new Date(endDate) : undefined,
               });
-              setName("");
             }}
           >
             <div className="mb-4 flex items-start justify-between gap-3">
               <div>
-                <h3 className="text-lg font-semibold text-slate-900">
-                  Create sprint
-                </h3>
-                <p className="mt-1 text-xs text-slate-500">
-                  Dates must be continuous with existing sprints and cannot
-                  overlap.
+                <h3 className="text-lg font-semibold text-heading">Create sprint</h3>
+                <p className="mt-1 text-xs text-muted">
+                  {planLabel}. Sprints must be continuous with no gaps or overlaps.
                 </p>
               </div>
               <button
                 type="button"
-                className="rounded-full px-2 py-1 text-slate-500 hover:bg-slate-100"
-                onClick={() => setShowCreateModal(false)}
+                className="app-nav-link rounded-full px-2 py-1"
+                onClick={closeCreateModal}
                 aria-label="Close create sprint modal"
               >
-                x
+                ×
               </button>
             </div>
             <div className="space-y-3">
@@ -1589,40 +1710,39 @@ function SprintSidebar({
                 value={name}
                 onChange={(event) => setName(event.target.value)}
               />
-              <input
-                type="date"
-                className="input"
-                value={startDate}
-                onChange={(event) => setStartDate(event.target.value)}
-                required
-              />
-              <select
-                className="input"
-                value={mode}
-                onChange={(event) =>
-                  setMode(
-                    event.target.value === "CUSTOM" ? "CUSTOM" : "CONFIGURED",
-                  )
-                }
-              >
-                <option value="CONFIGURED">
-                  {durationWeeks === 2 ? "Biweekly" : "Weekly"}
-                </option>
-                <option value="CUSTOM">Custom dates</option>
-              </select>
-              <input
-                type="date"
-                className="input"
-                value={endDate}
-                onChange={(event) => setEndDate(event.target.value)}
-                disabled={mode !== "CUSTOM"}
-                required={mode === "CUSTOM"}
-              />
+              <div>
+                <label className="label">Start date</label>
+                <input
+                  type="date"
+                  className="input mt-1"
+                  value={startDate}
+                  onChange={(event) => setStartDate(event.target.value)}
+                  required
+                />
+              </div>
+              <div>
+                <label className="label">End date (auto)</label>
+                <input
+                  type="date"
+                  className="input mt-1 opacity-80"
+                  value={previewEndDate}
+                  readOnly
+                  disabled
+                />
+              </div>
+              {sprintPlan === SprintPlan.CUSTOM_DAY && sprintStartDayOfWeek != null && (
+                <p className="text-xs text-muted">
+                  Start day must be{" "}
+                  {["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"][sprintStartDayOfWeek]}
+                </p>
+              )}
               <button className="btn-primary w-full" disabled={creatingSprint}>
                 {creatingSprint ? "Creating..." : "Create sprint"}
               </button>
               {createSprintError && (
-                <p className="text-xs text-red-600">{createSprintError}</p>
+                <p className="text-xs" style={{ color: "var(--danger-text)" }}>
+                  {createSprintError}
+                </p>
               )}
             </div>
           </form>
@@ -1709,14 +1829,14 @@ function ProjectMembersPanel({
 
   return (
     <section className="card p-2.5">
-      <h3 className="mb-2 text-sm font-semibold text-slate-900">Members</h3>
+      <h3 className="mb-2 text-sm font-semibold text-heading">Members</h3>
       <label className="sr-only" htmlFor="project-member-search">
         Search project members
       </label>
       <div className="relative mb-2">
         {hasMemberFilter && (
           <span
-            className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-indigo-600"
+            className="link-accent pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2"
             aria-hidden="true"
           >
             <FilterIcon />
@@ -1724,11 +1844,7 @@ function ProjectMembersPanel({
         )}
         <input
           id="project-member-search"
-          className={`h-9 w-full rounded-lg border text-xs outline-none ring-4 ring-transparent transition placeholder:text-slate-400 focus:ring-indigo-100 ${
-            hasMemberFilter
-              ? "border-indigo-300 bg-indigo-50/60 pl-8 pr-14 text-slate-900 focus:border-indigo-400 focus:bg-white"
-              : "border-slate-200 bg-slate-50 px-3 text-slate-900 focus:border-indigo-400 focus:bg-white"
-          }`}
+          className={`input h-9 w-full text-xs ${hasMemberFilter ? "pl-8 pr-14" : ""}`}
           placeholder="Search members..."
           value={memberSearch}
           onChange={(event) => onMemberSearch(event.target.value)}
@@ -1736,7 +1852,7 @@ function ProjectMembersPanel({
         {hasMemberFilter && (
           <button
             type="button"
-            className="absolute right-2 top-1/2 -translate-y-1/2 text-xs font-semibold text-indigo-600 transition hover:text-indigo-800 hover:underline"
+            className="link-accent absolute right-2 top-1/2 -translate-y-1/2 text-xs font-semibold hover:underline"
             onClick={onClearMembers}
           >
             Clear
@@ -1753,8 +1869,8 @@ function ProjectMembersPanel({
               key={member.id}
               className={`relative flex items-center gap-1 rounded-lg border px-1 py-1 transition ${
                 selected
-                  ? "border-indigo-300 bg-indigo-50"
-                  : "border-transparent hover:border-slate-200 hover:bg-slate-50"
+                  ? "chip-active"
+                  : "border-transparent interactive-hover"
               }`}
             >
               <button
@@ -1765,17 +1881,17 @@ function ProjectMembersPanel({
               >
                 <MemberAvatar member={member} />
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-xs font-semibold text-slate-800">
+                  <span className="block truncate text-xs font-semibold text-heading">
                     {label}
                   </span>
-                  <span className="block text-[10px] uppercase text-slate-500">
+                  <span className="block text-[10px] uppercase text-muted">
                     {member.role}
                   </span>
                 </span>
               </button>
               <button
                 type="button"
-                className="grid h-7 w-7 shrink-0 place-items-center rounded-md text-slate-500 transition hover:bg-slate-100 hover:text-slate-800"
+                className="app-nav-link grid h-7 w-7 shrink-0 place-items-center rounded-md"
                 onClick={() => onToggleMenu(member.user.id)}
                 aria-label={`Open actions for ${label}`}
                 aria-expanded={openMenuMemberId === member.user.id}
@@ -1783,10 +1899,10 @@ function ProjectMembersPanel({
                 ...
               </button>
               {openMenuMemberId === member.user.id && (
-                <div className="absolute right-0 top-9 z-40 w-44 overflow-hidden rounded-xl border border-slate-200 bg-white p-1 shadow-xl">
+                <div className="app-dropdown absolute right-0 top-9 z-40 w-44 rounded-xl p-1 shadow-xl">
                   <button
                     type="button"
-                    className="block w-full rounded-lg px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-100"
+                    className="app-dropdown-item block w-full rounded-lg px-3 py-2 text-left text-sm"
                     onClick={() => {
                       onCloseMenu();
                       alert(
@@ -1799,7 +1915,8 @@ function ProjectMembersPanel({
                   {canManage && member.role !== "OWNER" && (
                     <button
                       type="button"
-                      className="block w-full rounded-lg px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50"
+                      className="block w-full rounded-lg px-3 py-2 text-left text-sm transition hover:bg-[var(--danger-hover-bg)]"
+                      style={{ color: "var(--danger-text)" }}
                       onClick={() =>
                         remove.mutate({ projectId, userId: member.user.id })
                       }
@@ -1814,14 +1931,17 @@ function ProjectMembersPanel({
           );
         })}
         {visibleMembers.length === 0 && (
-          <li className="rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-500">
+          <li className="surface-muted rounded-lg px-3 py-2 text-xs text-muted">
             No members match this search.
           </li>
         )}
       </ul>
 
       {canManage && (
-        <div className="mt-3 space-y-2 border-t border-slate-100 pt-3">
+        <div
+          className="mt-3 space-y-2 border-t pt-3"
+          style={{ borderColor: "var(--border-muted)" }}
+        >
           <form
             className="space-y-2"
             onSubmit={(e) => {
@@ -1846,18 +1966,19 @@ function ProjectMembersPanel({
           </form>
           {pendingInvites.length > 0 && (
             <div className="space-y-1">
-              <p className="text-[10px] font-semibold uppercase text-slate-500">
+              <p className="text-[10px] font-semibold uppercase text-muted">
                 Pending
               </p>
               {pendingInvites.map((inv) => (
                 <div
                   key={inv.id}
-                  className="flex items-center justify-between gap-2 rounded-lg bg-amber-50 px-2 py-1 text-[11px] text-amber-700 ring-1 ring-amber-100"
+                  className="app-banner-warning flex items-center justify-between gap-2 rounded-lg px-2 py-1 text-[11px]"
                 >
                   <span className="truncate">{inv.email}</span>
                   <button
                     type="button"
-                    className="shrink-0 font-bold text-red-600 hover:underline"
+                    className="shrink-0 font-bold hover:underline"
+                    style={{ color: "var(--danger-text)" }}
                     onClick={() => cancelInvite.mutate({ inviteId: inv.id })}
                   >
                     Cancel
@@ -1867,7 +1988,9 @@ function ProjectMembersPanel({
             </div>
           )}
           {invite.error && (
-            <p className="text-xs text-red-600">{invite.error.message}</p>
+            <p className="text-xs" style={{ color: "var(--danger-text)" }}>
+              {invite.error.message}
+            </p>
           )}
         </div>
       )}
@@ -1896,20 +2019,13 @@ function MemberAvatar({ member }: { member: ProjectMemberItem }) {
   const label = member.user.name ?? member.user.email;
   const initials = initialsFromName(member.user.name, member.user.email);
   return (
-    <span className="grid h-7 w-7 shrink-0 place-items-center overflow-hidden rounded-full bg-indigo-100 text-[10px] font-bold text-indigo-700 ring-2 ring-white">
-      {member.user.image ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={member.user.image}
-          alt={label}
-          className="h-full w-full object-cover"
-          loading="lazy"
-          decoding="async"
-          referrerPolicy="no-referrer"
-        />
-      ) : (
-        initials
-      )}
+    <span className="app-avatar grid h-7 w-7 shrink-0 place-items-center overflow-hidden rounded-full text-[10px] font-bold ring-2 ring-[var(--surface)]">
+      <CachedAvatar
+        src={member.user.image}
+        alt={label}
+        className="h-full w-full object-cover"
+        fallback={initials}
+      />
     </span>
   );
 }
@@ -1938,22 +2054,14 @@ function TagsPanel({
 
   return (
     <div>
-      <h3 className="mb-3 text-sm font-semibold">Tags</h3>
+      <h3 className="mb-3 text-sm font-semibold text-heading">Tags</h3>
       <ul className="flex flex-wrap gap-2">
         {tags.data?.length === 0 && (
-          <li className="text-xs text-slate-500">No tags yet</li>
+          <li className="text-xs text-muted">No tags yet</li>
         )}
         {tags.data?.map((t) => (
-          <li
-            key={t.id}
-            className="group inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs ring-1 ring-inset"
-            style={{ color: t.color, borderColor: t.color }}
-          >
-            <span
-              className="h-2.5 w-2.5 rounded-full"
-              style={{ backgroundColor: t.color }}
-            />
-            {t.name}
+          <li key={t.id} className="group inline-flex items-center gap-1">
+            <TagChip name={t.name} color={t.color} size="md" />
             {canManage && (
               <button
                 onClick={() => remove.mutate({ id: t.id })}

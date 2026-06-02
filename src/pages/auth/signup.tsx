@@ -1,4 +1,4 @@
-import { signIn } from "next-auth/react";
+import { signIn, getSession } from "next-auth/react";
 import Head from "next/head";
 import Link from "next/link";
 import { useRouter } from "next/router";
@@ -24,7 +24,9 @@ export default function SignUpPage({ oauthProviders }: SignUpPageProps) {
   const router = useRouter();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
+  const [companyName, setCompanyName] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [otp, setOtp] = useState("");
   const [otpStep, setOtpStep] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -42,8 +44,13 @@ export default function SignUpPage({ oauthProviders }: SignUpPageProps) {
     setInfo(null);
     setError(null);
 
+    if (password !== confirmPassword) {
+      setError("Passwords do not match. Please re-enter them.");
+      return;
+    }
+
     try {
-      await sendSignupOtp.mutateAsync({ name, email, password });
+      await sendSignupOtp.mutateAsync({ name, email, password, companyName });
       setOtp("");
       setOtpStep(true);
     } catch (err) {
@@ -70,6 +77,7 @@ export default function SignUpPage({ oauthProviders }: SignUpPageProps) {
           name,
           email,
           password,
+          companyName,
           otp: code,
         });
       } catch (err) {
@@ -82,6 +90,7 @@ export default function SignUpPage({ oauthProviders }: SignUpPageProps) {
       const res = await signIn("credentials", {
         email,
         password,
+        authFlow: "signup",
         redirect: false,
       });
 
@@ -89,14 +98,15 @@ export default function SignUpPage({ oauthProviders }: SignUpPageProps) {
       verifyingRef.current = false;
 
       if (!res || res.error) {
-        setError("Account created. Please sign in.");
+        setError("Account created, but automatic sign-in failed. Please sign in.");
         void router.push("/auth/signin");
         return;
       }
 
-      void router.push("/dashboard");
+      await getSession();
+      void router.replace("/dashboard");
     },
-    [email, name, password, router, verifySignupOtpAndRegister],
+    [companyName, email, name, password, router, verifySignupOtpAndRegister],
   );
 
   async function handleVerifyAndCreate(e: FormEvent) {
@@ -110,7 +120,7 @@ export default function SignUpPage({ oauthProviders }: SignUpPageProps) {
     setOtp("");
     verifyingRef.current = false;
     try {
-      await sendSignupOtp.mutateAsync({ name, email, password });
+      await sendSignupOtp.mutateAsync({ name, email, password, companyName });
       setInfo("A new verification code was sent to your email.");
     } catch (err) {
       setError(
@@ -175,6 +185,25 @@ export default function SignUpPage({ oauthProviders }: SignUpPageProps) {
                   />
                 </div>
                 <div>
+                  <label className="label" htmlFor="company-name">
+                    Company
+                  </label>
+                  <input
+                    id="company-name"
+                    className="brand-input mt-1.5 h-11 text-sm"
+                    value={companyName}
+                    onChange={(e) => setCompanyName(e.target.value)}
+                    required
+                    minLength={2}
+                    maxLength={120}
+                    placeholder="Tasker"
+                    autoComplete="organization"
+                  />
+                  <p className="mt-1 text-xs text-slate-500">
+                    Teammate search and invites are limited to people in your company.
+                  </p>
+                </div>
+                <div>
                   <label className="label" htmlFor="password">
                     Password (min 8 characters)
                   </label>
@@ -200,6 +229,29 @@ export default function SignUpPage({ oauthProviders }: SignUpPageProps) {
                   </div>
                 </div>
 
+                <div>
+                  <label className="label" htmlFor="confirm-password">
+                    Confirm password
+                  </label>
+                  <input
+                    id="confirm-password"
+                    type={showPassword ? "text" : "password"}
+                    className="brand-input mt-1.5 h-11 text-sm"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    onPaste={(e) => e.preventDefault()}
+                    minLength={8}
+                    required
+                    autoComplete="new-password"
+                    aria-invalid={confirmPassword.length > 0 && password !== confirmPassword}
+                  />
+                  {confirmPassword.length > 0 && password !== confirmPassword && (
+                    <p className="mt-2 text-sm font-semibold text-red-600">
+                      Passwords do not match.
+                    </p>
+                  )}
+                </div>
+
                 {error && (
                   <p className="rounded-xl bg-red-50 px-4 py-3 text-sm font-semibold text-red-700 ring-1 ring-red-200">
                     {error}
@@ -208,7 +260,11 @@ export default function SignUpPage({ oauthProviders }: SignUpPageProps) {
 
                 <button
                   type="submit"
-                  disabled={sendSignupOtp.isPending}
+                  disabled={
+                    sendSignupOtp.isPending ||
+                    password !== confirmPassword ||
+                    !confirmPassword
+                  }
                   className="brand-button-primary h-11 w-full"
                 >
                   {sendSignupOtp.isPending ? (
@@ -286,10 +342,10 @@ export default function SignUpPage({ oauthProviders }: SignUpPageProps) {
                 {loading || verifySignupOtpAndRegister.isPending ? (
                   <span className="inline-flex items-center gap-2">
                     <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />
-                    Creating account...
+                    Signing you in...
                   </span>
                 ) : (
-                  "Verify & create account"
+                  "Verify & sign in"
                 )}
               </button>
 

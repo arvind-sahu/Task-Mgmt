@@ -26,7 +26,7 @@ export function StatusSelect({
         e.stopPropagation();
         onChange(e.target.value as TaskStatus);
       }}
-      className={`w-auto max-w-full rounded-full border-0 bg-white py-0.5 pl-2 pr-6 text-xs font-medium text-slate-700 ring-1 ring-inset ring-slate-200 focus:ring-2 focus:ring-indigo-500 ${className}`}
+      className={`w-auto max-w-full rounded-full border-0 bg-[var(--input-bg)] py-0.5 pl-2 pr-6 text-xs font-medium text-[var(--input-text)] ring-1 ring-inset ring-[var(--border)] focus:ring-2 focus:ring-[var(--input-focus-ring)] ${className}`}
       aria-label="Change task status"
     >
       {TASK_STATUSES.map((s) => (

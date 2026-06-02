@@ -43,8 +43,8 @@ export default function Dashboard() {
   return (
     <Layout title="Dashboard">
       <div className="mb-5">
-        <h1 className="text-2xl font-semibold">Dashboard</h1>
-        <p className="text-sm text-slate-500">
+        <h1 className="text-2xl font-semibold text-heading">Dashboard</h1>
+        <p className="text-sm text-muted">
           Overview, projects, and what needs your attention
         </p>
       </div>
@@ -56,24 +56,24 @@ export default function Dashboard() {
 
           <section>
             <div className="mb-3 flex items-center justify-between">
-              <h2 className="text-base font-semibold text-slate-800">
+              <h2 className="text-base font-semibold text-heading">
                 Your projects
               </h2>
               <Link
                 href="/projects"
-                className="text-sm font-medium text-indigo-600 hover:underline"
+                className="link-accent text-sm font-medium hover:underline"
               >
                 View all
               </Link>
             </div>
             <div className="card grid gap-2 p-3 sm:grid-cols-2">
               {projects.isLoading && (
-                <p className="p-2 text-sm text-slate-500 sm:col-span-2">
+                <p className="p-2 text-sm text-muted sm:col-span-2">
                   Loading…
                 </p>
               )}
               {projects.data?.length === 0 && (
-                <p className="p-2 text-sm text-slate-500 sm:col-span-2">
+                <p className="p-2 text-sm text-muted sm:col-span-2">
                   No projects yet.
                 </p>
               )}
@@ -81,17 +81,17 @@ export default function Dashboard() {
                 <Link
                   key={p.id}
                   href={`/projects/${p.id}`}
-                  className="flex items-center gap-3 rounded-md p-2 transition hover:bg-slate-50"
+                  className="list-row-hover flex items-center gap-3 rounded-md p-2 transition"
                 >
                   <span
                     className="h-3 w-3 shrink-0 rounded-sm"
                     style={{ backgroundColor: p.color }}
                   />
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium text-slate-900">
+                    <p className="truncate text-sm font-medium text-heading">
                       {p.name}
                     </p>
-                    <p className="text-xs text-slate-500">
+                    <p className="text-xs text-muted">
                       {p._count.tasks} tasks · {p._count.members} members
                     </p>
                   </div>
@@ -103,22 +103,22 @@ export default function Dashboard() {
 
         {/* Right sidebar: upcoming tasks */}
         <aside className="min-w-0 lg:col-span-4 lg:sticky lg:top-4">
-          <h2 className="mb-3 text-base font-semibold text-slate-800">
+          <h2 className="mb-3 text-base font-semibold text-heading">
             Upcoming tasks
           </h2>
-          <div className="card max-h-[calc(100vh-8rem)] divide-y divide-slate-100 overflow-y-auto p-0">
+          <div className="card list-divider max-h-[calc(100vh-8rem)] overflow-y-auto p-0">
             {upcoming.isLoading && (
-              <p className="p-4 text-sm text-slate-500">Loading…</p>
+              <p className="p-4 text-sm text-muted">Loading…</p>
             )}
             {upcoming.data?.length === 0 && (
-              <p className="p-4 text-sm text-slate-500">
+              <p className="p-4 text-sm text-muted">
                 You&apos;re all caught up. Create a task to get started.
               </p>
             )}
             {upcoming.data?.map((t) => (
               <div
                 key={t.id}
-                className="space-y-2 px-4 py-3 transition hover:bg-slate-50"
+                className="list-row-hover space-y-2 px-4 py-3 transition"
               >
                 <Link href={`/tasks/${t.id}`} className="block min-w-0">
                   <div className="flex items-start gap-2">
@@ -127,10 +127,10 @@ export default function Dashboard() {
                       style={{ backgroundColor: t.project.color }}
                     />
                     <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium leading-snug text-slate-900">
+                      <p className="text-sm font-medium leading-snug text-heading">
                         {t.title}
                       </p>
-                      <p className="mt-0.5 truncate text-xs text-slate-500">
+                      <p className="mt-0.5 truncate text-xs text-muted">
                         {t.project.name}
                       </p>
                     </div>
@@ -148,8 +148,8 @@ export default function Dashboard() {
                   <span
                     className={`ml-auto text-xs ${
                       isOverdue(t.deadline)
-                        ? "font-medium text-red-600"
-                        : "text-slate-500"
+                        ? "font-medium text-red-500"
+                        : "text-muted"
                     }`}
                   >
                     {relativeDeadline(t.deadline)}

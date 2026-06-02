@@ -45,7 +45,6 @@ export default function SignInPage({ oauthProviders }: SignInPageProps) {
   const verifyingRef = useRef(false);
 
   const sendLoginOtp = api.user.sendLoginOtp.useMutation();
-  const verifyLoginOtp = api.user.verifyLoginOtp.useMutation();
   const emailInvalid = emailTouched && email.length > 0 && !email.includes("@");
 
   async function handlePasswordSubmit(e: FormEvent) {
@@ -75,23 +74,10 @@ export default function SignInPage({ oauthProviders }: SignInPageProps) {
       setError(null);
       setLoading(true);
 
-      try {
-        await verifyLoginOtp.mutateAsync({ email, otp: code });
-      } catch (err) {
-        setLoading(false);
-        verifyingRef.current = false;
-        setError(
-          getTrpcMutationErrorMessage(
-            err,
-            "Invalid or expired verification code",
-          ),
-        );
-        return;
-      }
-
       const res = await signIn("credentials", {
         email,
         password,
+        otp: code,
         redirect: false,
         callbackUrl,
       });
@@ -100,13 +86,13 @@ export default function SignInPage({ oauthProviders }: SignInPageProps) {
       verifyingRef.current = false;
 
       if (!res || res.error) {
-        setError("Invalid email or password");
+        setError("Invalid email, password, or verification code.");
         return;
       }
 
       void router.push(res.url ?? callbackUrl);
     },
-    [callbackUrl, email, password, router, verifyLoginOtp],
+    [callbackUrl, email, password, router],
   );
 
   async function handleOtpSubmit(e: FormEvent) {
@@ -316,7 +302,7 @@ export default function SignInPage({ oauthProviders }: SignInPageProps) {
                     value={otp}
                     onChange={setOtp}
                     onComplete={(code) => void submitOtp(code)}
-                    disabled={loading || verifyLoginOtp.isPending}
+                    disabled={loading}
                   />
                 </div>
               </div>
@@ -334,10 +320,10 @@ export default function SignInPage({ oauthProviders }: SignInPageProps) {
 
               <button
                 type="submit"
-                disabled={loading || verifyLoginOtp.isPending || otp.length !== 6}
+                disabled={loading || otp.length !== 6}
                 className="brand-button-primary h-11 w-full bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 shadow-blue-600/25 hover:from-blue-700 hover:via-indigo-700 hover:to-purple-700"
               >
-                {loading || verifyLoginOtp.isPending ? (
+                {loading ? (
                   <span className="inline-flex items-center gap-2">
                     <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />
                     Verifying...

@@ -73,6 +73,8 @@ model User {
     image         String?
     password      String? // bcrypt hash; null for OAuth-only accounts
     bio           String?
+    /// Organization the user belongs to (used to scope employee search and invites).
+    companyName   String?
     timezone      String?   @default("UTC")
     createdAt     DateTime  @default(now())
     updatedAt     DateTime  @updatedAt
@@ -88,6 +90,14 @@ model User {
     notifications       Notification[]
     loginAudits         LoginAudit[]
     invitesSent         ProjectInvite[] @relation("InvitesSent")
+
+    @@index([companyName])
+}
+
+enum SprintPlan {
+    WEEKLY
+    BIWEEKLY
+    CUSTOM_DAY
 }
 
 /// Top-level container that groups tasks. Owned by a single user but can have
@@ -97,6 +107,8 @@ model Project {
     name        String
     description String?
     color       String   @default("#6366F1") // indigo-500 default
+    sprintPlan  SprintPlan @default(WEEKLY)
+    sprintStartDayOfWeek Int? // 0=Sun … 6=Sat, required when sprintPlan is CUSTOM_DAY
     sprintDurationWeeks Int      @default(1)
     createdAt   DateTime @default(now())
     updatedAt   DateTime @updatedAt
@@ -360,11 +372,17 @@ model LeadRequest {
 }
 
 model LoginAudit {
-    id        String   @id @default(cuid())
-    userId    String
-    user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-    method    String
-    createdAt DateTime @default(now())
+    id            String   @id @default(cuid())
+    userId        String
+    user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+    method        String
+    ipAddress     String?
+    userAgent     String?
+    deviceType    String?
+    deviceOs      String?
+    deviceLabel   String?
+    locationLabel String?
+    createdAt     DateTime @default(now())
 
     @@index([userId, createdAt])
 }

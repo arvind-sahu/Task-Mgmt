@@ -137,6 +137,7 @@ describe("user.register", () => {
         name: "Alice",
         email: "alice@example.com",
         password: "weakpass",
+        companyName: "Tasker",
       }),
     ).rejects.toThrow();
   });

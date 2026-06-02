@@ -1,10 +1,15 @@
 import { TRPCError } from "@trpc/server";
-import { InviteStatus, NotificationType, ProjectRole } from "@prisma/client";
+import { InviteStatus, NotificationType, ProjectRole, SprintPlan } from "@prisma/client";
 import { z } from "zod";
 
 import { assertProjectAccess } from "~/server/api/access";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { createNotification } from "~/server/notifications";
+import { companyNamesMatch } from "~/server/company";
+import {
+  durationWeeksForPlan,
+  SPRINT_DAY_LABELS,
+} from "~/server/sprint/rules";
 import {
   sanitizeOptionalPlainText,
   sanitizePlainText,
@@ -41,8 +46,27 @@ async function inviteMemberByEmail(
     select: { name: true },
   });
 
+  const inviter = await ctx.db.user.findUnique({
+    where: { id: ctx.session.user.id },
+    select: { companyName: true },
+  });
+  if (!inviter?.companyName) {
+    throw new TRPCError({
+      code: "PRECONDITION_FAILED",
+      message:
+        "Add your company name in Profile settings before inviting teammates.",
+    });
+  }
+
   const user = await ctx.db.user.findUnique({ where: { email } });
   if (user) {
+    if (!companyNamesMatch(inviter.companyName, user.companyName)) {
+      throw new TRPCError({
+        code: "FORBIDDEN",
+        message: "You can only add people from your own company.",
+      });
+    }
+
     const member = await ctx.db.projectMember.upsert({
       where: {
         userId_projectId: { userId: user.id, projectId: input.projectId },
@@ -103,10 +127,32 @@ const createInput = z.object({
     .string()
     .regex(/^#[0-9A-Fa-f]{6}$/, "Must be a hex color, e.g. #6366F1")
     .optional(),
+  sprintPlan: z.nativeEnum(SprintPlan).optional(),
+  sprintStartDayOfWeek: z.number().int().min(0).max(6).nullable().optional(),
   sprintDurationWeeks: z.union([z.literal(1), z.literal(2)]).optional(),
 });
 
 const updateInput = createInput.partial().extend({ id: z.string().cuid() });
+
+function normalizeSprintSettings(input: {
+  sprintPlan?: SprintPlan;
+  sprintStartDayOfWeek?: number | null;
+  sprintDurationWeeks?: 1 | 2;
+}) {
+  const sprintPlan = input.sprintPlan;
+  if (!sprintPlan) {
+    return {
+      sprintStartDayOfWeek: input.sprintStartDayOfWeek,
+      sprintDurationWeeks: input.sprintDurationWeeks,
+    };
+  }
+  const sprintDurationWeeks = durationWeeksForPlan(sprintPlan);
+  const sprintStartDayOfWeek =
+    sprintPlan === SprintPlan.CUSTOM_DAY
+      ? (input.sprintStartDayOfWeek ?? 1)
+      : null;
+  return { sprintPlan, sprintDurationWeeks, sprintStartDayOfWeek };
+}
 
 export const projectRouter = createTRPCRouter({
   list: protectedProcedure.query(async ({ ctx }) => {
@@ -163,12 +209,15 @@ export const projectRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const userId = ctx.session.user.id;
       return ctx.db.$transaction(async (tx) => {
+        const sprintSettings = normalizeSprintSettings(input);
         const project = await tx.project.create({
           data: {
             name: sanitizePlainText(input.name),
             description: sanitizeOptionalPlainText(input.description),
             color: input.color,
-            sprintDurationWeeks: input.sprintDurationWeeks,
+            sprintPlan: sprintSettings.sprintPlan,
+            sprintStartDayOfWeek: sprintSettings.sprintStartDayOfWeek,
+            sprintDurationWeeks: sprintSettings.sprintDurationWeeks ?? 1,
             ownerId: userId,
           },
         });
@@ -189,11 +238,22 @@ export const projectRouter = createTRPCRouter({
         ProjectRole.ADMIN,
       );
       const { id, ...data } = input;
+      const sprintSettings = normalizeSprintSettings(data);
       const sanitized = {
         ...data,
+        ...sprintSettings,
         name: data.name ? sanitizePlainText(data.name) : undefined,
         description: sanitizeOptionalPlainText(data.description),
       };
+      if (
+        sanitized.sprintPlan === SprintPlan.CUSTOM_DAY &&
+        sanitized.sprintStartDayOfWeek == null
+      ) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: `Choose a sprint start day (${SPRINT_DAY_LABELS.join(", ")})`,
+        });
+      }
       return ctx.db.project.update({ where: { id }, data: sanitized });
     }),
 

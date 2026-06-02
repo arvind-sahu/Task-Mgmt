@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
+import { CachedAvatar } from "~/components/CachedAvatar";
 import { type RouterOutputs } from "~/utils/api";
 import { api } from "~/utils/api";
 import { formatDateTime } from "~/utils/date";
@@ -9,11 +10,16 @@ type NotificationListItem = RouterOutputs["notification"]["list"][number];
 
 export function NotificationsBell() {
   const [open, setOpen] = useState(false);
+  const [fetchEnabled, setFetchEnabled] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const utils = api.useUtils();
 
+  const enableFetch = () => setFetchEnabled(true);
+
   const unread = api.notification.unreadCount.useQuery(undefined, {
-    refetchInterval: 60_000,
+    enabled: fetchEnabled,
+    staleTime: 60_000,
+    refetchInterval: fetchEnabled ? 60_000 : false,
   });
   const list = api.notification.list.useQuery(
     { limit: 25 },
@@ -55,8 +61,13 @@ export function NotificationsBell() {
     <div className="relative shrink-0" ref={ref}>
       <button
         type="button"
-        onClick={() => setOpen((o) => !o)}
-        className="relative rounded-md p-2 text-slate-600 transition hover:bg-slate-100"
+        onClick={() => {
+          enableFetch();
+          setOpen((o) => !o);
+        }}
+        onMouseEnter={enableFetch}
+        onFocus={enableFetch}
+        className="app-nav-link relative rounded-md p-2 transition"
         aria-label="Notifications"
       >
         <span className="text-lg">🔔</span>
@@ -68,12 +79,15 @@ export function NotificationsBell() {
       </button>
 
       {open && (
-        <div className="absolute right-0 z-[70] mt-2 w-[min(20rem,calc(100vw-1.5rem))] overflow-hidden rounded-lg border border-slate-200 bg-white shadow-xl sm:w-80">
-          <div className="flex items-center justify-between border-b border-slate-100 px-3 py-2">
-            <p className="text-sm font-semibold text-slate-800">Notifications</p>
+        <div className="app-dropdown absolute right-0 z-[70] mt-2 w-[min(20rem,calc(100vw-1.5rem))] overflow-hidden rounded-lg shadow-xl sm:w-80">
+          <div
+            className="flex items-center justify-between border-b px-3 py-2"
+            style={{ borderColor: "var(--border-muted)" }}
+          >
+            <p className="text-sm font-semibold text-heading">Notifications</p>
             <button
               type="button"
-              className="text-xs text-indigo-600 hover:underline"
+              className="text-xs text-[var(--accent-muted-text)] hover:underline"
               onClick={() => markAllRead.mutate()}
             >
               Mark all read

@@ -20,6 +20,15 @@ const getBaseUrl = () => {
 export const api = createTRPCNext<AppRouter>({
   config() {
     return {
+      queryClientConfig: {
+        defaultOptions: {
+          queries: {
+            staleTime: 2 * 60 * 1000,
+            gcTime: 30 * 60 * 1000,
+            refetchOnWindowFocus: false,
+          },
+        },
+      },
       /**
        * Links used to determine request flow from client to server.
        *
