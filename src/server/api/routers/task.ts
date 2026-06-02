@@ -42,17 +42,67 @@ const listInput = z.object({
   search: z.string().optional(),
 });
 
-const includeShape = {
-  assignees: {
-    select: { id: true, name: true, email: true, image: true },
-  },
+const assigneeSelect = {
+  id: true,
+  name: true,
+  email: true,
+  image: true,
+} as const;
+
+/** Board/list views — omit creator + sprint joins (sprintId is on the row). */
+const listIncludeShape = {
+  assignees: { select: assigneeSelect },
   tags: true,
-  creator: {
-    select: { id: true, name: true, email: true, image: true },
-  },
+  _count: { select: { comments: true } },
+} as const;
+
+const includeShape = {
+  assignees: { select: assigneeSelect },
+  tags: true,
+  creator: { select: assigneeSelect },
   sprint: true,
   _count: { select: { comments: true } },
 } as const;
+
+type TaskDb = Parameters<typeof assertProjectAccess>[0];
+
+function projectMemberFilter(userId: string) {
+  return {
+    OR: [{ ownerId: userId }, { members: { some: { userId } } }],
+  };
+}
+
+async function assertSprintBelongsToProject(
+  db: TaskDb,
+  sprintId: string,
+  projectId: string,
+) {
+  const sprint = await db.sprint.findUniqueOrThrow({
+    where: { id: sprintId },
+    select: { projectId: true },
+  });
+  if (sprint.projectId !== projectId) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: "Sprint does not belong to this project",
+    });
+  }
+}
+
+async function assertTaskMutationPreconditions(
+  db: TaskDb,
+  projectId: string,
+  userId: string,
+  options: { assigneeIds?: string[]; sprintId?: string | null } = {},
+) {
+  await assertProjectAccess(db, projectId, userId);
+  await Promise.all([
+    assertAssigneesBelongToProject(db, projectId, options.assigneeIds),
+    options.sprintId
+      ? assertSprintBelongsToProject(db, options.sprintId, projectId)
+      : Promise.resolve(),
+  ]);
+}
 
 async function assertAssigneesBelongToProject(
   db: Parameters<typeof assertProjectAccess>[0],
@@ -87,11 +137,12 @@ async function assertAssigneesBelongToProject(
 
 export const taskRouter = createTRPCRouter({
   list: protectedProcedure.input(listInput).query(async ({ ctx, input }) => {
-    await assertProjectAccess(ctx.db, input.projectId, ctx.session.user.id);
+    const userId = ctx.session.user.id;
 
     return ctx.db.task.findMany({
       where: {
         projectId: input.projectId,
+        project: projectMemberFilter(userId),
         status: input.status,
         priority: input.priority,
         sprintId:
@@ -111,7 +162,7 @@ export const taskRouter = createTRPCRouter({
             ]
           : undefined,
       },
-      include: includeShape,
+      include: listIncludeShape,
       // Order by deadline (nulls last), then priority, then most recent.
       orderBy: [
         { deadline: { sort: "asc", nulls: "last" } },
@@ -193,20 +244,12 @@ export const taskRouter = createTRPCRouter({
           message: "Missing required task fields",
         });
       }
-      await assertProjectAccess(ctx.db, projectId, ctx.session.user.id);
-      await assertAssigneesBelongToProject(ctx.db, projectId, assigneeIds);
-      if (sprintId) {
-        const sprint = await ctx.db.sprint.findUniqueOrThrow({
-          where: { id: sprintId },
-          select: { projectId: true },
-        });
-        if (sprint.projectId !== projectId) {
-          throw new TRPCError({
-            code: "BAD_REQUEST",
-            message: "Sprint does not belong to this project",
-          });
-        }
-      }
+      await assertTaskMutationPreconditions(
+        ctx.db,
+        projectId,
+        ctx.session.user.id,
+        { assigneeIds, sprintId },
+      );
       const resolvedStatus = status ?? TaskStatus.BACKLOG;
 
       const task = await ctx.db.task.create({
@@ -224,7 +267,7 @@ export const taskRouter = createTRPCRouter({
             : undefined,
           tags: tagIds ? { connect: tagIds.map((id) => ({ id })) } : undefined,
         },
-        include: includeShape,
+        include: listIncludeShape,
       });
 
       if (assigneeIds?.length) {
@@ -251,16 +294,12 @@ export const taskRouter = createTRPCRouter({
           assignees: { select: { id: true } },
         },
       });
-      await assertProjectAccess(
+      const { id, assigneeIds, tagIds, sprintId, ...rest } = input;
+      await assertTaskMutationPreconditions(
         ctx.db,
         existing.projectId,
         ctx.session.user.id,
-      );
-      const { id, assigneeIds, tagIds, sprintId, ...rest } = input;
-      await assertAssigneesBelongToProject(
-        ctx.db,
-        existing.projectId,
-        assigneeIds,
+        { assigneeIds, sprintId },
       );
 
       const sanitizedRest = {
@@ -268,19 +307,6 @@ export const taskRouter = createTRPCRouter({
         title: rest.title ? sanitizePlainText(rest.title) : undefined,
         description: sanitizeOptionalPlainText(rest.description),
       };
-
-      if (sprintId) {
-        const sprint = await ctx.db.sprint.findUniqueOrThrow({
-          where: { id: sprintId },
-          select: { projectId: true },
-        });
-        if (sprint.projectId !== existing.projectId) {
-          throw new TRPCError({
-            code: "BAD_REQUEST",
-            message: "Sprint does not belong to this project",
-          });
-        }
-      }
 
       const updated = await ctx.db.task.update({
         where: { id },
@@ -327,36 +353,51 @@ export const taskRouter = createTRPCRouter({
       z.object({ id: z.string().cuid(), status: z.nativeEnum(TaskStatus) }),
     )
     .mutation(async ({ ctx, input }) => {
-      const existing = await ctx.db.task.findUniqueOrThrow({
-        where: { id: input.id },
-        select: { projectId: true },
-      });
-      await assertProjectAccess(
-        ctx.db,
-        existing.projectId,
-        ctx.session.user.id,
-      );
-      return ctx.db.task.update({
-        where: { id: input.id },
-        data: {
-          status: input.status,
+      const userId = ctx.session.user.id;
+      const updated = await ctx.db.task.updateMany({
+        where: {
+          id: input.id,
+          project: projectMemberFilter(userId),
         },
+        data: { status: input.status },
       });
+      if (updated.count === 0) {
+        const task = await ctx.db.task.findUnique({
+          where: { id: input.id },
+          select: { id: true },
+        });
+        throw new TRPCError({
+          code: task ? "FORBIDDEN" : "NOT_FOUND",
+          message: task
+            ? "You are not a member of this project"
+            : "Task not found",
+        });
+      }
+      return { id: input.id, status: input.status };
     }),
 
   delete: protectedProcedure
     .input(z.object({ id: z.string().cuid() }))
     .mutation(async ({ ctx, input }) => {
-      const existing = await ctx.db.task.findUniqueOrThrow({
-        where: { id: input.id },
-        select: { projectId: true },
+      const userId = ctx.session.user.id;
+      const deleted = await ctx.db.task.deleteMany({
+        where: {
+          id: input.id,
+          project: projectMemberFilter(userId),
+        },
       });
-      await assertProjectAccess(
-        ctx.db,
-        existing.projectId,
-        ctx.session.user.id,
-      );
-      await ctx.db.task.delete({ where: { id: input.id } });
+      if (deleted.count === 0) {
+        const task = await ctx.db.task.findUnique({
+          where: { id: input.id },
+          select: { id: true },
+        });
+        throw new TRPCError({
+          code: task ? "FORBIDDEN" : "NOT_FOUND",
+          message: task
+            ? "You are not a member of this project"
+            : "Task not found",
+        });
+      }
       return { ok: true };
     }),
 });

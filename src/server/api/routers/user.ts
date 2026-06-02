@@ -8,6 +8,8 @@ import {
   publicProcedure,
 } from "~/server/api/trpc";
 import { EmailDeliveryError } from "~/server/emailErrors";
+import { LOGIN_OTP_SENT_MESSAGE } from "~/server/auth";
+import { normalizeCompanyName, companyNamesMatch } from "~/server/company";
 import { issueEmailOtp, verifyEmailOtp } from "~/server/otp";
 import {
   sanitizeOptionalPlainText,
@@ -33,8 +35,11 @@ const strongPasswordSchema = z
     "Password must contain at least one special character",
   );
 
+const companyNameSchema = z.string().min(2).max(120);
+
 export const updateProfileInput = z.object({
   name: z.string().min(1).max(80).optional(),
+  companyName: companyNameSchema.optional(),
   bio: z.string().max(500).optional(),
   timezone: z.string().max(64).optional(),
   image: z
@@ -88,6 +93,7 @@ export const userRouter = createTRPCRouter({
         name: z.string().min(1).max(80),
         email: z.string().email(),
         password: strongPasswordSchema,
+        companyName: companyNameSchema,
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -119,6 +125,7 @@ export const userRouter = createTRPCRouter({
         name: z.string().min(1).max(80),
         email: z.string().email(),
         password: strongPasswordSchema,
+        companyName: companyNameSchema,
         otp: z.string().regex(/^\d{6}$/, "Enter valid 6 digit OTP"),
       }),
     )
@@ -151,8 +158,9 @@ export const userRouter = createTRPCRouter({
           name: sanitizePlainText(input.name),
           email,
           password: passwordHash,
+          companyName: normalizeCompanyName(input.companyName),
         },
-        select: { id: true, email: true, name: true },
+        select: { id: true, email: true, name: true, companyName: true },
       });
       return user;
     }),
@@ -170,31 +178,25 @@ export const userRouter = createTRPCRouter({
         where: { email },
         select: { id: true, email: true, password: true },
       });
-      if (!user) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "No account exists with this email",
-        });
-      }
-      const ok = await bcrypt.compare(input.password, user.password ?? "");
-      if (!ok) {
-        throw new TRPCError({
-          code: "UNAUTHORIZED",
-          message: "Invalid email or password",
-        });
-      }
-      try {
-        await issueEmailOtp(email, "LOGIN_2FA");
-      } catch (err) {
-        if (err instanceof EmailDeliveryError) {
-          throw new TRPCError({
-            code: "INTERNAL_SERVER_ERROR",
-            message: err.message,
-          });
+
+      if (user) {
+        const ok = await bcrypt.compare(input.password, user.password ?? "");
+        if (ok) {
+          try {
+            await issueEmailOtp(email, "LOGIN_2FA");
+          } catch (err) {
+            if (err instanceof EmailDeliveryError) {
+              throw new TRPCError({
+                code: "INTERNAL_SERVER_ERROR",
+                message: err.message,
+              });
+            }
+            throw err;
+          }
         }
-        throw err;
       }
-      return { email, message: "OTP sent to your email" };
+
+      return { message: LOGIN_OTP_SENT_MESSAGE };
     }),
 
   verifyLoginOtp: publicProcedure
@@ -209,6 +211,7 @@ export const userRouter = createTRPCRouter({
         email: input.email,
         code: input.otp,
         purpose: "LOGIN_2FA",
+        consume: false,
       });
       if (!valid) {
         throw new TRPCError({
@@ -318,6 +321,7 @@ export const userRouter = createTRPCRouter({
         email: true,
         image: true,
         bio: true,
+        companyName: true,
         timezone: true,
         createdAt: true,
       },
@@ -332,6 +336,9 @@ export const userRouter = createTRPCRouter({
         data: {
           ...input,
           name: input.name ? sanitizePlainText(input.name) : undefined,
+          companyName: input.companyName
+            ? normalizeCompanyName(input.companyName)
+            : undefined,
           bio: sanitizeOptionalPlainText(input.bio),
         },
         select: {
@@ -340,27 +347,44 @@ export const userRouter = createTRPCRouter({
           email: true,
           image: true,
           bio: true,
+          companyName: true,
           timezone: true,
         },
       });
     }),
 
   /**
-   * Lightweight directory used by the assignee/member pickers. Scoped to a
-   * search query and capped at 20 results so we don't leak the full user
-   * table in a single round-trip.
+   * Employee directory scoped to the signed-in user's organization.
    */
   search: protectedProcedure
     .input(z.object({ query: z.string().min(1).max(80) }))
-    .query(({ ctx, input }) => {
+    .query(async ({ ctx, input }) => {
+      const currentUser = await ctx.db.user.findUnique({
+        where: { id: ctx.session.user.id },
+        select: { companyName: true },
+      });
+
+      if (!currentUser?.companyName) {
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message:
+            "Add your company name in Profile settings before searching teammates.",
+        });
+      }
+
       return ctx.db.user.findMany({
         where: {
+          companyName: {
+            equals: currentUser.companyName,
+            mode: "insensitive",
+          },
           OR: [
             { email: { contains: input.query, mode: "insensitive" } },
             { name: { contains: input.query, mode: "insensitive" } },
           ],
+          NOT: { id: ctx.session.user.id },
         },
-        select: { id: true, name: true, email: true, image: true },
+        select: { id: true, name: true, email: true, image: true, companyName: true },
         take: 20,
       });
     }),

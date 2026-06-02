@@ -128,12 +128,12 @@ const timingMiddleware = t.middleware(async ({ next, path }) => {
   return result;
 });
 
-const rateLimitMiddleware = t.middleware(async ({ ctx, next }) => {
+const rateLimitMiddleware = t.middleware(({ ctx, next }) => {
   const key = ctx.session?.user?.id
     ? `api:user:${ctx.session.user.id}`
     : `api:ip:${ctx.clientIp}`;
   try {
-    await assertRateLimit(ctx.db, key);
+    assertRateLimit(key);
   } catch (error) {
     toRateLimitTrpcError(error);
   }

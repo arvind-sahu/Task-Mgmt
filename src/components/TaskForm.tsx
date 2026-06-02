@@ -2,6 +2,7 @@ import { TaskPriority, TaskStatus } from "@prisma/client";
 import { useState, type FormEvent } from "react";
 
 import { TASK_PRIORITIES, TASK_STATUSES, statusLabel } from "./Badges";
+import { CachedAvatar } from "./CachedAvatar";
 import { api } from "~/utils/api";
 import { initialsFromName } from "~/utils/avatar";
 
@@ -201,19 +202,12 @@ export default function TaskForm({
                 }`}
               >
                 <span className="grid h-5 w-5 place-items-center overflow-hidden rounded-full bg-indigo-100 text-[10px] font-semibold text-indigo-700 ring-1 ring-indigo-200">
-                  {m.user.image ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={m.user.image}
-                      alt={m.user.name ?? m.user.email}
-                      loading="lazy"
-                      decoding="async"
-                      referrerPolicy="no-referrer"
-                      className="h-full w-full object-cover"
-                    />
-                  ) : (
-                    initialsFromName(m.user.name, m.user.email)
-                  )}
+                  <CachedAvatar
+                    src={m.user.image}
+                    alt={m.user.name ?? m.user.email}
+                    className="h-full w-full object-cover"
+                    fallback={initialsFromName(m.user.name, m.user.email)}
+                  />
                 </span>
                 {m.user.name ?? m.user.email}
               </button>

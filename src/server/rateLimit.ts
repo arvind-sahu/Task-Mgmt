@@ -1,9 +1,9 @@
 import { TRPCError } from "@trpc/server";
 
-import { db } from "~/server/db";
-
 export const RATE_LIMIT_MAX_REQUESTS = 60;
 export const RATE_LIMIT_WINDOW_MS = 60_000;
+/** Drop idle keys after 30 minutes to bound memory use. */
+export const RATE_LIMIT_ENTRY_TTL_MS = 30 * 60 * 1000;
 
 export class RateLimitError extends Error {
   constructor(message = "Rate limit exceeded. Maximum 60 requests per minute.") {
@@ -12,45 +12,49 @@ export class RateLimitError extends Error {
   }
 }
 
-function slidingWindowStart(now = Date.now()) {
-  return new Date(now - RATE_LIMIT_WINDOW_MS);
+const buckets = new Map<string, number[]>();
+
+function pruneBucket(hits: number[], now: number): number[] {
+  const windowStart = now - RATE_LIMIT_WINDOW_MS;
+  return hits.filter((t) => t >= windowStart);
 }
 
-/**
- * Sliding-window rate limit backed by Postgres so it works across Lambda instances.
- * Keeps request timestamps for each key and rejects when count >= limit in the window.
- */
-export async function assertRateLimit(
-  client: typeof db,
-  key: string,
-  now = Date.now(),
-): Promise<void> {
-  const windowStart = slidingWindowStart(now);
-
-  await client.$transaction(async (tx) => {
-    const recentCount = await tx.rateLimitHit.count({
-      where: {
-        key,
-        createdAt: { gte: windowStart },
-      },
-    });
-
-    if (recentCount >= RATE_LIMIT_MAX_REQUESTS) {
-      throw new RateLimitError();
+function purgeStaleKeys(now: number) {
+  const cutoff = now - RATE_LIMIT_ENTRY_TTL_MS;
+  for (const [key, hits] of buckets) {
+    const latest = hits.at(-1);
+    if (latest === undefined || latest < cutoff) {
+      buckets.delete(key);
     }
-
-    await tx.rateLimitHit.create({ data: { key } });
-  });
-
-  if (Math.random() < 0.02) {
-    void client.rateLimitHit
-      .deleteMany({
-        where: {
-          createdAt: { lt: new Date(now - RATE_LIMIT_WINDOW_MS * 2) },
-        },
-      })
-      .catch(() => undefined);
   }
+}
+
+let lastPurgeAt = 0;
+
+/**
+ * Sliding-window rate limit in process memory (no DB round-trips).
+ * Suitable for dev and single-instance Lambda; entries expire after 30 minutes.
+ */
+export function assertRateLimit(key: string, now = Date.now()): void {
+  if (now - lastPurgeAt >= RATE_LIMIT_ENTRY_TTL_MS) {
+    purgeStaleKeys(now);
+    lastPurgeAt = now;
+  }
+
+  const hits = pruneBucket(buckets.get(key) ?? [], now);
+
+  if (hits.length >= RATE_LIMIT_MAX_REQUESTS) {
+    throw new RateLimitError();
+  }
+
+  hits.push(now);
+  buckets.set(key, hits);
+}
+
+/** Test helper — clears in-memory counters between cases. */
+export function resetRateLimitStoreForTests() {
+  buckets.clear();
+  lastPurgeAt = 0;
 }
 
 export function toRateLimitTrpcError(error: unknown): never {

@@ -1,5 +1,7 @@
+import { SprintPlan } from "@prisma/client";
 import { useRef, useState, type ReactNode } from "react";
 
+import { SPRINT_DAY_LABELS } from "~/utils/sprint";
 import { api } from "~/utils/api";
 
 type ProjectSettingsPanelProps = {
@@ -9,6 +11,8 @@ type ProjectSettingsPanelProps = {
     name: string;
     description: string | null;
     color: string;
+    sprintPlan: SprintPlan;
+    sprintStartDayOfWeek: number | null;
     sprintDurationWeeks: number;
   };
 };
@@ -25,8 +29,9 @@ export function ProjectSettingsPanel({
   const suppressNameBlurRef = useRef(false);
   const [description, setDescription] = useState(initial.description ?? "");
   const [color, setColor] = useState(initial.color);
-  const [sprintDurationWeeks, setSprintDurationWeeks] = useState<1 | 2>(
-    initial.sprintDurationWeeks === 2 ? 2 : 1,
+  const [sprintPlan, setSprintPlan] = useState<SprintPlan>(initial.sprintPlan);
+  const [sprintStartDayOfWeek, setSprintStartDayOfWeek] = useState<number>(
+    initial.sprintStartDayOfWeek ?? 1,
   );
 
   const update = api.project.update.useMutation({
@@ -49,7 +54,7 @@ export function ProjectSettingsPanel({
 
   return (
     <div className="card">
-      <h3 className="mb-3 text-sm font-semibold">Project settings</h3>
+      <h3 className="mb-3 text-sm font-semibold text-heading">Project settings</h3>
       <form
         className="space-y-3"
         onSubmit={(e) => {
@@ -58,17 +63,19 @@ export function ProjectSettingsPanel({
             id: projectId,
             description: description || undefined,
             color,
-            sprintDurationWeeks,
+            sprintPlan,
+            sprintStartDayOfWeek:
+              sprintPlan === SprintPlan.CUSTOM_DAY ? sprintStartDayOfWeek : null,
           });
         }}
       >
-        <div className="rounded-xl bg-slate-50 p-3">
-          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+        <div className="surface-muted rounded-xl p-3">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted">
             Project name
           </p>
           {editingName ? (
             <input
-              className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-2 py-1 text-sm font-semibold text-slate-900 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+              className="input mt-1 text-sm font-semibold"
               value={draftName}
               onChange={(event) => setDraftName(event.target.value)}
               onBlur={() => {
@@ -92,7 +99,7 @@ export function ProjectSettingsPanel({
           ) : (
             <button
               type="button"
-              className="mt-1 w-full rounded-lg px-2 py-1 text-left text-sm font-semibold text-slate-900 transition hover:bg-slate-100"
+              className="app-nav-link mt-1 w-full rounded-lg px-2 py-1 text-left text-sm font-semibold text-heading"
               onClick={() => setEditingName(true)}
             >
               {name}
@@ -112,21 +119,42 @@ export function ProjectSettingsPanel({
           />
         </div>
         <div>
-          <label className="label" htmlFor="proj-sprint-duration">
+          <label className="label" htmlFor="proj-sprint-plan">
             Sprint plan
           </label>
           <select
-            id="proj-sprint-duration"
+            id="proj-sprint-plan"
             className="input mt-1"
-            value={sprintDurationWeeks}
-            onChange={(e) =>
-              setSprintDurationWeeks(e.target.value === "2" ? 2 : 1)
-            }
+            value={sprintPlan}
+            onChange={(e) => setSprintPlan(e.target.value as SprintPlan)}
           >
-            <option value={1}>Weekly sprint</option>
-            <option value={2}>Biweekly sprint</option>
+            <option value={SprintPlan.WEEKLY}>Weekly (7 days)</option>
+            <option value={SprintPlan.BIWEEKLY}>Bi-weekly (14 days)</option>
+            <option value={SprintPlan.CUSTOM_DAY}>Fixed start day (weekly)</option>
           </select>
+          <p className="mt-1 text-xs text-muted">
+            New sprints follow this plan. End dates are calculated automatically.
+          </p>
         </div>
+        {sprintPlan === SprintPlan.CUSTOM_DAY && (
+          <div>
+            <label className="label" htmlFor="proj-sprint-day">
+              Sprint starts on
+            </label>
+            <select
+              id="proj-sprint-day"
+              className="input mt-1"
+              value={sprintStartDayOfWeek}
+              onChange={(e) => setSprintStartDayOfWeek(Number(e.target.value))}
+            >
+              {SPRINT_DAY_LABELS.map((label, index) => (
+                <option key={label} value={index}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
         <div>
           <label className="label" htmlFor="proj-color">
             Color
@@ -134,7 +162,7 @@ export function ProjectSettingsPanel({
           <input
             id="proj-color"
             type="color"
-            className="mt-1 h-9 w-full cursor-pointer rounded-md border border-slate-300"
+            className="input mt-1 h-9 w-full cursor-pointer"
             value={color}
             onChange={(e) => setColor(e.target.value)}
           />
@@ -147,14 +175,21 @@ export function ProjectSettingsPanel({
           {update.isPending ? "Saving…" : "Save settings"}
         </button>
         {update.error && (
-          <p className="text-xs text-red-600">{update.error.message}</p>
+          <p className="text-xs" style={{ color: "var(--danger-text)" }}>
+            {update.error.message}
+          </p>
         )}
         {update.isSuccess && (
           <p className="text-xs text-emerald-600">Settings saved.</p>
         )}
       </form>
       {children && (
-        <div className="mt-5 border-t border-slate-100 pt-5">{children}</div>
+        <div
+          className="mt-5 border-t pt-5"
+          style={{ borderColor: "var(--border-muted)" }}
+        >
+          {children}
+        </div>
       )}
     </div>
   );

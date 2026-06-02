@@ -4,28 +4,36 @@ import { z } from "zod";
 
 import { assertProjectAccess } from "~/server/api/access";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
+import {
+  assertValidStartDayOfWeek,
+  computeSprintEndDate,
+  findInvalidSprintIds,
+  sameDay,
+  startOfDay,
+  timelineViolations,
+  type SprintProjectRules,
+} from "~/server/sprint/rules";
 import { sanitizePlainText } from "~/server/security/sanitize";
+import {
+  loadProjectSprintStatusBreakdowns,
+  loadSprintStatusBreakdowns,
+  projectMemberFilter,
+  withSprintStats,
+} from "~/server/sprint/stats";
 
-function endOfDay(date: Date) {
-  const next = new Date(date);
-  next.setHours(23, 59, 59, 999);
-  return next;
-}
-
-function startOfDay(date: Date) {
-  const next = new Date(date);
-  next.setHours(0, 0, 0, 0);
-  return next;
-}
-
-function nextDayStart(date: Date) {
-  const next = startOfDay(date);
-  next.setDate(next.getDate() + 1);
-  return next;
-}
-
-function sameDay(a: Date, b: Date) {
-  return startOfDay(a).getTime() === startOfDay(b).getTime();
+async function loadProjectSprintRules(
+  db: Parameters<typeof assertProjectAccess>[0],
+  projectId: string,
+): Promise<SprintProjectRules> {
+  const project = await db.project.findUniqueOrThrow({
+    where: { id: projectId },
+    select: {
+      sprintPlan: true,
+      sprintDurationWeeks: true,
+      sprintStartDayOfWeek: true,
+    },
+  });
+  return project;
 }
 
 async function assertContinuousSprintTimeline(
@@ -47,42 +55,146 @@ async function assertContinuousSprintTimeline(
   const timeline = [
     ...sprints,
     { startDate: input.startDate, endDate: input.endDate },
-  ].sort((a, b) => a.startDate.getTime() - b.startDate.getTime());
-
-  for (let index = 0; index < timeline.length - 1; index += 1) {
-    const current = timeline[index];
-    const next = timeline[index + 1];
-    if (!current || !next) continue;
-    if (next.startDate <= current.endDate) {
-      throw new TRPCError({
-        code: "CONFLICT",
-        message: "Sprint dates cannot overlap in the same project",
-      });
-    }
-    if (!sameDay(next.startDate, nextDayStart(current.endDate))) {
-      throw new TRPCError({
-        code: "BAD_REQUEST",
-        message: "Sprint dates must be continuous without gap days",
-      });
-    }
+  ];
+  const violation = timelineViolations(timeline);
+  if (violation === "overlap") {
+    throw new TRPCError({
+      code: "CONFLICT",
+      message: "Sprint dates cannot overlap in the same project",
+    });
+  }
+  if (violation === "gap") {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message:
+        "Sprint dates must be continuous without gap days (next sprint starts the day after the previous ends)",
+    });
   }
 }
 
+function assertSprintProjectRules(
+  rules: SprintProjectRules,
+  startDate: Date,
+  endDate: Date,
+) {
+  try {
+    assertValidStartDayOfWeek(rules, startDate);
+  } catch (error) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: error instanceof Error ? error.message : "Invalid sprint start day",
+    });
+  }
+
+  const expectedEnd = computeSprintEndDate(startDate, rules.sprintDurationWeeks);
+  if (!sameDay(endDate, expectedEnd)) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: `Sprint must run for ${rules.sprintDurationWeeks} week(s) (${rules.sprintDurationWeeks * 7} days inclusive)`,
+    });
+  }
+}
+
+const sprintSelect = {
+  id: true,
+  projectId: true,
+  name: true,
+  startDate: true,
+  endDate: true,
+  createdAt: true,
+  updatedAt: true,
+} as const;
+
+async function findAccessibleSprint(
+  db: Parameters<typeof assertProjectAccess>[0],
+  projectId: string,
+  userId: string,
+  dateFilter?: { startDate: { lte: Date }; endDate: { gte: Date } },
+) {
+  return db.sprint.findFirst({
+    where: {
+      projectId,
+      project: projectMemberFilter(userId),
+      ...dateFilter,
+    },
+    select: sprintSelect,
+    orderBy: dateFilter
+      ? { startDate: "desc" }
+      : [{ startDate: "desc" }, { createdAt: "desc" }],
+  });
+}
+
 export const sprintRouter = createTRPCRouter({
-  list: protectedProcedure
+  /** Active sprint for the project board (single row, no full list). */
+  current: protectedProcedure
+    .input(z.object({ projectId: z.string().cuid() }))
+    .query(async ({ ctx, input }) => {
+      const userId = ctx.session.user.id;
+      const now = new Date();
+
+      const [access, active] = await Promise.all([
+        assertProjectAccess(ctx.db, input.projectId, userId),
+        findAccessibleSprint(ctx.db, input.projectId, userId, {
+          startDate: { lte: now },
+          endDate: { gte: now },
+        }),
+      ]);
+
+      void access;
+
+      const sprint =
+        active ??
+        (await findAccessibleSprint(ctx.db, input.projectId, userId));
+
+      if (!sprint) return null;
+
+      const breakdowns = await loadSprintStatusBreakdowns(ctx.db, input.projectId, [
+        sprint.id,
+      ]);
+      return withSprintStats(sprint, breakdowns.get(sprint.id));
+    }),
+
+  /** Lightweight id/name/dates for task forms — no task stats. */
+  listBrief: protectedProcedure
     .input(z.object({ projectId: z.string().cuid() }))
     .query(async ({ ctx, input }) => {
       await assertProjectAccess(ctx.db, input.projectId, ctx.session.user.id);
       return ctx.db.sprint.findMany({
         where: { projectId: input.projectId },
-        include: {
-          tasks: {
-            select: { status: true },
-          },
-          _count: { select: { tasks: true } },
+        select: {
+          id: true,
+          name: true,
+          startDate: true,
+          endDate: true,
         },
         orderBy: [{ startDate: "desc" }, { createdAt: "desc" }],
       });
+    }),
+
+  list: protectedProcedure
+    .input(z.object({ projectId: z.string().cuid() }))
+    .query(async ({ ctx, input }) => {
+      const userId = ctx.session.user.id;
+      await assertProjectAccess(ctx.db, input.projectId, userId);
+
+      const [sprints, breakdowns] = await Promise.all([
+        ctx.db.sprint.findMany({
+          where: {
+            projectId: input.projectId,
+            project: projectMemberFilter(userId),
+          },
+          select: sprintSelect,
+          orderBy: [{ startDate: "desc" }, { createdAt: "desc" }],
+        }),
+        loadProjectSprintStatusBreakdowns(ctx.db, input.projectId),
+      ]);
+
+      return sprints.map((sprint) =>
+        withSprintStats(
+          sprint,
+          breakdowns.get(sprint.id) ?? undefined,
+        ),
+      );
     }),
 
   create: protectedProcedure
@@ -91,7 +203,6 @@ export const sprintRouter = createTRPCRouter({
         projectId: z.string().cuid(),
         name: z.string().min(1).max(120).optional(),
         startDate: z.coerce.date(),
-        endDate: z.coerce.date().optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -101,26 +212,11 @@ export const sprintRouter = createTRPCRouter({
         ctx.session.user.id,
         ProjectRole.ADMIN,
       );
-      const project = await ctx.db.project.findUniqueOrThrow({
-        where: { id: input.projectId },
-        select: { sprintDurationWeeks: true },
-      });
+      const rules = await loadProjectSprintRules(ctx.db, input.projectId);
       const startDate = startOfDay(input.startDate);
-      const endDate = input.endDate
-        ? endOfDay(input.endDate)
-        : endOfDay(
-            new Date(
-              startDate.getTime() +
-                project.sprintDurationWeeks * 7 * 24 * 60 * 60 * 1000 -
-                24 * 60 * 60 * 1000,
-            ),
-          );
-      if (endDate < startDate) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: "Sprint end date must be after the start date",
-        });
-      }
+      const endDate = computeSprintEndDate(startDate, rules.sprintDurationWeeks);
+
+      assertSprintProjectRules(rules, startDate, endDate);
       await assertContinuousSprintTimeline(ctx.db, {
         projectId: input.projectId,
         startDate,
@@ -145,7 +241,6 @@ export const sprintRouter = createTRPCRouter({
         id: z.string().cuid(),
         name: z.string().min(1).max(120).optional(),
         startDate: z.coerce.date().optional(),
-        endDate: z.coerce.date().optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -159,14 +254,13 @@ export const sprintRouter = createTRPCRouter({
         ctx.session.user.id,
         ProjectRole.ADMIN,
       );
-      const startDate = input.startDate ? startOfDay(input.startDate) : sprint.startDate;
-      const endDate = input.endDate ? endOfDay(input.endDate) : sprint.endDate;
-      if (endDate < startDate) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: "Sprint end date must be after the start date",
-        });
-      }
+      const rules = await loadProjectSprintRules(ctx.db, sprint.projectId);
+      const startDate = input.startDate
+        ? startOfDay(input.startDate)
+        : sprint.startDate;
+      const endDate = computeSprintEndDate(startDate, rules.sprintDurationWeeks);
+
+      assertSprintProjectRules(rules, startDate, endDate);
       await assertContinuousSprintTimeline(ctx.db, {
         projectId: sprint.projectId,
         startDate,
@@ -179,9 +273,48 @@ export const sprintRouter = createTRPCRouter({
         data: {
           name: input.name ? sanitizePlainText(input.name) : undefined,
           startDate: input.startDate ? startDate : undefined,
-          endDate: input.endDate ? endDate : undefined,
+          endDate: input.startDate ? endDate : undefined,
         },
       });
+    }),
+
+  delete: protectedProcedure
+    .input(z.object({ id: z.string().cuid() }))
+    .mutation(async ({ ctx, input }) => {
+      const sprint = await ctx.db.sprint.findUniqueOrThrow({
+        where: { id: input.id },
+        select: { projectId: true },
+      });
+      await assertProjectAccess(
+        ctx.db,
+        sprint.projectId,
+        ctx.session.user.id,
+        ProjectRole.ADMIN,
+      );
+      await ctx.db.sprint.delete({ where: { id: input.id } });
+      return { ok: true as const };
+    }),
+
+  cleanupInvalid: protectedProcedure
+    .input(z.object({ projectId: z.string().cuid() }))
+    .mutation(async ({ ctx, input }) => {
+      await assertProjectAccess(
+        ctx.db,
+        input.projectId,
+        ctx.session.user.id,
+        ProjectRole.ADMIN,
+      );
+      const rules = await loadProjectSprintRules(ctx.db, input.projectId);
+      const sprints = await ctx.db.sprint.findMany({
+        where: { projectId: input.projectId },
+        select: { id: true, startDate: true, endDate: true },
+      });
+      const invalidIds = findInvalidSprintIds(rules, sprints);
+      if (invalidIds.length === 0) {
+        return { deletedCount: 0, deletedIds: [] as string[] };
+      }
+      await ctx.db.sprint.deleteMany({ where: { id: { in: invalidIds } } });
+      return { deletedCount: invalidIds.length, deletedIds: invalidIds };
     }),
 
   assignTask: protectedProcedure

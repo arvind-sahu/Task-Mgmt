@@ -25,7 +25,7 @@ export function AttachmentList({
       {items.map((att) => (
         <li
           key={att.id}
-          className="group relative overflow-hidden rounded-lg border border-slate-200 bg-white"
+          className="surface-row group relative overflow-hidden rounded-lg"
         >
           {isImageMime(att.mimeType) ? (
             // eslint-disable-next-line @next/next/no-img-element
@@ -41,7 +41,7 @@ export function AttachmentList({
               href={att.dataUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex h-20 w-28 flex-col items-center justify-center gap-1 px-2 text-center text-xs text-slate-600 hover:bg-slate-50"
+              className="interactive-hover flex h-20 w-28 flex-col items-center justify-center gap-1 px-2 text-center text-xs text-muted"
             >
               <span className="text-lg">📄</span>
               <span className="line-clamp-2 break-all">{att.fileName}</span>

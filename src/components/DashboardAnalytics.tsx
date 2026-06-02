@@ -27,8 +27,11 @@ export function DashboardAnalytics() {
 
   if (isLoading) {
     return (
-      <section className="rounded-xl border border-indigo-100 bg-gradient-to-br from-indigo-50/90 via-white to-slate-50 p-5 shadow-sm">
-        <div className="h-24 animate-pulse rounded-lg bg-slate-200/60" />
+      <section className="analytics-section rounded-xl p-5">
+        <div
+          className="h-24 animate-pulse rounded-lg"
+          style={{ backgroundColor: "var(--surface-muted)" }}
+        />
       </section>
     );
   }
@@ -39,11 +42,11 @@ export function DashboardAnalytics() {
   const inProgress = data.byStatus.IN_PROGRESS ?? 0;
 
   return (
-    <section className="min-w-0 max-w-full overflow-hidden rounded-xl border border-indigo-100 bg-gradient-to-br from-indigo-50/90 via-white to-slate-50 p-4 shadow-sm ring-1 ring-indigo-50 sm:p-5">
+    <section className="analytics-section min-w-0 max-w-full overflow-hidden rounded-xl p-4 sm:p-5">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h2 className="text-lg font-semibold text-slate-900">Overview</h2>
-          <p className="mt-0.5 text-sm text-slate-600">
+          <h2 className="text-lg font-semibold text-heading">Overview</h2>
+          <p className="mt-0.5 text-sm text-muted">
             Task health and progress across your projects
           </p>
         </div>
@@ -60,8 +63,8 @@ export function DashboardAnalytics() {
       </div>
 
       <div className="mt-5 grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <div className="rounded-lg border border-white/80 bg-white/90 p-4 shadow-sm">
-          <h3 className="text-sm font-semibold text-slate-800">By status</h3>
+        <div className="analytics-panel rounded-lg p-4">
+          <h3 className="text-sm font-semibold text-heading">By status</h3>
           <BarChart
             className="mt-3"
             items={Object.entries(data.byStatus).map(([key, count]) => ({
@@ -74,8 +77,8 @@ export function DashboardAnalytics() {
           />
         </div>
 
-        <div className="rounded-lg border border-white/80 bg-white/90 p-4 shadow-sm">
-          <h3 className="text-sm font-semibold text-slate-800">By priority</h3>
+        <div className="analytics-panel rounded-lg p-4">
+          <h3 className="text-sm font-semibold text-heading">By priority</h3>
           <BarChart
             className="mt-3"
             items={Object.entries(data.byPriority).map(([key, count]) => ({
@@ -89,33 +92,39 @@ export function DashboardAnalytics() {
         </div>
       </div>
 
-      <div className="mt-4 rounded-lg border border-white/80 bg-white/90 p-4 shadow-sm">
-        <h3 className="text-sm font-semibold text-slate-800">Project progress</h3>
+      <div className="analytics-panel mt-4 rounded-lg p-4">
+        <h3 className="text-sm font-semibold text-heading">Project progress</h3>
         {data.projectProgress.length === 0 ? (
-          <p className="mt-2 text-sm text-slate-500">No projects yet.</p>
+          <p className="mt-2 text-sm text-muted">No projects yet.</p>
         ) : (
           <ul className="mt-3 grid gap-3 sm:grid-cols-2">
             {data.projectProgress.map((p) => (
-              <li key={p.id} className="rounded-md bg-slate-50/80 px-3 py-2">
+              <li
+                key={p.id}
+                className="surface-inset rounded-md px-3 py-2"
+              >
                 <div className="mb-1.5 flex items-center justify-between gap-2 text-sm">
-                  <span className="flex min-w-0 items-center gap-2 font-medium text-slate-800">
+                  <span className="flex min-w-0 items-center gap-2 font-medium text-heading">
                     <span
                       className="h-2.5 w-2.5 shrink-0 rounded-sm"
                       style={{ backgroundColor: p.color }}
                     />
                     <span className="truncate">{p.name}</span>
                   </span>
-                  <span className="shrink-0 text-xs font-medium text-indigo-600">
+                  <span className="link-accent shrink-0 text-xs font-medium">
                     {p.percent}%
                   </span>
                 </div>
-                <div className="h-2 overflow-hidden rounded-full bg-slate-200/80">
+                <div
+                  className="h-2 overflow-hidden rounded-full"
+                  style={{ backgroundColor: "var(--border-muted)" }}
+                >
                   <div
                     className="h-full rounded-full bg-indigo-500 transition-all"
                     style={{ width: `${p.percent}%` }}
                   />
                 </div>
-                <p className="mt-1 text-[11px] text-slate-500">
+                <p className="mt-1 text-[11px] text-muted">
                   {p.done} of {p.total} tasks completed
                 </p>
               </li>
@@ -136,16 +145,27 @@ function KpiPill({
   value: number;
   tone?: "neutral" | "blue" | "red" | "green";
 }) {
-  const tones = {
-    neutral: "bg-white text-slate-800 ring-slate-200",
-    blue: "bg-blue-50 text-blue-800 ring-blue-200",
-    red: "bg-red-50 text-red-800 ring-red-200",
-    green: "bg-emerald-50 text-emerald-800 ring-emerald-200",
-  };
+  const toneClass =
+    tone === "blue"
+      ? "chip-active"
+      : tone === "red"
+        ? "ring-[var(--danger-text)]/30"
+        : tone === "green"
+          ? "kpi-tone-green ring-emerald-500/35"
+          : "chip";
+
+  const toneStyle =
+    tone === "red"
+      ? {
+          color: "var(--danger-text)",
+          backgroundColor: "var(--danger-hover-bg)",
+        }
+      : undefined;
 
   return (
     <div
-      className={`inline-flex items-baseline gap-2 rounded-full px-3 py-1.5 text-sm ring-1 ring-inset ${tones[tone]}`}
+      className={`inline-flex items-baseline gap-2 rounded-full px-3 py-1.5 text-sm ring-1 ring-inset ${toneClass}`}
+      style={toneStyle}
     >
       <span className="text-xs font-medium uppercase tracking-wide opacity-80">
         {label}
@@ -168,11 +188,14 @@ function BarChart({
     <ul className={`space-y-2.5 ${className}`}>
       {items.map((item) => (
         <li key={item.key} className="flex items-center gap-2 text-sm">
-          <span className="w-[5.5rem] shrink-0 truncate text-slate-600">
+          <span className="w-[5.5rem] shrink-0 truncate text-muted">
             {item.label}
           </span>
           <div className="min-w-0 flex-1">
-            <div className="h-6 overflow-hidden rounded-md bg-slate-100">
+            <div
+              className="h-6 overflow-hidden rounded-md"
+              style={{ backgroundColor: "var(--surface-muted)" }}
+            >
               <div
                 className={`h-full ${item.color} transition-all`}
                 style={{
@@ -182,7 +205,7 @@ function BarChart({
               />
             </div>
           </div>
-          <span className="w-5 shrink-0 text-right text-sm font-semibold text-slate-800 tabular-nums">
+          <span className="w-5 shrink-0 text-right text-sm font-semibold text-heading tabular-nums">
             {item.count}
           </span>
         </li>

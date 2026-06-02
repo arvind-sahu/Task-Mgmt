@@ -34,6 +34,7 @@ export default function ProfilePage() {
   const utils = api.useUtils();
 
   const [name, setName] = useState("");
+  const [companyName, setCompanyName] = useState("");
   const [bio, setBio] = useState("");
   const [timezone, setTimezone] = useState("UTC");
   const [image, setImage] = useState("");
@@ -56,6 +57,7 @@ export default function ProfilePage() {
   useEffect(() => {
     if (me.data) {
       setName(me.data.name ?? "");
+      setCompanyName(me.data.companyName ?? "");
       setBio(me.data.bio ?? "");
       setTimezone(me.data.timezone ?? "UTC");
       setImage(me.data.image ?? "");
@@ -74,6 +76,7 @@ export default function ProfilePage() {
     e.preventDefault();
     update.mutate({
       name,
+      companyName: companyName || undefined,
       bio: bio || undefined,
       timezone,
       image: image || null,
@@ -188,7 +191,7 @@ export default function ProfilePage() {
             <button
               type="button"
               onClick={() => setPhotoMenuOpen((prev) => !prev)}
-              className="grid h-16 w-16 place-items-center overflow-hidden rounded-full bg-indigo-100 text-xl font-semibold text-indigo-700 ring-2 ring-indigo-200 transition hover:ring-indigo-400"
+              className="app-avatar grid h-16 w-16 place-items-center overflow-hidden rounded-full text-xl font-semibold transition hover:opacity-90"
               title="Update profile photo"
             >
               {image ? (
@@ -274,6 +277,22 @@ export default function ProfilePage() {
             maxLength={80}
             required
           />
+        </div>
+
+        <div>
+          <label className="label">Company</label>
+          <input
+            className="input mt-1"
+            value={companyName}
+            onChange={(e) => setCompanyName(e.target.value)}
+            minLength={2}
+            maxLength={120}
+            required
+            placeholder="Tasker"
+          />
+          <p className="mt-1 text-xs text-slate-500">
+            Used to scope teammate search and project invites to your organization.
+          </p>
         </div>
 
         <div>

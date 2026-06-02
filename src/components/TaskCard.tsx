@@ -3,6 +3,8 @@ import { TaskPriority } from "@prisma/client";
 
 import { type RouterOutputs } from "~/utils/api";
 import { PriorityBadge, priorityCardStyles } from "./Badges";
+import { CachedAvatar } from "./CachedAvatar";
+import { TagChip } from "./TagChip";
 import { deadlineDayLabel, isOverdue } from "~/utils/date";
 import { initialsFromName } from "~/utils/avatar";
 
@@ -25,14 +27,14 @@ export default function TaskCard({
   const content = (
     <>
       <div className="flex items-start justify-between gap-2">
-        <h4 className="line-clamp-2 text-[13px] font-semibold leading-snug text-slate-900">
+        <h4 className="line-clamp-2 text-[13px] font-semibold leading-snug text-heading">
           <HighlightedText text={task.title} query={searchQuery} />
         </h4>
         <PriorityBadge priority={task.priority} />
       </div>
 
       {task.description && (
-        <p className="mt-1 line-clamp-2 text-xs text-slate-500">
+        <p className="mt-1 line-clamp-2 text-xs text-muted">
           <HighlightedText text={task.description} query={searchQuery} />
         </p>
       )}
@@ -40,7 +42,7 @@ export default function TaskCard({
       <div className="mt-2.5 flex items-center justify-between gap-2">
         <div className="flex min-w-0 items-center">
           {task.assignees.length === 0 ? (
-            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-500 ring-1 ring-slate-200">
+            <span className="chip rounded-full px-2 py-0.5 text-[10px] font-medium">
               No assignee
             </span>
           ) : (
@@ -49,25 +51,18 @@ export default function TaskCard({
                 <div
                   key={a.id}
                   title={a.name ?? a.email}
-                  className="grid h-6 w-6 place-items-center overflow-hidden rounded-full bg-indigo-100 text-[10px] font-semibold text-indigo-700 ring-2 ring-white"
+                  className="app-avatar grid h-6 w-6 place-items-center overflow-hidden rounded-full text-[10px] font-semibold ring-2 ring-[var(--surface-elevated)]"
                 >
-                  {a.image ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={a.image}
-                      alt={a.name ?? a.email}
-                      className="h-full w-full object-cover"
-                      loading="lazy"
-                      decoding="async"
-                      referrerPolicy="no-referrer"
-                    />
-                  ) : (
-                    initialsFromName(a.name, a.email)
-                  )}
+                  <CachedAvatar
+                    src={a.image}
+                    alt={a.name ?? a.email}
+                    className="h-full w-full object-cover"
+                    fallback={initialsFromName(a.name, a.email)}
+                  />
                 </div>
               ))}
               {task.assignees.length > 3 && (
-                <div className="grid h-6 w-6 place-items-center rounded-full bg-slate-100 text-[10px] font-semibold text-slate-600 ring-2 ring-white">
+                <div className="chip grid h-6 w-6 place-items-center rounded-full text-[10px] font-semibold ring-2 ring-[var(--surface-elevated)]">
                   +{task.assignees.length - 3}
                 </div>
               )}
@@ -76,13 +71,26 @@ export default function TaskCard({
         </div>
         {deadlineLabel && (
           <span
-            className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] leading-4 ring-1 ring-slate-200 ${
+            className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] leading-4 ring-1 ${
               overdue
-                ? "bg-red-50 font-medium text-red-600 ring-red-200"
+                ? "font-medium ring-[var(--danger-text)]/30"
                 : deadlineLabel === "Today"
-                  ? "bg-amber-50 font-medium text-amber-700 ring-amber-200"
-                  : "bg-slate-50 text-slate-500"
+                  ? "font-medium ring-[var(--warning-border)]"
+                  : "chip"
             }`}
+            style={
+              overdue
+                ? {
+                    color: "var(--danger-text)",
+                    backgroundColor: "var(--danger-hover-bg)",
+                  }
+                : deadlineLabel === "Today"
+                  ? {
+                      color: "var(--warning-text)",
+                      backgroundColor: "var(--warning-bg)",
+                    }
+                  : undefined
+            }
           >
             {deadlineLabel}
           </span>
@@ -90,21 +98,19 @@ export default function TaskCard({
       </div>
 
       {task.tags.length > 0 && (
-        <div className="mt-2 flex flex-wrap gap-1 border-t border-slate-100 pt-2">
+        <div
+          className="mt-2 flex flex-wrap gap-1 border-t pt-2"
+          style={{ borderColor: "var(--border-muted)" }}
+        >
           {task.tags.map((t) => (
-            <span
-              key={t.id}
-              className="inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-medium ring-1 ring-inset ring-slate-200"
-              style={{ color: t.color, backgroundColor: `${t.color}15` }}
-            >
-              <span
-                className="h-1.5 w-1.5 rounded-full"
-                style={{ backgroundColor: t.color }}
-              />
-              {t.name}
-            </span>
+            <TagChip key={t.id} name={t.name} color={t.color} size="sm" />
           ))}
         </div>
+      )}
+      {task._count.comments > 0 && (
+        <p className="mt-2 text-[10px] text-muted">
+          {task._count.comments} comment{task._count.comments === 1 ? "" : "s"}
+        </p>
       )}
     </>
   );
@@ -113,13 +119,7 @@ export default function TaskCard({
 
   return (
     <div
-      className={`rounded-lg bg-white p-3 shadow-sm transition hover:shadow-md ${priorityBorder} ${
-        task.priority === TaskPriority.URGENT
-          ? "hover:border-red-600"
-          : task.priority === TaskPriority.HIGH
-            ? "hover:border-orange-500"
-            : "hover:border-indigo-300"
-      }`}
+      className={`task-tile rounded-lg p-3 transition hover:shadow-md ${priorityBorder}`}
     >
       {onOpen ? (
         <button
@@ -159,7 +159,7 @@ function HighlightedText({ text, query }: { text: string; query: string }) {
           <mark
             // eslint-disable-next-line react/no-array-index-key
             key={`${part}-${index}`}
-            className="rounded bg-yellow-200 px-0.5 text-inherit"
+            className="search-hit"
           >
             {part}
           </mark>

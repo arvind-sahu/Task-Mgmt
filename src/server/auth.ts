@@ -1,4 +1,5 @@
 import { PrismaAdapter } from "@auth/prisma-adapter";
+import { type NextApiRequest } from "next";
 import { type GetServerSidePropsContext } from "next";
 import {
   getServerSession,
@@ -17,8 +18,9 @@ import { z } from "zod";
 import { env } from "~/env";
 import { db } from "~/server/db";
 import { getEnabledOAuthProviders } from "~/server/oauth";
+import { verifyEmailOtp } from "~/server/otp";
+import { recordLoginAudit } from "~/server/security/loginAudit";
 
-// Module augmentation: expose `id` on `session.user` everywhere.
 declare module "next-auth" {
   interface Session extends DefaultSession {
     user: DefaultSession["user"] & {
@@ -36,12 +38,35 @@ declare module "next-auth/jwt" {
   }
 }
 
+export const INVALID_CREDENTIALS_MESSAGE = "Invalid email or password";
+export const LOGIN_OTP_SENT_MESSAGE =
+  "If your credentials are correct, a verification code was sent to your email.";
+
+const SIGNUP_LOGIN_GRACE_MS = 5 * 60 * 1000;
+
 // Schema for the credentials form payload — kept here so it stays in sync with
 // what `authorize` actually parses.
 export const credentialsSchema = z.object({
   email: z.string().email(),
   password: z.string().min(8),
+  otp: z
+    .string()
+    .regex(/^\d{6}$/, "Enter valid 6 digit OTP")
+    .optional(),
+  authFlow: z.enum(["signup"]).optional(),
 });
+
+async function hasRecentSignupVerification(email: string) {
+  const record = await db.emailOtp.findFirst({
+    where: {
+      email: email.toLowerCase(),
+      purpose: "SIGNUP_VERIFY",
+      consumedAt: { gte: new Date(Date.now() - SIGNUP_LOGIN_GRACE_MS) },
+    },
+    orderBy: { consumedAt: "desc" },
+  });
+  return !!record;
+}
 
 /**
  * Verify a plaintext password against a stored bcrypt hash. Extracted so it
@@ -99,7 +124,8 @@ function buildOAuthProviders() {
   return providers;
 }
 
-export const authOptions: NextAuthOptions = {
+export function createAuthOptions(req?: NextApiRequest): NextAuthOptions {
+  return {
   adapter: PrismaAdapter(db),
 
   // Credentials provider requires JWT sessions — DB sessions are not supported
@@ -116,21 +142,45 @@ export const authOptions: NextAuthOptions = {
       credentials: {
         email: { label: "Email", type: "email" },
         password: { label: "Password", type: "password" },
+        otp: { label: "OTP", type: "text" },
+        authFlow: { label: "Auth flow", type: "text" },
       },
       async authorize(raw) {
         const parsed = credentialsSchema.safeParse(raw);
         if (!parsed.success) return null;
 
-        const { email, password } = parsed.data;
+        const normalizedEmail = parsed.data.email.toLowerCase();
         const user = await db.user.findUnique({
-          where: { email: email.toLowerCase() },
+          where: { email: normalizedEmail },
         });
         if (!user) return null;
 
-        const ok = await verifyPassword(password, user.password);
-        if (!ok) return null;
+        const passwordOk = await verifyPassword(
+          parsed.data.password,
+          user.password,
+        );
+        if (!passwordOk) return null;
 
-        // The returned object is what gets persisted into the JWT.
+        if (parsed.data.authFlow === "signup") {
+          const recentlyVerified = await hasRecentSignupVerification(normalizedEmail);
+          if (!recentlyVerified) return null;
+          return {
+            id: user.id,
+            email: user.email,
+            name: user.name,
+          };
+        }
+
+        if (!parsed.data.otp) return null;
+
+        const otpOk = await verifyEmailOtp({
+          email: normalizedEmail,
+          code: parsed.data.otp,
+          purpose: "LOGIN_2FA",
+          consume: true,
+        });
+        if (!otpOk) return null;
+
         return {
           id: user.id,
           email: user.email,
@@ -146,9 +196,13 @@ export const authOptions: NextAuthOptions = {
       if (!user.id) return;
 
       const method = account?.provider ?? "credentials";
-      await db.loginAudit.create({
-        data: { userId: user.id, method },
-      });
+      if (req) {
+        await recordLoginAudit({ userId: user.id, method, req });
+      } else {
+        await db.loginAudit.create({
+          data: { userId: user.id, method },
+        });
+      }
 
       if (account?.provider === "credentials") return;
       await db.user.update({
@@ -198,7 +252,10 @@ export const authOptions: NextAuthOptions = {
       },
     }),
   },
-};
+  };
+}
+
+export const authOptions = createAuthOptions();
 
 /** Server-side helper used by getServerSideProps and the tRPC context. */
 export const getServerAuthSession = (ctx: {

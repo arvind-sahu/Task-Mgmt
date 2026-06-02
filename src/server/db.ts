@@ -5,16 +5,14 @@ import { env } from "~/env";
 const createPrismaClient = () =>
   new PrismaClient({
     log:
-      env.NODE_ENV === "development" ? ["query", "error", "warn"] : ["error"],
+      env.NODE_ENV === "development" && process.env.PRISMA_LOG_QUERIES === "1"
+        ? ["query", "error", "warn"]
+        : ["error", "warn"],
   });
 
 const globalForPrisma = globalThis as unknown as {
   prisma: ReturnType<typeof createPrismaClient> | undefined;
 };
 
-// Cache in production only. In dev, caching a PrismaClient across `prisma generate`
-// leaves missing delegates (e.g. notification) until the dev server restarts.
-export const db =
-  env.NODE_ENV === "production"
-    ? (globalForPrisma.prisma ??= createPrismaClient())
-    : createPrismaClient();
+// Reuse one client per process so Supabase pooler connections are not opened on every import.
+export const db = globalForPrisma.prisma ??= createPrismaClient();

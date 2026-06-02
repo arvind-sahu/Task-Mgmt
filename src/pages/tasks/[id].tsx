@@ -137,7 +137,7 @@ export default function TaskDetail() {
     <Layout title={t.title}>
       <Link
         href={`/projects/${t.projectId}`}
-        className="text-sm text-indigo-600 hover:underline"
+        className="link-accent text-sm hover:underline"
       >
         ← Back to {t.project.name}
       </Link>
@@ -173,7 +173,7 @@ export default function TaskDetail() {
           <div className="lg:col-span-2">
             <div className="card">
               <div className="flex items-start justify-between gap-3">
-                <h1 className="text-2xl font-semibold">{t.title}</h1>
+                <h1 className="text-2xl font-semibold text-heading">{t.title}</h1>
                 <div className="flex gap-2">
                   <button
                     className="btn-ghost"
@@ -216,17 +216,20 @@ export default function TaskDetail() {
               </div>
 
               {t.description ? (
-                <p className="mt-5 whitespace-pre-wrap text-sm leading-relaxed text-slate-700">
+                <p className="mt-5 whitespace-pre-wrap text-sm leading-relaxed text-heading">
                   {t.description}
                 </p>
               ) : (
-                <p className="mt-5 text-sm italic text-slate-400">
+                <p className="mt-5 text-sm italic text-muted">
                   No description yet.
                 </p>
               )}
 
-              <div className="mt-4 border-t border-slate-100 pt-4">
-                <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+              <div
+                className="mt-4 border-t pt-4"
+                style={{ borderColor: "var(--border-muted)" }}
+              >
+                <p className="text-xs font-medium uppercase tracking-wide text-muted">
                   Attachments
                 </p>
                 <AttachmentList
@@ -248,26 +251,26 @@ export default function TaskDetail() {
 
             {/* Comments */}
             <div className="card mt-6">
-              <h2 className="mb-4 text-base font-semibold">
+              <h2 className="mb-4 text-base font-semibold text-heading">
                 Comments ({t.comments.length})
               </h2>
               <ul className="space-y-4">
                 {t.comments.map((c) => (
                   <li key={c.id} className="flex gap-3">
-                    <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-indigo-100 text-xs font-semibold text-indigo-700">
+                    <span className="app-avatar grid h-8 w-8 shrink-0 place-items-center rounded-full text-xs font-semibold">
                       {(c.author.name ?? c.author.email)
                         .charAt(0)
                         .toUpperCase()}
                     </span>
-                    <div className="flex-1 rounded-md bg-slate-50 p-3">
+                    <div className="comment-bubble flex-1 rounded-md p-3">
                       <div className="flex flex-wrap items-start justify-between gap-2">
-                        <p className="text-sm font-medium text-slate-900">
+                        <p className="text-sm font-medium text-heading">
                           {c.author.name ?? c.author.email}
                         </p>
-                        <div className="text-right text-xs text-slate-500">
+                        <div className="text-right text-xs text-muted">
                           <p>{formatDateTime(c.createdAt)}</p>
                           {wasEdited(c.createdAt, c.updatedAt) && (
-                            <p className="text-slate-400">
+                            <p className="opacity-70">
                               Edited {formatDateTime(c.updatedAt)}
                             </p>
                           )}
@@ -316,7 +319,7 @@ export default function TaskDetail() {
                           </div>
                         </form>
                       ) : (
-                        <p className="mt-1 whitespace-pre-wrap text-sm text-slate-700">
+                        <p className="mt-1 whitespace-pre-wrap text-sm text-heading">
                           {c.body}
                         </p>
                       )}
@@ -345,7 +348,7 @@ export default function TaskDetail() {
                           />
                           <button
                             type="button"
-                            className="text-xs text-indigo-600 hover:underline"
+                            className="link-accent text-xs hover:underline"
                             onClick={() => {
                               setEditingCommentId(c.id);
                               setEditingCommentBody(c.body);
@@ -355,7 +358,8 @@ export default function TaskDetail() {
                           </button>
                           <button
                             type="button"
-                            className="text-xs text-red-600 hover:underline"
+                            className="text-xs hover:underline"
+                            style={{ color: "var(--danger-text)" }}
                             onClick={() => delComment.mutate({ id: c.id })}
                           >
                             Delete
@@ -366,7 +370,7 @@ export default function TaskDetail() {
                   </li>
                 ))}
                 {t.comments.length === 0 && (
-                  <li className="text-sm italic text-slate-400">
+                  <li className="text-sm italic text-muted">
                     No comments yet — start the discussion.
                   </li>
                 )}
@@ -382,7 +386,7 @@ export default function TaskDetail() {
                   required
                   maxLength={2000}
                 />
-                <p className="text-xs text-slate-500">
+                <p className="text-xs text-muted">
                   You can attach images or PDFs to comments after posting.
                 </p>
                 <div className="flex justify-end">
@@ -426,15 +430,15 @@ export default function TaskDetail() {
             </Field>
             <Field label="Assignees">
               {t.assignees.length === 0 ? (
-                <span className="text-slate-400">Unassigned</span>
+                <span className="text-muted">Unassigned</span>
               ) : (
                 <div className="flex flex-wrap gap-1.5">
                   {t.assignees.map((a) => (
                     <span
                       key={a.id}
-                      className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-2 py-0.5 text-xs"
+                      className="chip inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs"
                     >
-                      <span className="grid h-4 w-4 place-items-center rounded-full bg-indigo-100 text-[9px] font-semibold text-indigo-700">
+                      <span className="app-avatar grid h-4 w-4 place-items-center rounded-full text-[9px] font-semibold">
                         {(a.name ?? a.email).charAt(0).toUpperCase()}
                       </span>
                       {a.name ?? a.email}
@@ -461,10 +465,10 @@ function Field({
 }) {
   return (
     <div>
-      <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+      <p className="text-xs font-medium uppercase tracking-wide text-muted">
         {label}
       </p>
-      <div className="mt-1 text-slate-800">{children}</div>
+      <div className="mt-1 text-heading">{children}</div>
     </div>
   );
 }

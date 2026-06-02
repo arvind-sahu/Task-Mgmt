@@ -11,22 +11,25 @@ export const notificationRouter = createTRPCRouter({
   unreadCount: protectedProcedure.query(async ({ ctx }) => {
     const userId = ctx.session.user.id;
     const notifications = requireNotificationDelegate();
-    const stored = await notifications.count({
-      where: { userId, readAt: null },
-    });
-    const dueSoon = await ctx.db.task.count({
-      where: {
-        status: { not: TaskStatus.DONE },
-        deadline: {
-          lte: new Date(Date.now() + DUE_SOON_MS),
-          gte: new Date(),
+    const now = Date.now();
+    const [stored, dueSoon] = await Promise.all([
+      notifications.count({
+        where: { userId, readAt: null },
+      }),
+      ctx.db.task.count({
+        where: {
+          status: { not: TaskStatus.DONE },
+          deadline: {
+            lte: new Date(now + DUE_SOON_MS),
+            gte: new Date(now),
+          },
+          assignees: { some: { id: userId } },
+          project: {
+            OR: [{ ownerId: userId }, { members: { some: { userId } } }],
+          },
         },
-        assignees: { some: { id: userId } },
-        project: {
-          OR: [{ ownerId: userId }, { members: { some: { userId } } }],
-        },
-      },
-    });
+      }),
+    ]);
     return stored + dueSoon;
   }),
 
@@ -37,24 +40,25 @@ export const notificationRouter = createTRPCRouter({
       const now = new Date();
 
       const notifications = requireNotificationDelegate();
-      const stored = await notifications.findMany({
-        where: { userId },
-        orderBy: { createdAt: "desc" },
-        take: input.limit,
-      });
-
-      const dueTasks = await ctx.db.task.findMany({
-        where: {
-          status: { not: TaskStatus.DONE },
-          deadline: { not: null, lte: new Date(now.getTime() + DUE_SOON_MS) },
-          assignees: { some: { id: userId } },
-          project: {
-            OR: [{ ownerId: userId }, { members: { some: { userId } } }],
+      const [stored, dueTasks] = await Promise.all([
+        notifications.findMany({
+          where: { userId },
+          orderBy: { createdAt: "desc" },
+          take: input.limit,
+        }),
+        ctx.db.task.findMany({
+          where: {
+            status: { not: TaskStatus.DONE },
+            deadline: { not: null, lte: new Date(now.getTime() + DUE_SOON_MS) },
+            assignees: { some: { id: userId } },
+            project: {
+              OR: [{ ownerId: userId }, { members: { some: { userId } } }],
+            },
           },
-        },
-        include: { project: { select: { name: true } } },
-        take: 10,
-      });
+          include: { project: { select: { name: true } } },
+          take: 10,
+        }),
+      ]);
 
       const dueItems = dueTasks.map((t) => ({
         id: `due-${t.id}`,
