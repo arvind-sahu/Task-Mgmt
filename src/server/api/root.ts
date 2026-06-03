@@ -6,6 +6,7 @@ import { notificationRouter } from "~/server/api/routers/notification";
 import { projectRouter } from "~/server/api/routers/project";
 import { sprintRouter } from "~/server/api/routers/sprint";
 import { tagRouter } from "~/server/api/routers/tag";
+import { storageRouter } from "~/server/api/routers/storage";
 import { taskRouter } from "~/server/api/routers/task";
 import { userRouter } from "~/server/api/routers/user";
 import { createCallerFactory, createTRPCRouter } from "~/server/api/trpc";
@@ -26,6 +27,7 @@ export const appRouter = createTRPCRouter({
   tag: tagRouter,
   comment: commentRouter,
   attachment: attachmentRouter,
+  storage: storageRouter,
   notification: notificationRouter,
   dashboard: dashboardRouter,
   leadRequest: leadRequestRouter,

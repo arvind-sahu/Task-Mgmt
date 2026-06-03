@@ -4,6 +4,16 @@ import { z } from "zod";
 import { assertProjectAccess } from "~/server/api/access";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { sanitizePlainText } from "~/server/security/sanitize";
+import {
+  createPresignedUploadUrl,
+  deleteObjectByKey,
+  isAllowedTaskAttachmentKey,
+  isS3Configured,
+  isTaskAttachmentKeyForUser,
+  resolveLegacyAttachmentKey,
+  taskAttachmentKey,
+  uploadDataUrlToS3,
+} from "~/server/storage/s3";
 import { isAllowedAttachmentType } from "~/utils/attachments";
 
 const dataUrlSchema = z
@@ -14,6 +24,40 @@ const dataUrlSchema = z
     (v) => v.startsWith("data:image/") || v.startsWith("data:application/pdf"),
     "Invalid attachment data",
   );
+
+const storageKeySchema = z.string().min(1).max(512);
+
+async function resolveAttachmentStorage(
+  userId: string,
+  fileName: string,
+  storageKey?: string,
+  dataUrl?: string,
+): Promise<{ storageKey: string | null; dataUrl: string | null }> {
+  if (storageKey) {
+    if (!isTaskAttachmentKeyForUser(storageKey, userId)) {
+      throw new TRPCError({
+        code: "FORBIDDEN",
+        message: "Invalid attachment storage key",
+      });
+    }
+    return { storageKey, dataUrl: null };
+  }
+
+  if (!dataUrl) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: "Provide a storage key or attachment data",
+    });
+  }
+
+  if (!isS3Configured()) {
+    return { storageKey: null, dataUrl };
+  }
+
+  const key = taskAttachmentKey(userId, fileName);
+  await uploadDataUrlToS3(dataUrl, key);
+  return { storageKey: key, dataUrl: null };
+}
 
 async function assertTaskAccess(
   db: Parameters<typeof assertProjectAccess>[0],
@@ -29,14 +73,49 @@ async function assertTaskAccess(
 }
 
 export const attachmentRouter = createTRPCRouter({
-  createForTask: protectedProcedure
+  getUploadUrl: protectedProcedure
     .input(
       z.object({
-        taskId: z.string().cuid(),
         fileName: z.string().min(1).max(255),
         mimeType: z.string().min(1).max(100),
-        dataUrl: dataUrlSchema,
+        contentLength: z
+          .number()
+          .int()
+          .positive()
+          .max(5 * 1024 * 1024, "File must be 5MB or smaller"),
       }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      if (!isAllowedAttachmentType(input.mimeType)) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Only images and PDF files are allowed",
+        });
+      }
+      if (!isS3Configured()) {
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: "File storage is not configured on this server.",
+        });
+      }
+
+      const key = taskAttachmentKey(ctx.session.user.id, input.fileName);
+      return createPresignedUploadUrl(key, input.mimeType);
+    }),
+
+  createForTask: protectedProcedure
+    .input(
+      z
+        .object({
+          taskId: z.string().cuid(),
+          fileName: z.string().min(1).max(255),
+          mimeType: z.string().min(1).max(100),
+          storageKey: storageKeySchema.optional(),
+          dataUrl: dataUrlSchema.optional(),
+        })
+        .refine((value) => Boolean(value.storageKey ?? value.dataUrl), {
+          message: "Provide a storage key or attachment data",
+        }),
     )
     .mutation(async ({ ctx, input }) => {
       if (!isAllowedAttachmentType(input.mimeType)) {
@@ -47,12 +126,20 @@ export const attachmentRouter = createTRPCRouter({
       }
       await assertTaskAccess(ctx.db, input.taskId, ctx.session.user.id);
 
+      const stored = await resolveAttachmentStorage(
+        ctx.session.user.id,
+        input.fileName,
+        input.storageKey,
+        input.dataUrl,
+      );
+
       return ctx.db.taskAttachment.create({
         data: {
           taskId: input.taskId,
           fileName: sanitizePlainText(input.fileName),
           mimeType: input.mimeType,
-          dataUrl: input.dataUrl,
+          storageKey: stored.storageKey,
+          dataUrl: stored.dataUrl,
           uploaderId: ctx.session.user.id,
         },
       });
@@ -60,12 +147,17 @@ export const attachmentRouter = createTRPCRouter({
 
   createForComment: protectedProcedure
     .input(
-      z.object({
-        commentId: z.string().cuid(),
-        fileName: z.string().min(1).max(255),
-        mimeType: z.string().min(1).max(100),
-        dataUrl: dataUrlSchema,
-      }),
+      z
+        .object({
+          commentId: z.string().cuid(),
+          fileName: z.string().min(1).max(255),
+          mimeType: z.string().min(1).max(100),
+          storageKey: storageKeySchema.optional(),
+          dataUrl: dataUrlSchema.optional(),
+        })
+        .refine((value) => Boolean(value.storageKey ?? value.dataUrl), {
+          message: "Provide a storage key or attachment data",
+        }),
     )
     .mutation(async ({ ctx, input }) => {
       if (!isAllowedAttachmentType(input.mimeType)) {
@@ -80,12 +172,20 @@ export const attachmentRouter = createTRPCRouter({
       });
       await assertTaskAccess(ctx.db, comment.taskId, ctx.session.user.id);
 
+      const stored = await resolveAttachmentStorage(
+        ctx.session.user.id,
+        input.fileName,
+        input.storageKey,
+        input.dataUrl,
+      );
+
       return ctx.db.taskAttachment.create({
         data: {
           commentId: input.commentId,
           fileName: sanitizePlainText(input.fileName),
           mimeType: input.mimeType,
-          dataUrl: input.dataUrl,
+          storageKey: stored.storageKey,
+          dataUrl: stored.dataUrl,
           uploaderId: ctx.session.user.id,
         },
       });
@@ -113,6 +213,23 @@ export const attachmentRouter = createTRPCRouter({
           code: "FORBIDDEN",
           message: "You can only delete your own attachments",
         });
+      }
+
+      if (isAllowedTaskAttachmentKey(att.storageKey ?? "")) {
+        try {
+          await deleteObjectByKey(att.storageKey!);
+        } catch {
+          // Best-effort cleanup.
+        }
+      } else {
+        const legacyKey = resolveLegacyAttachmentKey(att);
+        if (legacyKey) {
+          try {
+            await deleteObjectByKey(legacyKey);
+          } catch {
+            // Best-effort cleanup.
+          }
+        }
       }
 
       await ctx.db.taskAttachment.delete({ where: { id: input.id } });

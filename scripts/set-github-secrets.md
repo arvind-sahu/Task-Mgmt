@@ -19,9 +19,13 @@ Plus these (if not already set):
 | `AUTH_GITHUB_SECRET` | from `.env` (GitHub OAuth Client Secret) |
 | `GOOGLE_CLIENT_ID` | from `.env` (optional) |
 | `GOOGLE_CLIENT_SECRET` | from `.env` (optional) |
-| `AWS_ACCESS_KEY_ID` | IAM access key |
-| `AWS_SECRET_ACCESS_KEY` | IAM secret |
-| `AWS_REGION` | `ap-south-1` |
+| `AWS_ACCESS_KEY_ID` | IAM access key **for SST deploy only** |
+| `AWS_SECRET_ACCESS_KEY` | IAM secret **for SST deploy only** |
+| `AWS_REGION` | `ap-south-1` (deploy region) |
+| `AWS_S3_ACCESS_KEY_ID` | IAM access key **scoped to S3 bucket only** |
+| `AWS_S3_SECRET_ACCESS_KEY` | IAM secret for S3 |
+| `AWS_S3_REGION` | `ap-south-1` |
+| `AWS_S3_BUCKET_NAME` | `tasker-prod-s3` |
 
 Add at: https://github.com/arvind-sahu/Task-Mgmt/settings/secrets/actions  
 Tab: **Secrets** → **Repository secrets** (NOT Variables).
