@@ -3,6 +3,7 @@ import { TRPCError } from "@trpc/server";
 import { NotificationType, TaskPriority, TaskStatus } from "@prisma/client";
 
 import { assertProjectAccess } from "~/server/api/access";
+import { publicUserSelect } from "~/server/api/userSelect";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { notifyUsers } from "~/server/notifications";
 import {
@@ -42,18 +43,13 @@ const listInput = z.object({
   search: z.string().optional(),
 });
 
-const assigneeSelect = {
-  id: true,
-  name: true,
-  email: true,
-  image: true,
-} as const;
+const assigneeSelect = publicUserSelect;
 
 /** Board/list views — omit creator + sprint joins (sprintId is on the row). */
 const listIncludeShape = {
   assignees: { select: assigneeSelect },
   tags: true,
-  _count: { select: { comments: true } },
+  _count: { select: { comments: true, attachments: true } },
 } as const;
 
 const includeShape = {
@@ -61,7 +57,7 @@ const includeShape = {
   tags: true,
   creator: { select: assigneeSelect },
   sprint: true,
-  _count: { select: { comments: true } },
+  _count: { select: { comments: true, attachments: true } },
 } as const;
 
 type TaskDb = Parameters<typeof assertProjectAccess>[0];
@@ -139,7 +135,7 @@ export const taskRouter = createTRPCRouter({
   list: protectedProcedure.input(listInput).query(async ({ ctx, input }) => {
     const userId = ctx.session.user.id;
 
-    return ctx.db.task.findMany({
+    const tasks = await ctx.db.task.findMany({
       where: {
         projectId: input.projectId,
         project: projectMemberFilter(userId),
@@ -163,12 +159,42 @@ export const taskRouter = createTRPCRouter({
           : undefined,
       },
       include: listIncludeShape,
-      // Order by deadline (nulls last), then priority, then most recent.
       orderBy: [
         { deadline: { sort: "asc", nulls: "last" } },
         { createdAt: "desc" },
       ],
     });
+
+    if (tasks.length === 0) return tasks;
+
+    const taskIds = tasks.map((t) => t.id);
+    const linkedAttachments = await ctx.db.taskAttachment.findMany({
+      where: {
+        OR: [
+          { taskId: { in: taskIds } },
+          { comment: { taskId: { in: taskIds } } },
+        ],
+      },
+      select: {
+        taskId: true,
+        comment: { select: { taskId: true } },
+      },
+    });
+
+    const attachmentTotals = new Map<string, number>();
+    for (const att of linkedAttachments) {
+      const ownerTaskId = att.taskId ?? att.comment?.taskId;
+      if (!ownerTaskId) continue;
+      attachmentTotals.set(ownerTaskId, (attachmentTotals.get(ownerTaskId) ?? 0) + 1);
+    }
+
+    return tasks.map((task) => ({
+      ...task,
+      _count: {
+        ...task._count,
+        attachments: attachmentTotals.get(task.id) ?? task._count.attachments,
+      },
+    }));
   }),
 
   byId: protectedProcedure
@@ -223,6 +249,45 @@ export const taskRouter = createTRPCRouter({
       take: 25,
     });
   }),
+
+  /** All open tasks assigned to the current user (My Tasks page). */
+  myTasks: protectedProcedure
+    .input(
+      z
+        .object({
+          search: z.string().max(200).optional(),
+          includeDone: z.boolean().optional(),
+        })
+        .optional(),
+    )
+    .query(async ({ ctx, input }) => {
+      const userId = ctx.session.user.id;
+      const search = input?.search?.trim();
+
+      return ctx.db.task.findMany({
+        where: {
+          assignees: { some: { id: userId } },
+          status: input?.includeDone ? undefined : { not: TaskStatus.DONE },
+          project: projectMemberFilter(userId),
+          OR: search
+            ? [
+                { title: { contains: search, mode: "insensitive" } },
+                { description: { contains: search, mode: "insensitive" } },
+              ]
+            : undefined,
+        },
+        include: {
+          ...listIncludeShape,
+          project: { select: { id: true, name: true, color: true } },
+        },
+        orderBy: [
+          { deadline: { sort: "asc", nulls: "last" } },
+          { priority: "desc" },
+          { createdAt: "desc" },
+        ],
+        take: 100,
+      });
+    }),
 
   create: protectedProcedure
     .input(createInput)
