@@ -9,10 +9,11 @@
     "db:down": "docker compose down",
     "db:logs": "docker compose logs -f db",
     "db:reset": "docker compose down -v && docker compose up -d",
-    "db:wait": "until docker compose exec -T db pg_isready -U postgres -d demo >/dev/null 2>&1; do sleep 1; done",
+    "db:wait": "docker compose wait db",
     "db:generate": "prisma migrate dev",
     "db:migrate": "prisma migrate deploy",
     "db:push": "prisma db push",
+    "db:seed:dummy": "npx tsx scripts/seed-dummy-users.ts",
     "db:studio": "prisma studio",
     "db:start": "npm run db:up && npm run db:wait && npm run db:push",
     "dev": "next dev",
@@ -25,10 +26,13 @@
     "sst:dev": "sst dev",
     "sst:deploy": "sst deploy",
     "sst:deploy:prod": "sst deploy --stage prod",
-    "deploy:prod": "bash scripts/deploy-prod.sh"
+    "deploy:prod": "bash scripts/deploy-prod.sh",
+    "s3:cors": "aws s3api put-bucket-cors --bucket tasker-prod-s3 --cors-configuration file://scripts/s3-cors.json"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^1.6.0",
+    "@aws-sdk/client-s3": "^3.1060.0",
+    "@aws-sdk/s3-request-presigner": "^3.1060.0",
     "@prisma/client": "^5.14.0",
     "@t3-oss/env-nextjs": "^0.10.1",
     "@tanstack/react-query": "^5.50.0",
