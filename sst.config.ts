@@ -117,6 +117,10 @@ export default $config({
         SMTP_USER: process.env.SMTP_USER ?? "",
         SMTP_PASS: process.env.SMTP_PASS ?? "",
         SMTP_FROM: process.env.SMTP_FROM ?? "",
+        AWS_S3_ACCESS_KEY_ID: process.env.AWS_S3_ACCESS_KEY_ID ?? "",
+        AWS_S3_SECRET_ACCESS_KEY: process.env.AWS_S3_SECRET_ACCESS_KEY ?? "",
+        AWS_S3_REGION: process.env.AWS_S3_REGION ?? "ap-south-1",
+        AWS_S3_BUCKET_NAME: process.env.AWS_S3_BUCKET_NAME ?? "",
       },
       transform: {
         cdn: {

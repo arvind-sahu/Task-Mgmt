@@ -17,22 +17,18 @@ function normalizeAttachments(
     id?: string;
     fileName?: string;
     mimeType?: string;
-    dataUrl?: string;
+    dataUrl?: string | null;
+    storageKey?: string | null;
   }>,
 ): AttachmentItem[] {
   return attachments.filter(
     (
       att,
-    ): att is {
-      id: string;
-      fileName: string;
-      mimeType: string;
-      dataUrl: string;
-    } =>
+    ): att is AttachmentItem =>
       Boolean(att.id) &&
       Boolean(att.fileName) &&
       Boolean(att.mimeType) &&
-      Boolean(att.dataUrl),
+      Boolean(att.storageKey ?? att.dataUrl),
   );
 }
 
@@ -66,6 +62,7 @@ export function TaskCommentsSection({
   const addCommentAttachment = api.attachment.createForComment.useMutation({
     onSuccess: invalidate,
   });
+  const requestAttachmentUploadUrl = api.attachment.getUploadUrl.useMutation();
   const delAttachment = api.attachment.delete.useMutation({
     onSuccess: invalidate,
   });
@@ -162,10 +159,15 @@ export function TaskCommentsSection({
                   <FileUploadButton
                     label="Attach file"
                     disabled={addCommentAttachment.isPending}
+                    requestUploadUrl={(input) =>
+                      requestAttachmentUploadUrl.mutateAsync(input)
+                    }
                     onUploaded={async (file) => {
                       await addCommentAttachment.mutateAsync({
                         commentId: c.id,
-                        ...file,
+                        fileName: file.fileName,
+                        mimeType: file.mimeType,
+                        storageKey: file.storageKey,
                       });
                     }}
                   />

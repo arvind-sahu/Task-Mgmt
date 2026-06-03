@@ -18,7 +18,7 @@ import { z } from "zod";
 import { env } from "~/env";
 import { db } from "~/server/db";
 import { getEnabledOAuthProviders } from "~/server/oauth";
-import { verifyEmailOtp } from "~/server/otp";
+import { hasRecentLoginOtpVerification } from "~/server/security/loginSecurity";
 import { recordLoginAudit } from "~/server/security/loginAudit";
 
 declare module "next-auth" {
@@ -40,7 +40,7 @@ declare module "next-auth/jwt" {
 
 export const INVALID_CREDENTIALS_MESSAGE = "Invalid email or password";
 export const LOGIN_OTP_SENT_MESSAGE =
-  "If your credentials are correct, a verification code was sent to your email.";
+  "A verification code was sent to your email.";
 
 const SIGNUP_LOGIN_GRACE_MS = 5 * 60 * 1000;
 
@@ -171,15 +171,11 @@ export function createAuthOptions(req?: NextApiRequest): NextAuthOptions {
           };
         }
 
-        if (!parsed.data.otp) return null;
-
-        const otpOk = await verifyEmailOtp({
-          email: normalizedEmail,
-          code: parsed.data.otp,
-          purpose: "LOGIN_2FA",
-          consume: true,
-        });
-        if (!otpOk) return null;
+        const recentlyVerifiedOtp = await hasRecentLoginOtpVerification(
+          db,
+          normalizedEmail,
+        );
+        if (!recentlyVerifiedOtp) return null;
 
         return {
           id: user.id,

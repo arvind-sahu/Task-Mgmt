@@ -10,13 +10,20 @@ import Layout from "~/components/Layout";
 import TaskForm, { type TaskFormValues } from "~/components/TaskForm";
 import { PriorityBadge } from "~/components/Badges";
 import { StatusSelect } from "~/components/StatusSelect";
+import {
+  isTaskCompleted,
+  TaskCompletedTick,
+  OverdueIcon,
+  CalendarDueIcon,
+} from "~/components/TaskIndicators";
 import { requireAuth } from "~/server/auth";
 import { api } from "~/utils/api";
 import {
   formatDate,
   formatDateTime,
+  formatBoardDueDate,
+  boardDeadlineLabel,
   isOverdue,
-  relativeDeadline,
   wasEdited,
 } from "~/utils/date";
 
@@ -79,6 +86,7 @@ export default function TaskDetail() {
   const addCommentAttachment = api.attachment.createForComment.useMutation({
     onSuccess: () => utils.task.byId.invalidate({ id }),
   });
+  const requestAttachmentUploadUrl = api.attachment.getUploadUrl.useMutation();
   const delAttachment = api.attachment.delete.useMutation({
     onSuccess: () => utils.task.byId.invalidate({ id }),
   });
@@ -173,7 +181,10 @@ export default function TaskDetail() {
           <div className="lg:col-span-2">
             <div className="card">
               <div className="flex items-start justify-between gap-3">
-                <h1 className="text-2xl font-semibold text-heading">{t.title}</h1>
+                <h1 className="flex min-w-0 flex-1 items-start gap-2 text-2xl font-semibold text-heading">
+                  {isTaskCompleted(t.status) && <TaskCompletedTick className="mt-1.5" />}
+                  <span className="min-w-0">{t.title}</span>
+                </h1>
                 <div className="flex gap-2">
                   <button
                     className="btn-ghost"
@@ -239,10 +250,15 @@ export default function TaskDetail() {
                 />
                 <FileUploadButton
                   disabled={addTaskAttachment.isPending}
+                  requestUploadUrl={(input) =>
+                    requestAttachmentUploadUrl.mutateAsync(input)
+                  }
                   onUploaded={async (file) => {
                     await addTaskAttachment.mutateAsync({
                       taskId: id,
-                      ...file,
+                      fileName: file.fileName,
+                      mimeType: file.mimeType,
+                      storageKey: file.storageKey,
                     });
                   }}
                 />
@@ -339,10 +355,15 @@ export default function TaskDetail() {
                           <FileUploadButton
                             label="Attach file"
                             disabled={addCommentAttachment.isPending}
+                            requestUploadUrl={(input) =>
+                              requestAttachmentUploadUrl.mutateAsync(input)
+                            }
                             onUploaded={async (file) => {
                               await addCommentAttachment.mutateAsync({
                                 commentId: c.id,
-                                ...file,
+                                fileName: file.fileName,
+                                mimeType: file.mimeType,
+                                storageKey: file.storageKey,
                               });
                             }}
                           />
@@ -417,13 +438,26 @@ export default function TaskDetail() {
             </Field>
             <Field label="Deadline">
               {t.deadline ? (
-                <span
-                  className={
-                    isOverdue(t.deadline) ? "font-medium text-red-600" : ""
-                  }
-                >
-                  {formatDate(t.deadline)} · {relativeDeadline(t.deadline)}
-                </span>
+                isTaskCompleted(t.status) ? (
+                  <span>{formatDate(t.deadline)}</span>
+                ) : isOverdue(t.deadline) ? (
+                  <span
+                    className="inline-flex items-center gap-1.5 font-semibold"
+                    style={{ color: "var(--danger-text)" }}
+                  >
+                    <OverdueIcon className="h-4 w-4" />
+                    Overdue
+                    <span className="inline-flex items-center gap-1 font-medium">
+                      <CalendarDueIcon className="h-4 w-4" />
+                      {formatBoardDueDate(t.deadline)}
+                    </span>
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1.5">
+                    <CalendarDueIcon className="h-4 w-4 text-muted" />
+                    {boardDeadlineLabel(t.deadline) || formatBoardDueDate(t.deadline)}
+                  </span>
+                )
               ) : (
                 "—"
               )}
@@ -482,21 +516,17 @@ function normalizeAttachments(
     id?: string;
     fileName?: string;
     mimeType?: string;
-    dataUrl?: string;
+    dataUrl?: string | null;
+    storageKey?: string | null;
   }>,
 ): AttachmentItem[] {
   return attachments.filter(
     (
       att,
-    ): att is {
-      id: string;
-      fileName: string;
-      mimeType: string;
-      dataUrl: string;
-    } =>
+    ): att is AttachmentItem =>
       Boolean(att.id) &&
       Boolean(att.fileName) &&
       Boolean(att.mimeType) &&
-      Boolean(att.dataUrl),
+      Boolean(att.storageKey ?? att.dataUrl),
   );
 }

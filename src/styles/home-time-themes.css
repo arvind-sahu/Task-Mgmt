@@ -1,0 +1,2233 @@
+/* Homepage time-of-day themes — scoped to .home-time-theme only */
+
+.home-time-theme:not([data-home-theme]) {
+  --ht-page-bg: #f0f9ff;
+  --ht-page-text: #0f172a;
+}
+
+.home-time-theme {
+  --ht-transition: background-color 0.5s ease, color 0.5s ease, border-color 0.5s ease,
+    box-shadow 0.5s ease;
+  --ht-glass-blur: 16px;
+  background: var(--ht-page-bg);
+  color: var(--ht-page-text);
+  transition: var(--ht-transition);
+}
+
+/* --- Animated sky: sun / moon / horizon --- */
+.home-sky-backdrop {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 2;
+  overflow: hidden;
+  will-change: transform;
+}
+
+.home-sky-horizon {
+  position: absolute;
+  left: -10%;
+  right: -10%;
+  bottom: -2vh;
+  height: var(--ht-sky-horizon-height, 32vh);
+  background: var(--ht-sky-horizon);
+  opacity: var(--ht-sky-horizon-opacity, 0.85);
+  transition: opacity 0.6s ease, background 0.6s ease;
+}
+
+.home-sky-sun-scene {
+  position: absolute;
+  left: var(--sky-sun-left, 11%);
+  top: var(--sky-sun-top, 84%);
+  --ht-sky-sun-scale: 1;
+  width: calc(var(--ht-sky-celestial-size, 5.5rem) * var(--ht-sky-sun-scale));
+  height: calc(var(--ht-sky-celestial-size, 5.5rem) * var(--ht-sky-sun-scale));
+  translate: -50% -50%;
+  pointer-events: none;
+  will-change: left, top;
+}
+
+.home-sky-sun-wrap {
+  position: absolute;
+  inset: 0;
+  animation: home-sky-sun-pulse 6s ease-in-out infinite;
+}
+
+@media (min-width: 768px) {
+  .home-sky-sun-scene {
+    --ht-sky-sun-scale: 1.55;
+  }
+
+  .home-sky-sun-core {
+    box-shadow:
+      0 0 36px rgba(251, 191, 36, 0.95),
+      0 0 72px rgba(251, 191, 36, 0.35);
+  }
+
+  .home-sky-sun-glow {
+    inset: -42%;
+  }
+
+  .home-sky-sun-rays {
+    inset: -105%;
+  }
+}
+
+@media (min-width: 1024px) {
+  .home-sky-sun-scene {
+    --ht-sky-sun-scale: 1.85;
+  }
+
+  .home-sky-sun-scene--dawn {
+    --ht-sky-sun-scale: 2.05;
+  }
+
+  .home-sky-sun-core {
+    box-shadow:
+      0 0 44px rgba(251, 191, 36, 1),
+      0 0 96px rgba(251, 191, 36, 0.4),
+      0 0 140px rgba(253, 224, 71, 0.18);
+  }
+
+  .home-sky-sun-glow {
+    inset: -48%;
+  }
+
+  .home-sky-sun-rays {
+    inset: -120%;
+  }
+}
+
+.home-sky-sun-core {
+  position: absolute;
+  inset: 22%;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 32%, #fffef5 0%, #fde68a 42%, #fbbf24 100%);
+  box-shadow: 0 0 24px rgba(251, 191, 36, 0.9);
+}
+
+.home-sky-sun-glow {
+  position: absolute;
+  inset: -35%;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(253, 224, 71, 0.55) 0%, rgba(251, 191, 36, 0.22) 42%, transparent 68%);
+  animation: home-sky-glow-breathe 5s ease-in-out infinite;
+}
+
+.home-sky-sun-rays {
+  position: absolute;
+  inset: -90%;
+  border-radius: 50%;
+  background: conic-gradient(
+    from 0deg,
+    transparent 0deg 8deg,
+    rgba(255, 230, 120, 0.34) 8deg 11deg,
+    transparent 11deg 28deg,
+    rgba(255, 215, 100, 0.28) 28deg 31deg,
+    transparent 31deg 48deg,
+    rgba(255, 200, 85, 0.32) 48deg 51deg,
+    transparent 51deg 68deg,
+    rgba(255, 185, 70, 0.26) 68deg 71deg,
+    transparent 71deg 88deg,
+    rgba(255, 170, 55, 0.3) 88deg 91deg,
+    transparent 91deg 108deg,
+    rgba(255, 160, 50, 0.24) 108deg 111deg,
+    transparent 111deg 128deg,
+    rgba(255, 150, 45, 0.28) 128deg 131deg,
+    transparent 131deg 148deg,
+    rgba(255, 140, 40, 0.22) 148deg 151deg,
+    transparent 151deg 360deg
+  );
+  mask: radial-gradient(circle, transparent 18%, black 36%, black 100%);
+  -webkit-mask: radial-gradient(circle, transparent 18%, black 36%, black 100%);
+  animation: home-sky-rays-spin 48s linear infinite;
+}
+
+/* Dawn / morning — hazy sunrise bloom (CSS only, no image) */
+.home-sky-sun-scene--dawn .home-sky-sun-atmosphere {
+  position: absolute;
+  left: 50%;
+  top: 58%;
+  width: 340%;
+  height: 280%;
+  translate: -50% -42%;
+  border-radius: 50%;
+  background: radial-gradient(
+    ellipse 72% 68% at 50% 62%,
+    rgba(255, 252, 235, 0.92) 0%,
+    rgba(255, 210, 120, 0.62) 16%,
+    rgba(255, 145, 55, 0.38) 34%,
+    rgba(220, 80, 20, 0.18) 52%,
+    transparent 72%
+  );
+  filter: blur(2px);
+  pointer-events: none;
+}
+
+.home-sky-sun-scene--dawn .home-sky-sun-cloud-band {
+  position: absolute;
+  left: 50%;
+  top: 8%;
+  width: 420%;
+  height: 38%;
+  translate: -50% 0;
+  border-radius: 50%;
+  background: linear-gradient(
+    180deg,
+    rgba(92, 38, 12, 0.72) 0%,
+    rgba(140, 55, 18, 0.52) 38%,
+    rgba(180, 75, 25, 0.28) 62%,
+    transparent 100%
+  );
+  filter: blur(5px);
+  opacity: 0.88;
+  pointer-events: none;
+}
+
+.home-sky-sun-scene--dawn .home-sky-sun-god-rays {
+  position: absolute;
+  left: 50%;
+  top: 42%;
+  width: 520%;
+  height: 420%;
+  translate: -50% -35%;
+  pointer-events: none;
+  background:
+    linear-gradient(
+      195deg,
+      transparent 42%,
+      rgba(255, 220, 140, 0.22) 52%,
+      transparent 62%
+    ),
+    linear-gradient(
+      165deg,
+      transparent 38%,
+      rgba(255, 200, 110, 0.18) 50%,
+      transparent 64%
+    ),
+    linear-gradient(
+      180deg,
+      transparent 44%,
+      rgba(255, 235, 180, 0.28) 54%,
+      rgba(255, 180, 80, 0.12) 68%,
+      transparent 82%
+    ),
+    conic-gradient(
+      from 270deg at 50% 78%,
+      transparent 0deg 28deg,
+      rgba(255, 210, 120, 0.2) 28deg 32deg,
+      transparent 32deg 58deg,
+      rgba(255, 195, 100, 0.16) 58deg 62deg,
+      transparent 62deg 88deg,
+      rgba(255, 180, 85, 0.18) 88deg 92deg,
+      transparent 92deg 118deg,
+      rgba(255, 165, 70, 0.14) 118deg 122deg,
+      transparent 122deg 360deg
+    );
+  filter: blur(10px);
+  opacity: 0.85;
+  animation: home-sky-god-rays-breathe 7s ease-in-out infinite;
+}
+
+.home-sky-sun-scene--dawn .home-sky-sun-wrap {
+  animation: home-sky-sun-pulse-dawn 5s ease-in-out infinite;
+}
+
+.home-sky-sun-scene--dawn .home-sky-sun-core {
+  inset: 18%;
+  background: radial-gradient(
+    circle at 50% 48%,
+    #ffffff 0%,
+    #fff8dc 18%,
+    #fde047 38%,
+    #fb923c 68%,
+    #ea580c 100%
+  );
+  box-shadow:
+    0 0 20px rgba(255, 255, 255, 0.95),
+    0 0 48px rgba(255, 200, 80, 0.95),
+    0 0 96px rgba(255, 130, 40, 0.55),
+    0 0 160px rgba(255, 90, 20, 0.28);
+}
+
+.home-sky-sun-scene--dawn .home-sky-sun-glow {
+  inset: -55%;
+  background: radial-gradient(
+    circle,
+    rgba(255, 245, 210, 0.75) 0%,
+    rgba(255, 180, 70, 0.42) 28%,
+    rgba(255, 120, 40, 0.18) 52%,
+    transparent 72%
+  );
+  animation: home-sky-glow-breathe 4.5s ease-in-out infinite;
+}
+
+.home-sky-sun-scene--dawn .home-sky-sun-rays {
+  inset: -130%;
+  opacity: 0.55;
+  animation: home-sky-rays-spin 72s linear infinite;
+}
+
+.home-sky-sun-scene--dawn .home-sky-sun-haze {
+  position: absolute;
+  inset: -180% -140%;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle at 50% 55%,
+    rgba(255, 200, 100, 0.35) 0%,
+    rgba(255, 140, 50, 0.12) 45%,
+    transparent 68%
+  );
+  filter: blur(18px);
+  mix-blend-mode: screen;
+  pointer-events: none;
+  animation: home-sky-glow-breathe 6s ease-in-out infinite reverse;
+}
+
+@keyframes home-sky-god-rays-breathe {
+  0%,
+  100% {
+    opacity: 0.78;
+  }
+  50% {
+    opacity: 0.95;
+  }
+}
+
+@keyframes home-sky-sun-pulse-dawn {
+  0%,
+  100% {
+    scale: 1;
+    filter: brightness(1);
+  }
+  50% {
+    scale: 1.04;
+    filter: brightness(1.08);
+  }
+}
+
+/* Sunset — fiery sky, rim-lit clouds, sinking sun (CSS only) */
+.home-sky-backdrop[data-sky-theme="sunset"] .home-sky-horizon {
+  height: 42vh;
+  opacity: 1;
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    rgba(180, 45, 20, 0.35) 22%,
+    rgba(220, 60, 25, 0.62) 48%,
+    rgba(190, 35, 18, 0.88) 78%,
+    rgba(8, 4, 4, 0.98) 100%
+  );
+}
+
+.home-sky-sunset-sky-wash {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    180deg,
+    #3e1a11 0%,
+    #6b2a18 18%,
+    #b83c12 42%,
+    #d84315 58%,
+    #8a2510 72%,
+    transparent 88%
+  );
+  opacity: 0.92;
+  pointer-events: none;
+}
+
+.home-sky-sunset-cloud {
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+  filter: blur(4px);
+}
+
+.home-sky-sunset-cloud--upper {
+  left: 18%;
+  top: 8%;
+  width: 52%;
+  height: 14%;
+  background: radial-gradient(
+    ellipse 100% 100% at 50% 60%,
+    rgba(12, 6, 6, 0.95) 0%,
+    rgba(28, 12, 10, 0.75) 55%,
+    transparent 100%
+  );
+  box-shadow:
+    0 8px 28px rgba(255, 120, 50, 0.22),
+    inset 0 -6px 18px rgba(255, 90, 40, 0.35);
+}
+
+.home-sky-sunset-cloud--mid {
+  left: -8%;
+  top: 28%;
+  width: 68%;
+  height: 10%;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(10, 5, 5, 0.88) 18%,
+    rgba(18, 8, 8, 0.92) 50%,
+    rgba(10, 5, 5, 0.85) 82%,
+    transparent 100%
+  );
+  box-shadow: 0 0 24px rgba(255, 100, 45, 0.28);
+  opacity: 0.9;
+}
+
+.home-sky-sunset-cloud--streak {
+  right: -5%;
+  top: 22%;
+  width: 55%;
+  height: 6%;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 110, 45, 0.15) 30%,
+    rgba(12, 6, 6, 0.82) 55%,
+    rgba(255, 85, 35, 0.2) 78%,
+    transparent 100%
+  );
+  filter: blur(3px);
+}
+
+.home-sky-sunset-horizon-glow {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 52vh;
+  background: radial-gradient(
+    ellipse 95% 72% at var(--sky-sun-left, 50%) 100%,
+    rgba(255, 220, 160, 0.55) 0%,
+    rgba(255, 120, 45, 0.42) 18%,
+    rgba(220, 55, 25, 0.35) 38%,
+    rgba(120, 25, 12, 0.18) 58%,
+    transparent 78%
+  );
+  pointer-events: none;
+  animation: home-sky-sunset-glow-breathe 6s ease-in-out infinite;
+}
+
+.home-sky-sunset-foreground {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 22vh;
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    rgba(6, 3, 3, 0.55) 28%,
+    rgba(4, 2, 2, 0.92) 58%,
+    #000000 100%
+  );
+  pointer-events: none;
+}
+
+.home-sky-sun-scene--sunset {
+  translate: -50% calc(-50% + var(--sky-sun-sink, 0) * 14%);
+  z-index: 1;
+}
+
+@media (min-width: 768px) {
+  .home-sky-sun-scene--sunset {
+    --ht-sky-sun-scale: 1.65;
+  }
+}
+
+@media (min-width: 1024px) {
+  .home-sky-sun-scene--sunset {
+    --ht-sky-sun-scale: 2.1;
+  }
+}
+
+.home-sky-sun-scene--sunset .home-sky-sun-sunset-bloom {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 520%;
+  height: 220%;
+  translate: -50% -48%;
+  border-radius: 50%;
+  background: radial-gradient(
+    ellipse 88% 52% at 50% 58%,
+    rgba(255, 245, 210, 0.75) 0%,
+    rgba(255, 160, 60, 0.5) 22%,
+    rgba(230, 70, 25, 0.32) 42%,
+    rgba(180, 40, 15, 0.12) 58%,
+    transparent 72%
+  );
+  filter: blur(3px);
+  pointer-events: none;
+}
+
+.home-sky-sun-scene--sunset .home-sky-sun-sunset-rays {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 680%;
+  height: 180%;
+  translate: -50% -42%;
+  pointer-events: none;
+  background:
+    linear-gradient(
+      90deg,
+      transparent 0%,
+      rgba(255, 130, 50, 0.08) 20%,
+      rgba(255, 180, 90, 0.22) 50%,
+      rgba(255, 130, 50, 0.08) 80%,
+      transparent 100%
+    ),
+    linear-gradient(
+      180deg,
+      transparent 35%,
+      rgba(255, 200, 120, 0.18) 52%,
+      rgba(255, 90, 40, 0.12) 68%,
+      transparent 85%
+    );
+  filter: blur(12px);
+  opacity: 0.88;
+}
+
+.home-sky-sun-scene--sunset .home-sky-sun-wrap {
+  clip-path: inset(0 0 calc(var(--sky-sun-sink, 0) * 50%) 0 round 50%);
+  animation: home-sky-sunset-pulse 5s ease-in-out infinite;
+}
+
+.home-sky-sun-scene--sunset .home-sky-sun-core {
+  inset: 16%;
+  background: radial-gradient(
+    circle at 50% 46%,
+    #ffffff 0%,
+    #fff4c2 14%,
+    #ffd54a 32%,
+    #ff8c32 58%,
+    #e65100 82%,
+    #bf360c 100%
+  );
+  box-shadow:
+    0 0 16px rgba(255, 255, 255, 0.95),
+    0 0 40px rgba(255, 200, 80, 0.95),
+    0 0 80px rgba(255, 110, 40, 0.75),
+    0 0 140px rgba(230, 60, 20, 0.45),
+    0 0 220px rgba(180, 40, 10, 0.22);
+}
+
+.home-sky-sun-scene--sunset .home-sky-sun-glow {
+  inset: -62%;
+  background: radial-gradient(
+    ellipse 115% 85% at 50% 52%,
+    rgba(255, 230, 180, 0.72) 0%,
+    rgba(255, 130, 45, 0.45) 30%,
+    rgba(220, 55, 20, 0.22) 52%,
+    transparent 72%
+  );
+  animation: home-sky-glow-breathe 5s ease-in-out infinite;
+}
+
+.home-sky-sun-scene--sunset .home-sky-sun-sunset-haze {
+  position: absolute;
+  inset: -160% -120%;
+  border-radius: 50%;
+  background: radial-gradient(
+    ellipse 100% 70% at 50% 58%,
+    rgba(255, 120, 45, 0.28) 0%,
+    rgba(200, 50, 20, 0.1) 48%,
+    transparent 70%
+  );
+  filter: blur(20px);
+  mix-blend-mode: screen;
+  pointer-events: none;
+}
+
+@keyframes home-sky-sunset-glow-breathe {
+  0%,
+  100% {
+    opacity: 0.88;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.home-sky-moon-scene {
+  position: absolute;
+  left: var(--sky-moon-left, 11%);
+  top: var(--sky-moon-top, 84%);
+  width: var(--ht-sky-moon-size, clamp(13rem, 34vw, 22rem));
+  height: var(--ht-sky-moon-size, clamp(13rem, 34vw, 22rem));
+  pointer-events: none;
+  translate: -50% -50%;
+  will-change: left, top;
+}
+
+.home-sky-moon-outer-glow {
+  position: absolute;
+  inset: -45%;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    rgba(191, 219, 254, 0.42) 0%,
+    rgba(147, 197, 253, 0.18) 38%,
+    transparent 68%
+  );
+  animation: home-sky-glow-breathe 8s ease-in-out infinite;
+}
+
+.home-sky-moon-inner-glow {
+  position: absolute;
+  inset: -18%;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    rgba(248, 250, 252, 0.35) 0%,
+    rgba(191, 219, 254, 0.12) 55%,
+    transparent 72%
+  );
+  animation: home-sky-glow-breathe 6s ease-in-out infinite reverse;
+}
+
+.home-sky-moon-frame {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 50%, #1a2744 0%, #0a1020 100%);
+  box-shadow: inset 0 0 0 1px rgba(191, 219, 254, 0.08);
+}
+
+.home-sky-moon-photo {
+  filter: drop-shadow(0 0 28px rgba(226, 232, 240, 0.65))
+    drop-shadow(0 0 64px rgba(147, 197, 253, 0.35));
+}
+
+.home-sky-moon-photo--full {
+  object-fit: cover;
+  object-position: center center;
+  transform: scale(2.75);
+  transform-origin: center center;
+}
+
+.home-sky-moon-photo--crescent {
+  object-fit: cover;
+  object-position: 7% 93%;
+  scale: 3.4;
+  transform-origin: 7% 93%;
+}
+
+.home-sky-moon-mist {
+  position: absolute;
+  inset: -8%;
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 60%, transparent 42%, rgba(15, 23, 42, 0.18) 100%);
+  mix-blend-mode: multiply;
+  opacity: 0.55;
+}
+
+.home-sky-moon-scene--crescent {
+  width: var(--ht-sky-moon-size, clamp(9rem, 22vw, 14rem));
+  height: var(--ht-sky-moon-size, clamp(9rem, 22vw, 14rem));
+}
+
+.home-sky-stars {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at 12% 18%, rgba(255, 255, 255, 0.9) 0 1px, transparent 1.5px),
+    radial-gradient(circle at 28% 32%, rgba(255, 255, 255, 0.75) 0 1px, transparent 1.5px),
+    radial-gradient(circle at 44% 14%, rgba(255, 255, 255, 0.85) 0 1px, transparent 1.5px),
+    radial-gradient(circle at 58% 26%, rgba(255, 255, 255, 0.7) 0 1px, transparent 1.5px),
+    radial-gradient(circle at 72% 12%, rgba(255, 255, 255, 0.9) 0 1px, transparent 1.5px),
+    radial-gradient(circle at 86% 22%, rgba(255, 255, 255, 0.8) 0 1px, transparent 1.5px),
+    radial-gradient(circle at 18% 48%, rgba(255, 255, 255, 0.65) 0 1px, transparent 1.5px),
+    radial-gradient(circle at 36% 56%, rgba(255, 255, 255, 0.55) 0 1px, transparent 1.5px),
+    radial-gradient(circle at 64% 44%, rgba(255, 255, 255, 0.7) 0 1px, transparent 1.5px),
+    radial-gradient(circle at 78% 52%, rgba(255, 255, 255, 0.6) 0 1px, transparent 1.5px),
+    radial-gradient(circle at 92% 38%, rgba(255, 255, 255, 0.75) 0 1px, transparent 1.5px);
+  opacity: var(--ht-sky-stars-opacity, 0.75);
+  animation: home-sky-stars-twinkle 8s ease-in-out infinite;
+}
+
+@keyframes home-sky-float {
+  0%,
+  100% {
+    translate: 0 0;
+  }
+  33% {
+    translate: -10px 8px;
+  }
+  66% {
+    translate: 8px -6px;
+  }
+}
+
+@keyframes home-sky-sun-pulse {
+  0%,
+  100% {
+    scale: 1;
+  }
+  50% {
+    scale: 1.04;
+  }
+}
+
+@keyframes home-sky-moon-drift {
+  0%,
+  100% {
+    rotate: -2deg;
+  }
+  50% {
+    rotate: 3deg;
+  }
+}
+
+@keyframes home-sky-glow-breathe {
+  0%,
+  100% {
+    opacity: 0.75;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes home-sky-rays-spin {
+  from {
+    rotate: 0deg;
+  }
+  to {
+    rotate: 360deg;
+  }
+}
+
+@keyframes home-sky-stars-twinkle {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 0.95;
+  }
+}
+
+.home-time-theme::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  opacity: var(--ht-decor-opacity);
+  background: var(--ht-decor-bg);
+  transition: opacity 0.5s ease;
+}
+
+.home-time-theme::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+  opacity: var(--ht-sun-rays-opacity, 0);
+  background: var(--ht-sun-rays, none);
+  transition: opacity 0.5s ease;
+}
+
+.home-time-theme > *:not(.home-sky-backdrop) {
+  position: relative;
+  z-index: 3;
+}
+
+.home-time-theme .home-time-header {
+  background: var(--ht-header-bg);
+  border-color: var(--ht-header-border);
+  color: var(--ht-header-text);
+  transition: var(--ht-transition);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.home-time-theme .home-time-footer {
+  background: var(--ht-footer-bg);
+  color: var(--ht-footer-text);
+  transition: var(--ht-transition);
+  backdrop-filter: blur(var(--ht-glass-blur));
+  -webkit-backdrop-filter: blur(var(--ht-glass-blur));
+}
+
+.home-time-theme .marketing-section {
+  background: var(--ht-section-bg) !important;
+  color: var(--ht-section-text) !important;
+  transition: var(--ht-transition);
+  backdrop-filter: blur(var(--ht-glass-blur));
+  -webkit-backdrop-filter: blur(var(--ht-glass-blur));
+}
+
+.home-time-theme .home-time-hero {
+  background: var(--ht-hero-bg);
+  transition: var(--ht-transition);
+  backdrop-filter: blur(calc(var(--ht-glass-blur) * 0.5));
+  -webkit-backdrop-filter: blur(calc(var(--ht-glass-blur) * 0.5));
+}
+
+.home-time-theme .home-time-hero-title {
+  color: var(--ht-hero-title);
+}
+
+.home-time-theme .home-time-hero-subtitle {
+  color: var(--ht-hero-subtitle);
+}
+
+.home-time-theme .home-time-hero-badge {
+  border-color: var(--ht-hero-badge-border);
+  background: var(--ht-hero-badge-bg);
+  color: var(--ht-hero-badge-text);
+}
+
+.home-time-theme .home-time-trust-badge {
+  border-color: var(--ht-trust-badge-border);
+  background: var(--ht-trust-badge-bg);
+  color: var(--ht-trust-badge-text);
+}
+
+.home-time-theme .home-time-btn-primary {
+  background: var(--ht-btn-primary-bg);
+  color: var(--ht-btn-primary-text);
+  box-shadow: var(--ht-btn-primary-shadow);
+}
+
+.home-time-theme .home-time-btn-secondary {
+  border-color: var(--ht-btn-secondary-border);
+  color: var(--ht-btn-secondary-text);
+  background: var(--ht-btn-secondary-bg);
+}
+
+.home-time-theme .home-time-nav-link {
+  color: var(--ht-nav-muted);
+}
+
+.home-time-theme .home-time-nav-link:hover {
+  color: var(--ht-header-text);
+}
+
+.home-time-theme .home-time-brand-mark {
+  background: var(--ht-brand-mark-bg);
+  color: var(--ht-brand-mark-text);
+  box-shadow: var(--ht-brand-mark-shadow);
+}
+
+.home-time-theme .home-time-progress {
+  background: var(--ht-progress-bg);
+}
+
+.home-time-theme .marketing-section h2,
+.home-time-theme .marketing-section h3 {
+  color: var(--ht-section-heading) !important;
+}
+
+.home-time-theme .marketing-section p,
+.home-time-theme .marketing-section li {
+  color: var(--ht-section-muted);
+}
+
+.home-time-theme .marketing-section .text-blue-600 {
+  color: var(--ht-accent) !important;
+}
+
+.home-time-theme .ht-section-eyebrow {
+  color: var(--ht-accent) !important;
+}
+
+.home-time-theme .ht-section-title {
+  color: var(--ht-section-heading) !important;
+}
+
+.home-time-theme .ht-section-desc {
+  color: var(--ht-section-muted) !important;
+}
+
+/* Dark inset panels (lead capture, case studies, engagement) */
+.home-time-theme .ht-spotlight-panel,
+.home-time-theme .ht-spotlight-strip,
+.home-time-theme .ht-spotlight-card {
+  background: var(--ht-spotlight-bg);
+  border-color: var(--ht-spotlight-border);
+  color: var(--ht-spotlight-text);
+  backdrop-filter: blur(var(--ht-glass-blur));
+  -webkit-backdrop-filter: blur(var(--ht-glass-blur));
+  transition: var(--ht-transition);
+}
+
+/* Beat .marketing-section h2/h3 — spotlight cards use inverted palette on light themes */
+.home-time-theme .marketing-section .ht-spotlight-panel h2,
+.home-time-theme .marketing-section .ht-spotlight-card h3,
+.home-time-theme .marketing-section .ht-spotlight-item h3,
+.home-time-theme .ht-spotlight-panel .ht-spotlight-title,
+.home-time-theme .ht-spotlight-card .ht-spotlight-title,
+.home-time-theme .ht-spotlight-strip .ht-spotlight-title,
+.home-time-theme .ht-spotlight-item .ht-spotlight-title {
+  color: var(--ht-spotlight-text) !important;
+}
+
+.home-time-theme .ht-spotlight-eyebrow {
+  color: var(--ht-spotlight-accent) !important;
+}
+
+.home-time-theme .ht-spotlight-muted {
+  color: var(--ht-spotlight-muted) !important;
+}
+
+.home-time-theme .ht-spotlight-item {
+  background: var(--ht-spotlight-item-bg);
+  border-color: var(--ht-spotlight-item-border);
+  transition: var(--ht-transition);
+}
+
+.home-time-theme .ht-trust-section {
+  background: var(--ht-spotlight-bg) !important;
+  color: var(--ht-spotlight-text);
+}
+
+.home-time-theme .ht-trust-section .ht-section-title {
+  color: var(--ht-spotlight-text) !important;
+}
+
+.home-time-theme .ht-trust-section .ht-section-desc {
+  color: var(--ht-spotlight-muted) !important;
+}
+
+.home-time-theme .ht-trust-section .ht-section-eyebrow {
+  color: var(--ht-spotlight-accent) !important;
+}
+
+.home-time-theme .ht-solution-title {
+  color: var(--ht-panel-text) !important;
+}
+
+.home-time-theme .ht-quote-name {
+  color: var(--ht-panel-text) !important;
+}
+
+.home-time-theme .ht-pricing-name {
+  color: inherit;
+}
+
+/* Demo shell — isolate from section typography overrides */
+.home-time-theme .marketing-section .ht-demo-shell {
+  color: var(--ht-demo-shell-text);
+}
+
+.home-time-theme .marketing-section .ht-demo-shell .ht-demo-label {
+  color: var(--ht-demo-preview-label) !important;
+}
+
+.home-time-theme .ht-marquee-wrap:hover .marketing-marquee,
+.home-time-theme .ht-marquee-wrap:focus-within .marketing-marquee {
+  animation-play-state: paused;
+}
+
+.home-time-theme .ht-logo-chip {
+  background: var(--ht-logo-bg);
+  color: var(--ht-logo-text);
+  border-color: var(--ht-logo-border);
+  transition: transform 0.25s ease, box-shadow 0.25s ease, background-color 0.5s ease,
+    color 0.5s ease, border-color 0.5s ease;
+}
+
+.home-time-theme .ht-logo-chip:hover {
+  background: var(--ht-logo-bg-hover);
+  border-color: var(--ht-logo-border-hover);
+  color: var(--ht-logo-text-hover);
+  box-shadow: var(--ht-logo-shadow-hover);
+  transform: scale(1.04);
+  z-index: 1;
+}
+
+.home-time-theme .marketing-feature {
+  background: var(--ht-card-bg) !important;
+  border-color: var(--ht-card-border) !important;
+  box-shadow: var(--ht-card-shadow) !important;
+  backdrop-filter: blur(var(--ht-glass-blur));
+  -webkit-backdrop-filter: blur(var(--ht-glass-blur));
+}
+
+.home-time-theme .marketing-section--bridge::before {
+  background: var(--ht-section-bridge) !important;
+}
+
+.home-time-theme .section-divider {
+  background: var(--ht-section-divider) !important;
+}
+
+/* Light slots — readable panels on bright sections */
+.home-time-theme:is(
+  [data-home-theme="sunrise"],
+  [data-home-theme="morning"],
+  [data-home-theme="late-morning"],
+  [data-home-theme="noon"],
+  [data-home-theme="afternoon"]
+) {
+  --ht-panel-bg: rgba(255, 255, 255, 0.58);
+  --ht-panel-muted-bg: rgba(255, 255, 255, 0.42);
+  --ht-panel-border: rgba(255, 255, 255, 0.55);
+  --ht-panel-text: #0f172a;
+  --ht-panel-muted-text: #475569;
+  --ht-input-bg: rgba(255, 255, 255, 0.72);
+  --ht-input-border: rgba(203, 213, 225, 0.85);
+  --ht-input-text: #0f172a;
+  --ht-input-placeholder: #64748b;
+  --ht-step-bg: rgba(255, 255, 255, 0.62);
+  --ht-step-border: rgba(226, 232, 240, 0.9);
+  --ht-step-text: #475569;
+  --ht-step-title: #0f172a;
+  --ht-step-active-bg: rgba(239, 246, 255, 0.82);
+  --ht-step-active-border: #3b82f6;
+  --ht-demo-shell-bg: rgba(15, 23, 42, 0.88);
+  --ht-demo-inner-bg: linear-gradient(135deg, rgba(15, 23, 42, 0.95), rgba(30, 58, 138, 0.88), rgba(15, 23, 42, 0.95));
+  --ht-demo-shell-text: #f8fafc;
+  --ht-demo-preview-label: #67e8f9;
+  --ht-pricing-idle-bg: rgba(255, 255, 255, 0.58);
+  --ht-pricing-idle-text: #0f172a;
+  --ht-pricing-idle-muted: #475569;
+  --ht-pricing-active-bg: rgba(255, 255, 255, 0.94);
+  --ht-pricing-active-text: #0f172a;
+  --ht-pricing-active-muted: #475569;
+  --ht-logo-bg: rgba(255, 255, 255, 0.72);
+  --ht-logo-text: #475569;
+  --ht-logo-border: rgba(148, 163, 184, 0.45);
+  --ht-logo-bg-hover: rgba(255, 255, 255, 0.96);
+  --ht-logo-text-hover: #0f172a;
+  --ht-logo-border-hover: var(--ht-accent);
+  --ht-logo-shadow-hover: 0 16px 32px rgba(15, 23, 42, 0.12);
+  --ht-spotlight-bg: rgba(15, 23, 42, 0.94);
+  --ht-spotlight-text: #f8fafc;
+  --ht-spotlight-muted: #cbd5e1;
+  --ht-spotlight-accent: #67e8f9;
+  --ht-spotlight-border: rgba(148, 163, 184, 0.28);
+  --ht-spotlight-item-bg: rgba(255, 255, 255, 0.08);
+  --ht-spotlight-item-border: rgba(255, 255, 255, 0.14);
+  --ht-team-dept-bg: rgba(239, 246, 255, 0.72);
+  --ht-team-dept-text: #1d4ed8;
+  --ht-btn-solid-bg: #0f172a;
+  --ht-btn-solid-text: #ffffff;
+  --ht-btn-accent-bg: #2563eb;
+  --ht-btn-accent-text: #ffffff;
+  --ht-card-bg: rgba(255, 255, 255, 0.58);
+  --ht-pricing-active-shadow: 0 24px 48px rgba(15, 23, 42, 0.14);
+}
+
+/* Dark slots — translucent panels with high-contrast text */
+.home-time-theme:is(
+  [data-home-theme="sunset"],
+  [data-home-theme="night"],
+  [data-home-theme="late-night"],
+  [data-home-theme="pre-dawn"]
+) {
+  --ht-panel-bg: rgba(255, 255, 255, 0.1);
+  --ht-panel-muted-bg: rgba(255, 255, 255, 0.06);
+  --ht-panel-border: rgba(255, 255, 255, 0.2);
+  --ht-panel-text: #f8fafc;
+  --ht-panel-muted-text: #cbd5e1;
+  --ht-input-bg: rgba(255, 255, 255, 0.08);
+  --ht-input-border: rgba(255, 255, 255, 0.22);
+  --ht-input-text: #f8fafc;
+  --ht-input-placeholder: #94a3b8;
+  --ht-step-bg: rgba(255, 255, 255, 0.06);
+  --ht-step-border: rgba(255, 255, 255, 0.14);
+  --ht-step-text: #cbd5e1;
+  --ht-step-title: #f8fafc;
+  --ht-step-active-bg: rgba(96, 165, 250, 0.18);
+  --ht-step-active-border: rgba(125, 211, 252, 0.55);
+  --ht-demo-shell-bg: rgba(0, 0, 0, 0.35);
+  --ht-demo-inner-bg: linear-gradient(135deg, rgba(15, 23, 42, 0.95), rgba(30, 58, 138, 0.85), rgba(15, 23, 42, 0.95));
+  --ht-demo-shell-text: #f8fafc;
+  --ht-demo-preview-label: #bae6fd;
+  --ht-pricing-idle-bg: rgba(255, 255, 255, 0.1);
+  --ht-pricing-idle-text: #f8fafc;
+  --ht-pricing-idle-muted: #cbd5e1;
+  --ht-pricing-active-bg: rgba(255, 255, 255, 0.2);
+  --ht-pricing-active-text: #ffffff;
+  --ht-pricing-active-muted: #e2e8f0;
+  --ht-logo-bg: rgba(255, 255, 255, 0.08);
+  --ht-logo-text: #e2e8f0;
+  --ht-logo-border: rgba(255, 255, 255, 0.16);
+  --ht-logo-bg-hover: rgba(255, 255, 255, 0.18);
+  --ht-logo-text-hover: #ffffff;
+  --ht-logo-border-hover: var(--ht-accent);
+  --ht-logo-shadow-hover: 0 16px 32px rgba(0, 0, 0, 0.28);
+  --ht-spotlight-bg: rgba(255, 255, 255, 0.1);
+  --ht-spotlight-text: #f8fafc;
+  --ht-spotlight-muted: #cbd5e1;
+  --ht-spotlight-accent: #bae6fd;
+  --ht-spotlight-border: rgba(255, 255, 255, 0.18);
+  --ht-spotlight-item-bg: rgba(255, 255, 255, 0.06);
+  --ht-spotlight-item-border: rgba(255, 255, 255, 0.12);
+  --ht-team-dept-bg: rgba(96, 165, 250, 0.18);
+  --ht-team-dept-text: #bfdbfe;
+  --ht-btn-solid-bg: #f8fafc;
+  --ht-btn-solid-text: #0f172a;
+  --ht-btn-accent-bg: #3b82f6;
+  --ht-btn-accent-text: #ffffff;
+  --ht-card-bg: rgba(255, 255, 255, 0.1);
+  --ht-pricing-active-shadow: 0 24px 48px rgba(0, 0, 0, 0.32);
+}
+
+/* Moonlit nights — darker glass so the moon shows through but text stays crisp */
+.home-time-theme:is(
+  [data-home-theme="night"],
+  [data-home-theme="late-night"],
+  [data-home-theme="pre-dawn"]
+) {
+  --ht-glass-blur: 11px;
+  --ht-panel-bg: rgba(2, 8, 23, 0.48);
+  --ht-panel-muted-bg: rgba(2, 8, 23, 0.36);
+  --ht-panel-border: rgba(148, 163, 184, 0.28);
+  --ht-pricing-idle-bg: rgba(2, 8, 23, 0.46);
+  --ht-pricing-active-bg: rgba(15, 23, 42, 0.72);
+  --ht-step-bg: rgba(2, 8, 23, 0.42);
+  --ht-input-bg: rgba(2, 8, 23, 0.52);
+  --ht-card-bg: rgba(2, 8, 23, 0.45);
+}
+
+/* Night themes — moon visible through glass; text stays readable */
+.home-time-theme:is(
+  [data-home-theme="night"],
+  [data-home-theme="late-night"],
+  [data-home-theme="pre-dawn"]
+) .ht-panel,
+.home-time-theme:is(
+  [data-home-theme="night"],
+  [data-home-theme="late-night"],
+  [data-home-theme="pre-dawn"]
+) .ht-panel-muted,
+.home-time-theme:is(
+  [data-home-theme="night"],
+  [data-home-theme="late-night"],
+  [data-home-theme="pre-dawn"]
+) .marketing-feature,
+.home-time-theme:is(
+  [data-home-theme="night"],
+  [data-home-theme="late-night"],
+  [data-home-theme="pre-dawn"]
+) .ht-social-card,
+.home-time-theme:is(
+  [data-home-theme="night"],
+  [data-home-theme="late-night"],
+  [data-home-theme="pre-dawn"]
+) .ht-stat-card,
+.home-time-theme:is(
+  [data-home-theme="night"],
+  [data-home-theme="late-night"],
+  [data-home-theme="pre-dawn"]
+) .ht-quote-card,
+.home-time-theme:is(
+  [data-home-theme="night"],
+  [data-home-theme="late-night"],
+  [data-home-theme="pre-dawn"]
+) .ht-pricing-card,
+.home-time-theme:is(
+  [data-home-theme="night"],
+  [data-home-theme="late-night"],
+  [data-home-theme="pre-dawn"]
+) .ht-team-card,
+.home-time-theme:is(
+  [data-home-theme="night"],
+  [data-home-theme="late-night"],
+  [data-home-theme="pre-dawn"]
+) .ht-solution-card {
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+.home-time-theme:is(
+  [data-home-theme="night"],
+  [data-home-theme="late-night"],
+  [data-home-theme="pre-dawn"]
+) .marketing-section h2,
+.home-time-theme:is(
+  [data-home-theme="night"],
+  [data-home-theme="late-night"],
+  [data-home-theme="pre-dawn"]
+) .marketing-section h3,
+.home-time-theme:is(
+  [data-home-theme="night"],
+  [data-home-theme="late-night"],
+  [data-home-theme="pre-dawn"]
+) .ht-panel,
+.home-time-theme:is(
+  [data-home-theme="night"],
+  [data-home-theme="late-night"],
+  [data-home-theme="pre-dawn"]
+) .ht-step-title {
+  text-shadow: 0 1px 14px rgba(0, 0, 0, 0.55);
+}
+
+.home-time-theme .ht-panel {
+  background: var(--ht-panel-bg);
+  border-color: var(--ht-panel-border);
+  color: var(--ht-panel-text);
+  transition: var(--ht-transition);
+  backdrop-filter: blur(var(--ht-glass-blur));
+  -webkit-backdrop-filter: blur(var(--ht-glass-blur));
+}
+
+.home-time-theme .ht-panel-muted {
+  background: var(--ht-panel-muted-bg);
+  border-color: var(--ht-panel-border);
+  color: var(--ht-panel-text);
+  backdrop-filter: blur(var(--ht-glass-blur));
+  -webkit-backdrop-filter: blur(var(--ht-glass-blur));
+}
+
+.home-time-theme .ht-panel-muted-text {
+  color: var(--ht-panel-muted-text);
+}
+
+.home-time-theme .ht-input,
+.home-time-theme .ht-textarea,
+.home-time-theme .ht-select {
+  background: var(--ht-input-bg);
+  border-color: var(--ht-input-border);
+  color: var(--ht-input-text);
+  transition: var(--ht-transition);
+}
+
+.home-time-theme .ht-input::placeholder,
+.home-time-theme .ht-textarea::placeholder {
+  color: var(--ht-input-placeholder);
+}
+
+.home-time-theme .ht-step {
+  background: var(--ht-step-bg);
+  border-color: var(--ht-step-border);
+  color: var(--ht-step-text);
+  transition: var(--ht-transition);
+}
+
+.home-time-theme .ht-step-title {
+  color: var(--ht-step-title);
+}
+
+.home-time-theme .ht-step-active {
+  background: var(--ht-step-active-bg);
+  border-color: var(--ht-step-active-border);
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.12);
+}
+
+.home-time-theme .ht-demo-shell {
+  background: var(--ht-demo-shell-bg);
+  color: var(--ht-demo-shell-text);
+}
+
+.home-time-theme .ht-demo-inner {
+  background: var(--ht-demo-inner-bg);
+}
+
+.home-time-theme .ht-demo-label {
+  color: var(--ht-demo-preview-label);
+}
+
+.home-time-theme .ht-social-card,
+.home-time-theme .ht-stat-card,
+.home-time-theme .ht-quote-card,
+.home-time-theme .ht-marquee-wrap {
+  background: var(--ht-panel-bg);
+  border-color: var(--ht-panel-border);
+  color: var(--ht-panel-text);
+  transition: var(--ht-transition);
+  backdrop-filter: blur(var(--ht-glass-blur));
+  -webkit-backdrop-filter: blur(var(--ht-glass-blur));
+}
+
+.home-time-theme .ht-solution-card {
+  background: var(--ht-panel-muted-bg);
+  border-color: var(--ht-panel-border);
+  color: var(--ht-panel-text);
+  transition: var(--ht-transition);
+  backdrop-filter: blur(var(--ht-glass-blur));
+  -webkit-backdrop-filter: blur(var(--ht-glass-blur));
+}
+
+.home-time-theme .ht-team-card {
+  background: var(--ht-panel-bg);
+  border-color: var(--ht-panel-border);
+  color: var(--ht-panel-text);
+  box-shadow: var(--ht-card-shadow);
+  transition: var(--ht-transition);
+  backdrop-filter: blur(var(--ht-glass-blur));
+  -webkit-backdrop-filter: blur(var(--ht-glass-blur));
+}
+
+.home-time-theme .ht-team-card .ht-team-name {
+  color: var(--ht-panel-text);
+}
+
+.home-time-theme .ht-team-card .ht-team-bio {
+  color: var(--ht-panel-muted-text);
+}
+
+.home-time-theme .ht-team-dept {
+  background: var(--ht-team-dept-bg);
+  border-color: var(--ht-panel-border);
+  color: var(--ht-team-dept-text);
+}
+
+.home-time-theme .ht-pricing-card {
+  background: var(--ht-pricing-idle-bg);
+  border-color: var(--ht-panel-border);
+  color: var(--ht-pricing-idle-text);
+  transition: transform 0.25s ease, box-shadow 0.25s ease, background-color 0.5s ease,
+    color 0.5s ease, border-color 0.5s ease;
+  backdrop-filter: blur(var(--ht-glass-blur));
+  -webkit-backdrop-filter: blur(var(--ht-glass-blur));
+}
+
+.home-time-theme .ht-pricing-card .ht-pricing-desc {
+  color: var(--ht-pricing-idle-muted);
+}
+
+.home-time-theme .ht-pricing-card-active {
+  background: var(--ht-pricing-active-bg);
+  border-color: var(--ht-accent);
+  color: var(--ht-pricing-active-text);
+  transform: translateY(-0.35rem) scale(1.02);
+  box-shadow: var(--ht-pricing-active-shadow, 0 24px 48px rgba(15, 23, 42, 0.22));
+  z-index: 1;
+}
+
+.home-time-theme .ht-pricing-card-active .ht-pricing-name {
+  color: var(--ht-pricing-active-text) !important;
+}
+
+.home-time-theme .ht-pricing-card-active .ht-pricing-desc {
+  color: var(--ht-pricing-active-muted);
+}
+
+.home-time-theme .ht-btn-solid {
+  background: var(--ht-btn-solid-bg);
+  color: var(--ht-btn-solid-text);
+}
+
+.home-time-theme .ht-btn-accent {
+  background: var(--ht-btn-accent-bg);
+  color: var(--ht-btn-accent-text);
+}
+
+.home-time-theme .ht-cta-section {
+  background: transparent !important;
+  color: var(--ht-cta-title, var(--ht-section-text));
+  transition: var(--ht-transition);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+/* Moonlit themes — keep hero, CTA shell see-through so moon stays visible */
+.home-time-theme:is(
+  [data-home-theme="night"],
+  [data-home-theme="late-night"],
+  [data-home-theme="pre-dawn"]
+) .home-time-hero {
+  background: transparent !important;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.home-time-theme:is(
+  [data-home-theme="night"],
+  [data-home-theme="late-night"],
+  [data-home-theme="pre-dawn"]
+) .home-time-footer {
+  background: var(--ht-footer-bg) !important;
+}
+
+.home-time-theme:is(
+  [data-home-theme="night"],
+  [data-home-theme="late-night"],
+  [data-home-theme="pre-dawn"]
+) .marketing-section--bridge::before {
+  background: linear-gradient(
+    180deg,
+    rgba(99, 102, 241, 0.12) 0%,
+    rgba(15, 23, 42, 0.18) 45%,
+    transparent 100%
+  ) !important;
+}
+
+.home-time-theme:is(
+  [data-home-theme="night"],
+  [data-home-theme="late-night"],
+  [data-home-theme="pre-dawn"]
+) .section-divider {
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(148, 163, 184, 0.12),
+    transparent
+  ) !important;
+  min-height: 1px;
+}
+
+@media (max-width: 767px) {
+  .home-sky-moon-scene {
+    width: var(--ht-sky-moon-size-mobile, clamp(10rem, 58vw, 14rem)) !important;
+    height: var(--ht-sky-moon-size-mobile, clamp(10rem, 58vw, 14rem)) !important;
+  }
+}
+
+.home-time-theme .ht-cta-banner {
+  background: var(--ht-cta-banner-bg);
+  color: var(--ht-cta-title, #ffffff);
+  box-shadow: var(--ht-cta-banner-shadow, none);
+  border: 1px solid var(--ht-cta-banner-border, rgba(255, 255, 255, 0.22));
+  transition: var(--ht-transition);
+  backdrop-filter: blur(calc(var(--ht-glass-blur) * 1.15));
+  -webkit-backdrop-filter: blur(calc(var(--ht-glass-blur) * 1.15));
+}
+
+.home-time-theme .ht-cta-eyebrow {
+  color: var(--ht-cta-eyebrow);
+}
+
+.home-time-theme .ht-cta-title {
+  color: var(--ht-cta-title);
+}
+
+.home-time-theme .ht-cta-muted {
+  color: var(--ht-cta-muted);
+}
+
+.home-time-theme .ht-cta-btn {
+  background: var(--ht-cta-btn-bg);
+  color: var(--ht-cta-btn-text);
+}
+
+.home-time-theme .home-time-control__badge,
+.home-time-theme .home-time-control__select {
+  border-color: var(--ht-control-border);
+  background: var(--ht-control-bg);
+  color: var(--ht-control-text);
+  transition: var(--ht-transition);
+}
+
+.home-time-theme .home-time-control__icon {
+  animation: home-time-icon-pulse 4s ease-in-out infinite;
+}
+
+@keyframes home-time-icon-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.08);
+  }
+}
+
+/* --- Sunrise (5:00 – 6:59) --- */
+.home-time-theme[data-home-theme="sunrise"] {
+  --ht-page-bg: #fff7ed;
+  --ht-page-text: #431407;
+  --ht-header-bg: rgba(255, 247, 237, 0.88);
+  --ht-header-border: rgba(251, 146, 60, 0.25);
+  --ht-header-text: #7c2d12;
+  --ht-nav-muted: #c2410c;
+  --ht-footer-bg: #ffedd5;
+  --ht-footer-text: #9a3412;
+  --ht-hero-bg: radial-gradient(circle at 18% 12%, rgba(251, 191, 36, 0.55), transparent 34%),
+    radial-gradient(circle at 82% 8%, rgba(249, 115, 22, 0.35), transparent 30%),
+    linear-gradient(180deg, #fff7ed 0%, #fed7aa 58%, #fffbeb 58%, #fffbeb 100%);
+  --ht-hero-title: #7c2d12;
+  --ht-hero-subtitle: #9a3412;
+  --ht-hero-badge-bg: rgba(254, 215, 170, 0.75);
+  --ht-hero-badge-border: rgba(251, 146, 60, 0.45);
+  --ht-hero-badge-text: #9a3412;
+  --ht-trust-badge-bg: rgba(255, 255, 255, 0.72);
+  --ht-trust-badge-border: rgba(251, 146, 60, 0.35);
+  --ht-trust-badge-text: #c2410c;
+  --ht-btn-primary-bg: linear-gradient(90deg, #fdba74, #fb923c, #f97316);
+  --ht-btn-primary-text: #431407;
+  --ht-btn-primary-shadow: 0 16px 36px rgba(249, 115, 22, 0.28);
+  --ht-btn-secondary-bg: rgba(255, 255, 255, 0.45);
+  --ht-btn-secondary-border: rgba(234, 88, 12, 0.35);
+  --ht-btn-secondary-text: #9a3412;
+  --ht-brand-mark-bg: #fff;
+  --ht-brand-mark-text: #ea580c;
+  --ht-brand-mark-shadow: 0 12px 28px rgba(249, 115, 22, 0.22);
+  --ht-progress-bg: linear-gradient(90deg, #fdba74, #fb923c, #f97316);
+  --ht-section-bg: rgba(255, 251, 235, 0.62);
+  --ht-section-text: #431407;
+  --ht-section-heading: #7c2d12;
+  --ht-section-muted: #9a3412;
+  --ht-section-bridge: linear-gradient(180deg, rgba(251, 146, 60, 0.28) 0%, rgba(255, 251, 235, 0.92) 52%, #fffbeb 100%);
+  --ht-section-divider: radial-gradient(circle at 15% 0%, rgba(251, 146, 60, 0.18), transparent 36%),
+    linear-gradient(135deg, rgba(253, 186, 116, 0.22), rgba(249, 115, 22, 0.14));
+  --ht-card-bg: #ffffff;
+  --ht-card-border: #fed7aa;
+  --ht-card-shadow: 0 10px 30px rgba(251, 146, 60, 0.12);
+  --ht-accent: #ea580c;
+  --ht-control-bg: rgba(255, 255, 255, 0.82);
+  --ht-control-border: rgba(251, 146, 60, 0.35);
+  --ht-control-text: #9a3412;
+  --ht-decor-opacity: 0.4;
+  --ht-decor-bg: radial-gradient(circle at 50% 115%, rgba(251, 146, 60, 0.3), transparent 50%);
+  --ht-sun-rays-opacity: 0.22;
+  --ht-sun-rays:
+    radial-gradient(circle at 86% 8%, #fff7cc 0%, #ffd966 2.8%, rgba(255, 180, 60, 0.45) 7%, transparent 17%),
+    linear-gradient(208deg, transparent 58%, rgba(255, 210, 100, 0.2) 59.5%, transparent 61%),
+    linear-gradient(218deg, transparent 58%, rgba(255, 195, 85, 0.26) 59.5%, transparent 61%),
+    linear-gradient(228deg, transparent 58%, rgba(255, 180, 70, 0.32) 59.5%, transparent 61%),
+    linear-gradient(238deg, transparent 58%, rgba(255, 165, 55, 0.28) 59.5%, transparent 61%),
+    linear-gradient(248deg, transparent 58%, rgba(255, 150, 45, 0.22) 59.5%, transparent 61%);
+  --ht-cta-section-bg: transparent;
+  --ht-cta-banner-bg: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.58) 0%,
+    rgba(255, 237, 213, 0.42) 100%
+  );
+  --ht-cta-banner-border: rgba(251, 146, 60, 0.38);
+  --ht-cta-banner-shadow: 0 20px 48px rgba(234, 88, 12, 0.12);
+  --ht-cta-eyebrow: #ea580c;
+  --ht-cta-title: #431407;
+  --ht-cta-muted: #7c2d12;
+  --ht-cta-btn-bg: #fff7ed;
+  --ht-cta-btn-text: #9a3412;
+}
+
+/* --- Morning (7:00 – 9:59) — default fallback --- */
+.home-time-theme[data-home-theme="morning"] {
+  --ht-page-bg: #f0f9ff;
+  --ht-page-text: #0f172a;
+  --ht-header-bg: rgba(240, 249, 255, 0.9);
+  --ht-header-border: rgba(56, 189, 248, 0.22);
+  --ht-header-text: #0c4a6e;
+  --ht-nav-muted: #0369a1;
+  --ht-footer-bg: #e0f2fe;
+  --ht-footer-text: #0c4a6e;
+  --ht-hero-bg: radial-gradient(circle at 20% 10%, rgba(56, 189, 248, 0.38), transparent 32%),
+    radial-gradient(circle at 78% 8%, rgba(250, 204, 21, 0.42), transparent 28%),
+    linear-gradient(180deg, #e0f2fe 0%, #bae6fd 62%, #f8fafc 62%, #f8fafc 100%);
+  --ht-hero-title: #0c4a6e;
+  --ht-hero-subtitle: #075985;
+  --ht-hero-badge-bg: rgba(224, 242, 254, 0.85);
+  --ht-hero-badge-border: rgba(56, 189, 248, 0.45);
+  --ht-hero-badge-text: #0369a1;
+  --ht-trust-badge-bg: rgba(255, 255, 255, 0.78);
+  --ht-trust-badge-border: rgba(56, 189, 248, 0.35);
+  --ht-trust-badge-text: #0369a1;
+  --ht-btn-primary-bg: linear-gradient(90deg, #7dd3fc, #38bdf8, #0ea5e9);
+  --ht-btn-primary-text: #082f49;
+  --ht-btn-primary-shadow: 0 16px 36px rgba(14, 165, 233, 0.25);
+  --ht-btn-secondary-bg: rgba(255, 255, 255, 0.55);
+  --ht-btn-secondary-border: rgba(14, 165, 233, 0.35);
+  --ht-btn-secondary-text: #0c4a6e;
+  --ht-brand-mark-bg: #fff;
+  --ht-brand-mark-text: #0284c7;
+  --ht-brand-mark-shadow: 0 12px 28px rgba(14, 165, 233, 0.2);
+  --ht-progress-bg: linear-gradient(90deg, #7dd3fc, #38bdf8, #2563eb);
+  --ht-section-bg: rgba(248, 250, 252, 0.58);
+  --ht-section-text: #0f172a;
+  --ht-section-heading: #0f172a;
+  --ht-section-muted: #475569;
+  --ht-section-bridge: linear-gradient(180deg, rgba(56, 189, 248, 0.28) 0%, rgba(248, 250, 252, 0.92) 48%, #f8fafc 100%);
+  --ht-section-divider: radial-gradient(circle at 15% 0%, rgba(37, 99, 235, 0.12), transparent 36%),
+    linear-gradient(135deg, rgba(37, 99, 235, 0.08), rgba(124, 58, 237, 0.08));
+  --ht-card-bg: #ffffff;
+  --ht-card-border: #e2e8f0;
+  --ht-card-shadow: 0 10px 30px rgba(37, 99, 235, 0.08);
+  --ht-accent: #2563eb;
+  --ht-control-bg: rgba(255, 255, 255, 0.88);
+  --ht-control-border: rgba(56, 189, 248, 0.35);
+  --ht-control-text: #0c4a6e;
+  --ht-decor-opacity: 0.28;
+  --ht-decor-bg: radial-gradient(circle at 82% 12%, rgba(250, 204, 21, 0.4), transparent 38%);
+  --ht-sun-rays-opacity: 0.18;
+  --ht-sun-rays:
+    radial-gradient(circle at 82% 10%, #fffbeb 0%, #fde68a 3%, rgba(250, 204, 21, 0.35) 8%, transparent 18%),
+    linear-gradient(212deg, transparent 60%, rgba(255, 230, 130, 0.16) 61%, transparent 62%),
+    linear-gradient(222deg, transparent 60%, rgba(255, 220, 110, 0.2) 61%, transparent 62%),
+    linear-gradient(232deg, transparent 60%, rgba(255, 210, 95, 0.18) 61%, transparent 62%);
+  --ht-cta-section-bg: transparent;
+  --ht-cta-banner-bg: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.58) 0%,
+    rgba(224, 242, 254, 0.4) 100%
+  );
+  --ht-cta-banner-border: rgba(56, 189, 248, 0.38);
+  --ht-cta-banner-shadow: 0 20px 48px rgba(37, 99, 235, 0.1);
+  --ht-cta-eyebrow: #0284c7;
+  --ht-cta-title: #0c4a6e;
+  --ht-cta-muted: #0369a1;
+  --ht-cta-btn-bg: #ffffff;
+  --ht-cta-btn-text: #0f172a;
+}
+
+/* --- Late morning (10:00 – 11:59) --- */
+.home-time-theme[data-home-theme="late-morning"] {
+  --ht-page-bg: #fffbeb;
+  --ht-page-text: #1e293b;
+  --ht-header-bg: rgba(255, 251, 235, 0.92);
+  --ht-header-border: rgba(245, 158, 11, 0.22);
+  --ht-header-text: #78350f;
+  --ht-nav-muted: #b45309;
+  --ht-footer-bg: #fef3c7;
+  --ht-footer-text: #92400e;
+  --ht-hero-bg: radial-gradient(circle at 78% 10%, rgba(251, 191, 36, 0.52), transparent 30%),
+    radial-gradient(circle at 22% 14%, rgba(253, 224, 71, 0.35), transparent 28%),
+    linear-gradient(180deg, #fef3c7 0%, #fde68a 58%, #fffbeb 58%, #fffbeb 100%);
+  --ht-hero-title: #78350f;
+  --ht-hero-subtitle: #92400e;
+  --ht-hero-badge-bg: rgba(254, 243, 199, 0.88);
+  --ht-hero-badge-border: rgba(245, 158, 11, 0.4);
+  --ht-hero-badge-text: #b45309;
+  --ht-trust-badge-bg: rgba(255, 255, 255, 0.78);
+  --ht-trust-badge-border: rgba(245, 158, 11, 0.32);
+  --ht-trust-badge-text: #b45309;
+  --ht-btn-primary-bg: linear-gradient(90deg, #fcd34d, #f59e0b, #d97706);
+  --ht-btn-primary-text: #451a03;
+  --ht-btn-primary-shadow: 0 16px 36px rgba(245, 158, 11, 0.24);
+  --ht-btn-secondary-bg: rgba(255, 255, 255, 0.55);
+  --ht-btn-secondary-border: rgba(217, 119, 6, 0.32);
+  --ht-btn-secondary-text: #92400e;
+  --ht-brand-mark-bg: #fff;
+  --ht-brand-mark-text: #d97706;
+  --ht-brand-mark-shadow: 0 12px 28px rgba(245, 158, 11, 0.18);
+  --ht-progress-bg: linear-gradient(90deg, #fcd34d, #f59e0b, #ea580c);
+  --ht-section-bg: rgba(255, 251, 235, 0.62);
+  --ht-section-text: #1e293b;
+  --ht-section-heading: #78350f;
+  --ht-section-muted: #57534e;
+  --ht-section-bridge: linear-gradient(180deg, rgba(245, 158, 11, 0.22) 0%, rgba(255, 251, 235, 0.94) 48%, #fffbeb 100%);
+  --ht-section-divider: radial-gradient(circle at 15% 0%, rgba(245, 158, 11, 0.14), transparent 36%),
+    linear-gradient(135deg, rgba(245, 158, 11, 0.12), rgba(251, 191, 36, 0.1));
+  --ht-card-bg: #ffffff;
+  --ht-card-border: #fde68a;
+  --ht-card-shadow: 0 10px 30px rgba(245, 158, 11, 0.1);
+  --ht-accent: #d97706;
+  --ht-control-bg: rgba(255, 255, 255, 0.88);
+  --ht-control-border: rgba(245, 158, 11, 0.32);
+  --ht-control-text: #92400e;
+  --ht-decor-opacity: 0.32;
+  --ht-decor-bg: radial-gradient(circle at 70% 15%, rgba(253, 224, 71, 0.28), transparent 40%);
+  --ht-sun-rays-opacity: 0.2;
+  --ht-sun-rays:
+    radial-gradient(circle at 84% 9%, #fffef0 0%, #fde047 2.5%, rgba(251, 191, 36, 0.5) 7%, transparent 16%),
+    linear-gradient(205deg, transparent 55%, rgba(255, 225, 120, 0.22) 56.5%, transparent 58%),
+    linear-gradient(215deg, transparent 55%, rgba(255, 215, 100, 0.28) 56.5%, transparent 58%),
+    linear-gradient(225deg, transparent 55%, rgba(255, 205, 85, 0.34) 56.5%, transparent 58%),
+    linear-gradient(235deg, transparent 55%, rgba(255, 195, 70, 0.28) 56.5%, transparent 58%),
+    linear-gradient(245deg, transparent 55%, rgba(255, 185, 55, 0.22) 56.5%, transparent 58%);
+  --ht-cta-section-bg: transparent;
+  --ht-cta-banner-bg: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.56) 0%,
+    rgba(254, 243, 199, 0.38) 100%
+  );
+  --ht-cta-banner-border: rgba(217, 119, 6, 0.32);
+  --ht-cta-banner-shadow: 0 20px 48px rgba(217, 119, 6, 0.1);
+  --ht-cta-eyebrow: #b45309;
+  --ht-cta-title: #78350f;
+  --ht-cta-muted: #92400e;
+  --ht-cta-btn-bg: #ffffff;
+  --ht-cta-btn-text: #78350f;
+}
+
+/* --- Noon (12:00 – 2:59) --- */
+.home-time-theme[data-home-theme="noon"] {
+  --ht-page-bg: #ffffff;
+  --ht-page-text: #0f172a;
+  --ht-header-bg: rgba(255, 255, 255, 0.94);
+  --ht-header-border: rgba(148, 163, 184, 0.35);
+  --ht-header-text: #0f172a;
+  --ht-nav-muted: #334155;
+  --ht-footer-bg: #f1f5f9;
+  --ht-footer-text: #334155;
+  --ht-hero-bg: radial-gradient(circle at 50% 0%, rgba(255, 255, 255, 0.95), transparent 38%),
+    radial-gradient(circle at 20% 20%, rgba(59, 130, 246, 0.18), transparent 30%),
+    linear-gradient(180deg, #ffffff 0%, #e2e8f0 62%, #f8fafc 62%, #f8fafc 100%);
+  --ht-hero-title: #0f172a;
+  --ht-hero-subtitle: #334155;
+  --ht-hero-badge-bg: rgba(241, 245, 249, 0.95);
+  --ht-hero-badge-border: rgba(100, 116, 139, 0.35);
+  --ht-hero-badge-text: #1e293b;
+  --ht-trust-badge-bg: #ffffff;
+  --ht-trust-badge-border: rgba(100, 116, 139, 0.28);
+  --ht-trust-badge-text: #334155;
+  --ht-btn-primary-bg: linear-gradient(90deg, #2563eb, #1d4ed8, #1e40af);
+  --ht-btn-primary-text: #ffffff;
+  --ht-btn-primary-shadow: 0 16px 36px rgba(37, 99, 235, 0.28);
+  --ht-btn-secondary-bg: #ffffff;
+  --ht-btn-secondary-border: rgba(15, 23, 42, 0.18);
+  --ht-btn-secondary-text: #0f172a;
+  --ht-brand-mark-bg: #0f172a;
+  --ht-brand-mark-text: #ffffff;
+  --ht-brand-mark-shadow: 0 12px 28px rgba(15, 23, 42, 0.18);
+  --ht-progress-bg: linear-gradient(90deg, #2563eb, #1d4ed8, #0f172a);
+  --ht-section-bg: rgba(248, 250, 252, 0.58);
+  --ht-section-text: #0f172a;
+  --ht-section-heading: #0f172a;
+  --ht-section-muted: #475569;
+  --ht-section-bridge: linear-gradient(180deg, rgba(148, 163, 184, 0.22) 0%, rgba(248, 250, 252, 0.96) 48%, #f8fafc 100%);
+  --ht-section-divider: radial-gradient(circle at 15% 0%, rgba(15, 23, 42, 0.08), transparent 36%),
+    linear-gradient(135deg, rgba(15, 23, 42, 0.06), rgba(37, 99, 235, 0.08));
+  --ht-card-bg: #ffffff;
+  --ht-card-border: #cbd5e1;
+  --ht-card-shadow: 0 14px 34px rgba(15, 23, 42, 0.1);
+  --ht-accent: #1d4ed8;
+  --ht-control-bg: rgba(255, 255, 255, 0.94);
+  --ht-control-border: rgba(148, 163, 184, 0.35);
+  --ht-control-text: #0f172a;
+  --ht-decor-opacity: 0.18;
+  --ht-decor-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.65), transparent 40%);
+  --ht-sun-rays-opacity: 0.15;
+  --ht-sun-rays:
+    radial-gradient(circle at 50% 4%, #ffffff 0%, #fef9c3 3%, rgba(253, 224, 71, 0.35) 10%, transparent 22%),
+    linear-gradient(180deg, rgba(254, 240, 138, 0.12) 0%, transparent 28%);
+  --ht-cta-section-bg: transparent;
+  --ht-cta-banner-bg: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.62) 0%,
+    rgba(241, 245, 249, 0.44) 100%
+  );
+  --ht-cta-banner-border: rgba(148, 163, 184, 0.4);
+  --ht-cta-banner-shadow: 0 20px 48px rgba(15, 23, 42, 0.08);
+  --ht-cta-eyebrow: #1d4ed8;
+  --ht-cta-title: #0f172a;
+  --ht-cta-muted: #475569;
+  --ht-cta-btn-bg: #ffffff;
+  --ht-cta-btn-text: #0f172a;
+}
+
+/* --- Afternoon (3:00 – 5:59) --- */
+.home-time-theme[data-home-theme="afternoon"] {
+  --ht-page-bg: #fff7ed;
+  --ht-page-text: #292524;
+  --ht-header-bg: rgba(255, 247, 237, 0.9);
+  --ht-header-border: rgba(251, 191, 36, 0.22);
+  --ht-header-text: #44403c;
+  --ht-nav-muted: #78716c;
+  --ht-footer-bg: #ffedd5;
+  --ht-footer-text: #57534e;
+  --ht-hero-bg: radial-gradient(circle at 76% 11%, rgba(251, 191, 36, 0.5), transparent 32%),
+    radial-gradient(circle at 24% 14%, rgba(253, 186, 116, 0.42), transparent 30%),
+    linear-gradient(180deg, #ffedd5 0%, #fed7aa 58%, #fafaf9 58%, #fafaf9 100%);
+  --ht-hero-title: #44403c;
+  --ht-hero-subtitle: #57534e;
+  --ht-hero-badge-bg: rgba(255, 237, 213, 0.88);
+  --ht-hero-badge-border: rgba(251, 191, 36, 0.35);
+  --ht-hero-badge-text: #78716c;
+  --ht-trust-badge-bg: rgba(255, 255, 255, 0.78);
+  --ht-trust-badge-border: rgba(251, 191, 36, 0.28);
+  --ht-trust-badge-text: #78716c;
+  --ht-btn-primary-bg: linear-gradient(90deg, #fdba74, #fbbf24, #f59e0b);
+  --ht-btn-primary-text: #292524;
+  --ht-btn-primary-shadow: 0 16px 36px rgba(245, 158, 11, 0.2);
+  --ht-btn-secondary-bg: rgba(255, 255, 255, 0.55);
+  --ht-btn-secondary-border: rgba(120, 113, 108, 0.28);
+  --ht-btn-secondary-text: #44403c;
+  --ht-brand-mark-bg: #fff;
+  --ht-brand-mark-text: #d97706;
+  --ht-brand-mark-shadow: 0 12px 28px rgba(245, 158, 11, 0.16);
+  --ht-progress-bg: linear-gradient(90deg, #fdba74, #fbbf24, #78716c);
+  --ht-section-bg: rgba(250, 250, 249, 0.62);
+  --ht-section-text: #292524;
+  --ht-section-heading: #44403c;
+  --ht-section-muted: #57534e;
+  --ht-section-bridge: linear-gradient(180deg, rgba(253, 186, 116, 0.2) 0%, rgba(250, 250, 249, 0.94) 48%, #fafaf9 100%);
+  --ht-section-divider: radial-gradient(circle at 15% 0%, rgba(251, 191, 36, 0.12), transparent 36%),
+    linear-gradient(135deg, rgba(251, 191, 36, 0.08), rgba(120, 113, 108, 0.08));
+  --ht-card-bg: #ffffff;
+  --ht-card-border: #fed7aa;
+  --ht-card-shadow: 0 10px 30px rgba(120, 113, 108, 0.08);
+  --ht-accent: #b45309;
+  --ht-control-bg: rgba(255, 255, 255, 0.88);
+  --ht-control-border: rgba(251, 191, 36, 0.28);
+  --ht-control-text: #57534e;
+  --ht-decor-opacity: 0.28;
+  --ht-decor-bg: radial-gradient(circle at 78% 18%, rgba(251, 191, 36, 0.32), transparent 42%);
+  --ht-sun-rays-opacity: 0.18;
+  --ht-sun-rays:
+    radial-gradient(circle at 80% 11%, #fffbeb 0%, #fde68a 3%, rgba(251, 191, 36, 0.45) 8%, transparent 18%),
+    linear-gradient(210deg, transparent 56%, rgba(255, 215, 100, 0.2) 57.5%, transparent 59%),
+    linear-gradient(220deg, transparent 56%, rgba(255, 200, 85, 0.26) 57.5%, transparent 59%),
+    linear-gradient(230deg, transparent 56%, rgba(255, 185, 70, 0.3) 57.5%, transparent 59%),
+    linear-gradient(240deg, transparent 56%, rgba(255, 170, 55, 0.24) 57.5%, transparent 59%);
+  --ht-cta-section-bg: transparent;
+  --ht-cta-banner-bg: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.54) 0%,
+    rgba(255, 237, 213, 0.36) 100%
+  );
+  --ht-cta-banner-border: rgba(234, 88, 12, 0.32);
+  --ht-cta-banner-shadow: 0 20px 48px rgba(194, 65, 12, 0.1);
+  --ht-cta-eyebrow: #c2410c;
+  --ht-cta-title: #431407;
+  --ht-cta-muted: #7c2d12;
+  --ht-cta-btn-bg: #ffffff;
+  --ht-cta-btn-text: #431407;
+}
+
+/* --- Sunset / evening (6:00 – 8:59) --- */
+.home-time-theme[data-home-theme="sunset"] {
+  --ht-page-bg: #1a0c12;
+  --ht-page-text: #fde68a;
+  --ht-header-bg: rgba(26, 12, 18, 0.9);
+  --ht-header-border: rgba(251, 146, 60, 0.28);
+  --ht-header-text: #fff7ed;
+  --ht-nav-muted: #fdba74;
+  --ht-footer-bg: #120810;
+  --ht-footer-text: #fcd34d;
+  --ht-hero-bg: radial-gradient(circle at 50% 88%, rgba(249, 115, 22, 0.65) 0%, rgba(234, 88, 12, 0.35) 18%, transparent 42%),
+    radial-gradient(circle at 72% 18%, rgba(244, 63, 94, 0.28), transparent 32%),
+    linear-gradient(180deg, #2a1020 0%, #5c1a1a 52%, #1a0c12 52%, #1a0c12 100%);
+  --ht-hero-title: #fff7ed;
+  --ht-hero-subtitle: #fde68a;
+  --ht-hero-badge-bg: rgba(88, 28, 28, 0.55);
+  --ht-hero-badge-border: rgba(251, 146, 60, 0.4);
+  --ht-hero-badge-text: #ffedd5;
+  --ht-trust-badge-bg: rgba(26, 12, 18, 0.72);
+  --ht-trust-badge-border: rgba(251, 146, 60, 0.35);
+  --ht-trust-badge-text: #fde68a;
+  --ht-btn-primary-bg: linear-gradient(90deg, #fb923c, #f97316, #ea580c);
+  --ht-btn-primary-text: #1a0c12;
+  --ht-btn-primary-shadow: 0 16px 36px rgba(249, 115, 22, 0.32);
+  --ht-btn-secondary-bg: rgba(255, 255, 255, 0.08);
+  --ht-btn-secondary-border: rgba(253, 186, 116, 0.35);
+  --ht-btn-secondary-text: #ffedd5;
+  --ht-brand-mark-bg: #fff;
+  --ht-brand-mark-text: #ea580c;
+  --ht-brand-mark-shadow: 0 12px 28px rgba(249, 115, 22, 0.28);
+  --ht-progress-bg: linear-gradient(90deg, #fb923c, #f97316, #c2410c);
+  --ht-section-bg: rgba(22, 10, 16, 0.72);
+  --ht-section-text: #fde68a;
+  --ht-section-heading: #fff7ed;
+  --ht-section-muted: #fcd34d;
+  --ht-section-bridge: linear-gradient(180deg, rgba(249, 115, 22, 0.28) 0%, rgba(22, 10, 16, 0.94) 48%, #160a10 100%);
+  --ht-section-divider: radial-gradient(circle at 15% 0%, rgba(249, 115, 22, 0.2), transparent 36%),
+    linear-gradient(135deg, rgba(249, 115, 22, 0.14), rgba(190, 24, 93, 0.1));
+  --ht-card-bg: rgba(255, 255, 255, 0.06);
+  --ht-card-border: rgba(251, 146, 60, 0.22);
+  --ht-card-shadow: 0 14px 34px rgba(0, 0, 0, 0.45);
+  --ht-accent: #fb923c;
+  --ht-control-bg: rgba(26, 12, 18, 0.88);
+  --ht-control-border: rgba(251, 146, 60, 0.28);
+  --ht-control-text: #ffedd5;
+  --ht-decor-opacity: 0.5;
+  --ht-decor-bg: radial-gradient(circle at 50% 105%, rgba(249, 115, 22, 0.45), transparent 48%);
+  --ht-sun-rays-opacity: 0.25;
+  --ht-sun-rays:
+    radial-gradient(circle at 50% 94%, #fff4c2 0%, #fdba74 4%, rgba(249, 115, 22, 0.55) 12%, transparent 28%),
+    linear-gradient(0deg, rgba(251, 146, 60, 0.22) 0%, transparent 38%),
+    linear-gradient(352deg, transparent 68%, rgba(255, 180, 80, 0.18) 69%, transparent 70%),
+    linear-gradient(358deg, transparent 68%, rgba(255, 170, 70, 0.24) 69%, transparent 70%),
+    linear-gradient(4deg, transparent 68%, rgba(255, 160, 60, 0.28) 69%, transparent 70%),
+    linear-gradient(10deg, transparent 68%, rgba(255, 150, 50, 0.24) 69%, transparent 70%),
+    linear-gradient(16deg, transparent 68%, rgba(255, 140, 45, 0.18) 69%, transparent 70%);
+  --ht-cta-section-bg: transparent;
+  --ht-cta-banner-bg: linear-gradient(
+    145deg,
+    rgba(62, 26, 17, 0.42) 0%,
+    rgba(26, 12, 18, 0.36) 100%
+  );
+  --ht-cta-banner-border: rgba(251, 146, 60, 0.28);
+  --ht-cta-banner-shadow: 0 20px 48px rgba(0, 0, 0, 0.28);
+  --ht-cta-eyebrow: #fdba74;
+  --ht-cta-title: #fff7ed;
+  --ht-cta-muted: #fcd34d;
+  --ht-cta-btn-bg: #ffedd5;
+  --ht-cta-btn-text: #7c2d12;
+}
+
+/* --- Night (9:00 – 11:59) --- */
+.home-time-theme[data-home-theme="night"] {
+  --ht-page-bg: #0f172a;
+  --ht-page-text: #e2e8f0;
+  --ht-header-bg: rgba(15, 23, 42, 0.9);
+  --ht-header-border: rgba(99, 102, 241, 0.25);
+  --ht-header-text: #f8fafc;
+  --ht-nav-muted: #94a3b8;
+  --ht-footer-bg: rgba(2, 6, 23, 0.38);
+  --ht-footer-text: #94a3b8;
+  --ht-hero-bg: transparent;
+  --ht-hero-title: #f8fafc;
+  --ht-hero-subtitle: #cbd5e1;
+  --ht-hero-badge-bg: rgba(30, 41, 59, 0.75);
+  --ht-hero-badge-border: rgba(99, 102, 241, 0.35);
+  --ht-hero-badge-text: #c7d2fe;
+  --ht-trust-badge-bg: rgba(15, 23, 42, 0.72);
+  --ht-trust-badge-border: rgba(99, 102, 241, 0.28);
+  --ht-trust-badge-text: #c7d2fe;
+  --ht-btn-primary-bg: linear-gradient(90deg, #818cf8, #6366f1, #4338ca);
+  --ht-btn-primary-text: #ffffff;
+  --ht-btn-primary-shadow: 0 16px 36px rgba(99, 102, 241, 0.28);
+  --ht-btn-secondary-bg: rgba(255, 255, 255, 0.06);
+  --ht-btn-secondary-border: rgba(148, 163, 184, 0.28);
+  --ht-btn-secondary-text: #e2e8f0;
+  --ht-brand-mark-bg: #fff;
+  --ht-brand-mark-text: #4338ca;
+  --ht-brand-mark-shadow: 0 12px 28px rgba(99, 102, 241, 0.22);
+  --ht-progress-bg: linear-gradient(90deg, #818cf8, #6366f1, #312e81);
+  --ht-section-bg: rgba(15, 23, 42, 0.42);
+  --ht-section-text: #e2e8f0;
+  --ht-section-heading: #f8fafc;
+  --ht-section-muted: #94a3b8;
+  --ht-section-bridge: linear-gradient(180deg, rgba(99, 102, 241, 0.15) 0%, rgba(17, 24, 39, 0.22) 48%, transparent 100%);
+  --ht-section-divider: radial-gradient(circle at 15% 0%, rgba(99, 102, 241, 0.14), transparent 36%),
+    linear-gradient(135deg, rgba(99, 102, 241, 0.1), rgba(49, 46, 129, 0.1));
+  --ht-card-bg: rgba(255, 255, 255, 0.05);
+  --ht-card-border: rgba(148, 163, 184, 0.18);
+  --ht-card-shadow: 0 14px 34px rgba(2, 6, 23, 0.45);
+  --ht-accent: #818cf8;
+  --ht-control-bg: rgba(15, 23, 42, 0.88);
+  --ht-control-border: rgba(99, 102, 241, 0.28);
+  --ht-control-text: #e2e8f0;
+  --ht-decor-opacity: 0.25;
+  --ht-decor-bg: radial-gradient(circle at 10% 12%, #fff 1px, transparent 1.5px),
+    radial-gradient(circle at 22% 28%, #fff 1px, transparent 1.5px),
+    radial-gradient(circle at 78% 18%, #fff 1px, transparent 1.5px),
+    radial-gradient(circle at 64% 34%, #fff 1px, transparent 1.5px),
+    radial-gradient(circle at 88% 42%, #fff 1px, transparent 1.5px);
+  --ht-sun-rays-opacity: 0;
+  --ht-sun-rays: none;
+  --ht-cta-section-bg: transparent;
+  --ht-cta-banner-bg: linear-gradient(
+    145deg,
+    rgba(30, 41, 59, 0.38) 0%,
+    rgba(15, 23, 42, 0.32) 100%
+  );
+  --ht-cta-banner-border: rgba(99, 102, 241, 0.18);
+  --ht-cta-banner-shadow: 0 16px 40px rgba(0, 0, 0, 0.5);
+  --ht-cta-eyebrow: #a5b4fc;
+  --ht-cta-title: #f1f5f9;
+  --ht-cta-muted: #94a3b8;
+  --ht-cta-btn-bg: #e2e8f0;
+  --ht-cta-btn-text: #0f172a;
+}
+
+/* --- Late night (12:00 – 2:59 AM) --- */
+.home-time-theme[data-home-theme="late-night"] {
+  --ht-page-bg: #030712;
+  --ht-page-text: #f8fafc;
+  --ht-header-bg: rgba(3, 7, 18, 0.94);
+  --ht-header-border: rgba(51, 65, 85, 0.45);
+  --ht-header-text: #f8fafc;
+  --ht-nav-muted: #94a3b8;
+  --ht-footer-bg: rgba(0, 0, 0, 0.42);
+  --ht-footer-text: #64748b;
+  --ht-hero-bg: transparent;
+  --ht-hero-title: #ffffff;
+  --ht-hero-subtitle: #cbd5e1;
+  --ht-hero-badge-bg: rgba(15, 23, 42, 0.82);
+  --ht-hero-badge-border: rgba(71, 85, 105, 0.45);
+  --ht-hero-badge-text: #e2e8f0;
+  --ht-trust-badge-bg: rgba(3, 7, 18, 0.82);
+  --ht-trust-badge-border: rgba(71, 85, 105, 0.35);
+  --ht-trust-badge-text: #cbd5e1;
+  --ht-btn-primary-bg: linear-gradient(90deg, #e2e8f0, #cbd5e1, #94a3b8);
+  --ht-btn-primary-text: #020617;
+  --ht-btn-primary-shadow: 0 16px 36px rgba(0, 0, 0, 0.45);
+  --ht-btn-secondary-bg: rgba(255, 255, 255, 0.04);
+  --ht-btn-secondary-border: rgba(148, 163, 184, 0.28);
+  --ht-btn-secondary-text: #f8fafc;
+  --ht-brand-mark-bg: #f8fafc;
+  --ht-brand-mark-text: #020617;
+  --ht-brand-mark-shadow: 0 12px 28px rgba(0, 0, 0, 0.35);
+  --ht-progress-bg: linear-gradient(90deg, #64748b, #334155, #0f172a);
+  --ht-section-bg: rgba(3, 7, 18, 0.44);
+  --ht-section-text: #f8fafc;
+  --ht-section-heading: #ffffff;
+  --ht-section-muted: #94a3b8;
+  --ht-section-bridge: linear-gradient(180deg, rgba(15, 23, 42, 0.2) 0%, rgba(11, 17, 32, 0.18) 48%, transparent 100%);
+  --ht-section-divider: radial-gradient(circle at 15% 0%, rgba(148, 163, 184, 0.08), transparent 36%),
+    linear-gradient(135deg, rgba(15, 23, 42, 0.45), rgba(0, 0, 0, 0.35));
+  --ht-card-bg: rgba(255, 255, 255, 0.04);
+  --ht-card-border: rgba(71, 85, 105, 0.35);
+  --ht-card-shadow: 0 14px 34px rgba(0, 0, 0, 0.55);
+  --ht-accent: #e2e8f0;
+  --ht-control-bg: rgba(3, 7, 18, 0.92);
+  --ht-control-border: rgba(71, 85, 105, 0.45);
+  --ht-control-text: #f8fafc;
+  --ht-decor-opacity: 0.35;
+  --ht-decor-bg: radial-gradient(circle at 70% 20%, rgba(148, 163, 184, 0.08), transparent 40%);
+  --ht-sun-rays-opacity: 0;
+  --ht-sun-rays: none;
+  --ht-cta-section-bg: transparent;
+  --ht-cta-banner-bg: linear-gradient(
+    145deg,
+    rgba(15, 23, 42, 0.4) 0%,
+    rgba(3, 7, 18, 0.34) 100%
+  );
+  --ht-cta-banner-border: rgba(71, 85, 105, 0.35);
+  --ht-cta-banner-shadow: 0 16px 40px rgba(0, 0, 0, 0.55);
+  --ht-cta-eyebrow: #94a3b8;
+  --ht-cta-title: #f8fafc;
+  --ht-cta-muted: #64748b;
+  --ht-cta-btn-bg: #e2e8f0;
+  --ht-cta-btn-text: #020617;
+}
+
+/* --- Pre-dawn (3:00 – 4:59 AM) --- */
+.home-time-theme[data-home-theme="pre-dawn"] {
+  --ht-page-bg: #0b1224;
+  --ht-page-text: #dbeafe;
+  --ht-header-bg: rgba(11, 18, 36, 0.92);
+  --ht-header-border: rgba(96, 165, 250, 0.22);
+  --ht-header-text: #eff6ff;
+  --ht-nav-muted: #93c5fd;
+  --ht-footer-bg: rgba(7, 13, 26, 0.4);
+  --ht-footer-text: #93c5fd;
+  --ht-hero-bg: transparent;
+  --ht-hero-title: #eff6ff;
+  --ht-hero-subtitle: #bfdbfe;
+  --ht-hero-badge-bg: rgba(30, 58, 138, 0.45);
+  --ht-hero-badge-border: rgba(96, 165, 250, 0.32);
+  --ht-hero-badge-text: #dbeafe;
+  --ht-trust-badge-bg: rgba(11, 18, 36, 0.72);
+  --ht-trust-badge-border: rgba(96, 165, 250, 0.28);
+  --ht-trust-badge-text: #bfdbfe;
+  --ht-btn-primary-bg: linear-gradient(90deg, #93c5fd, #60a5fa, #3b82f6);
+  --ht-btn-primary-text: #082f49;
+  --ht-btn-primary-shadow: 0 16px 36px rgba(59, 130, 246, 0.22);
+  --ht-btn-secondary-bg: rgba(255, 255, 255, 0.05);
+  --ht-btn-secondary-border: rgba(147, 197, 253, 0.28);
+  --ht-btn-secondary-text: #eff6ff;
+  --ht-brand-mark-bg: #eff6ff;
+  --ht-brand-mark-text: #1d4ed8;
+  --ht-brand-mark-shadow: 0 12px 28px rgba(59, 130, 246, 0.2);
+  --ht-progress-bg: linear-gradient(90deg, #93c5fd, #60a5fa, #1e3a8a);
+  --ht-section-bg: rgba(11, 18, 36, 0.4);
+  --ht-section-text: #dbeafe;
+  --ht-section-heading: #eff6ff;
+  --ht-section-muted: #93c5fd;
+  --ht-section-bridge: linear-gradient(180deg, rgba(59, 130, 246, 0.14) 0%, rgba(17, 24, 39, 0.2) 48%, transparent 100%);
+  --ht-section-divider: radial-gradient(circle at 15% 0%, rgba(96, 165, 250, 0.12), transparent 36%),
+    linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(30, 58, 138, 0.12));
+  --ht-card-bg: rgba(255, 255, 255, 0.05);
+  --ht-card-border: rgba(96, 165, 250, 0.18);
+  --ht-card-shadow: 0 14px 34px rgba(2, 6, 23, 0.45);
+  --ht-accent: #60a5fa;
+  --ht-control-bg: rgba(11, 18, 36, 0.9);
+  --ht-control-border: rgba(96, 165, 250, 0.28);
+  --ht-control-text: #eff6ff;
+  --ht-decor-opacity: 0.65;
+  --ht-decor-bg: radial-gradient(circle at 14% 18%, #fff 1px, transparent 1.5px),
+    radial-gradient(circle at 28% 32%, #fff 1px, transparent 1.5px),
+    radial-gradient(circle at 72% 22%, #fff 1px, transparent 1.5px),
+    radial-gradient(circle at 50% 0%, rgba(191, 219, 254, 0.22), transparent 45%);
+  --ht-sun-rays-opacity: 0.28;
+  --ht-sun-rays:
+    radial-gradient(circle at 88% 12%, rgba(254, 215, 170, 0.55) 0%, rgba(251, 146, 60, 0.25) 8%, transparent 20%);
+  --ht-cta-section-bg: transparent;
+  --ht-cta-banner-bg: linear-gradient(
+    145deg,
+    rgba(17, 24, 39, 0.38) 0%,
+    rgba(11, 18, 36, 0.32) 100%
+  );
+  --ht-cta-banner-border: rgba(96, 165, 250, 0.16);
+  --ht-cta-banner-shadow: 0 16px 40px rgba(0, 0, 0, 0.48);
+  --ht-cta-eyebrow: #93c5fd;
+  --ht-cta-title: #eff6ff;
+  --ht-cta-muted: #94a3b8;
+  --ht-cta-btn-bg: #dbeafe;
+  --ht-cta-btn-text: #1e3a8a;
+}
+
+/* Celestial position + horizon per time slot */
+.home-time-theme[data-home-theme="sunrise"] {
+  --ht-sky-celestial-size: 7.25rem;
+  --ht-sky-horizon-height: 34vh;
+  --ht-sky-horizon: linear-gradient(
+    180deg,
+    transparent 0%,
+    rgba(254, 215, 170, 0.28) 32%,
+    rgba(251, 146, 60, 0.48) 68%,
+    rgba(194, 65, 12, 0.38) 100%
+  );
+}
+
+.home-time-theme[data-home-theme="morning"] {
+  --ht-sky-celestial-size: 7rem;
+  --ht-sky-horizon-height: 30vh;
+  --ht-sky-horizon: linear-gradient(
+    180deg,
+    transparent 0%,
+    rgba(186, 230, 253, 0.22) 38%,
+    rgba(56, 189, 248, 0.32) 72%,
+    rgba(14, 165, 233, 0.28) 100%
+  );
+}
+
+.home-time-theme[data-home-theme="late-morning"] {
+  --ht-sky-celestial-x: 82%;
+  --ht-sky-celestial-y: 7%;
+  --ht-sky-celestial-size: 6.5rem;
+  --ht-sky-horizon-height: 28vh;
+  --ht-sky-horizon: linear-gradient(
+    180deg,
+    transparent 0%,
+    rgba(253, 230, 138, 0.25) 36%,
+    rgba(251, 191, 36, 0.38) 70%,
+    rgba(217, 119, 6, 0.28) 100%
+  );
+}
+
+.home-time-theme[data-home-theme="noon"] {
+  --ht-sky-celestial-x: 50%;
+  --ht-sky-celestial-y: 4%;
+  --ht-sky-celestial-tx: -50%;
+  --ht-sky-celestial-size: 7.5rem;
+  --ht-sky-horizon-height: 26vh;
+  --ht-sky-horizon: linear-gradient(
+    180deg,
+    transparent 0%,
+    rgba(226, 232, 240, 0.18) 42%,
+    rgba(148, 163, 184, 0.28) 78%,
+    rgba(100, 116, 139, 0.22) 100%
+  );
+}
+
+.home-time-theme[data-home-theme="afternoon"] {
+  --ht-sky-celestial-x: 78%;
+  --ht-sky-celestial-y: 11%;
+  --ht-sky-celestial-size: 6rem;
+  --ht-sky-horizon-height: 30vh;
+  --ht-sky-horizon: linear-gradient(
+    180deg,
+    transparent 0%,
+    rgba(254, 215, 170, 0.24) 34%,
+    rgba(251, 191, 36, 0.34) 68%,
+    rgba(180, 83, 9, 0.26) 100%
+  );
+}
+
+.home-time-theme[data-home-theme="sunset"] {
+  --ht-sky-celestial-size: 8.5rem;
+  --ht-sky-horizon-height: 42vh;
+  --ht-sky-horizon-opacity: 1;
+  --ht-sky-horizon: linear-gradient(
+    180deg,
+    transparent 0%,
+    rgba(180, 45, 20, 0.35) 22%,
+    rgba(220, 60, 25, 0.62) 48%,
+    rgba(190, 35, 18, 0.88) 78%,
+    rgba(8, 4, 4, 0.98) 100%
+  );
+}
+
+.home-time-theme[data-home-theme="sunset"] .home-sky-sun-wrap {
+  animation: none;
+}
+
+@keyframes home-sky-sunset-pulse {
+  0%,
+  100% {
+    scale: 1;
+    filter: brightness(1);
+  }
+  50% {
+    scale: 1.06;
+    filter: brightness(1.12);
+  }
+}
+
+.home-time-theme[data-home-theme="night"] {
+  --ht-sky-moon-x: 54%;
+  --ht-sky-moon-y: 10%;
+  --ht-sky-moon-size: clamp(14rem, 38vw, 24rem);
+  --ht-sky-stars-opacity: 0.85;
+  --ht-sky-horizon-height: 28vh;
+  --ht-sky-horizon: linear-gradient(
+    180deg,
+    transparent 0%,
+    rgba(30, 41, 59, 0.55) 45%,
+    rgba(15, 23, 42, 0.75) 100%
+  );
+}
+
+.home-time-theme[data-home-theme="late-night"] {
+  --ht-sky-moon-x: 48%;
+  --ht-sky-moon-y: 12%;
+  --ht-sky-moon-size: clamp(15rem, 40vw, 26rem);
+  --ht-sky-stars-opacity: 0.95;
+  --ht-sky-horizon-height: 24vh;
+  --ht-sky-horizon: linear-gradient(
+    180deg,
+    transparent 0%,
+    rgba(15, 23, 42, 0.65) 50%,
+    rgba(0, 0, 0, 0.85) 100%
+  );
+}
+
+.home-time-theme[data-home-theme="pre-dawn"] {
+  --ht-sky-moon-x: 62%;
+  --ht-sky-moon-y: 14%;
+  --ht-sky-moon-size: clamp(10rem, 24vw, 15rem);
+  --ht-sky-stars-opacity: 0.65;
+  --ht-sky-horizon-height: 32vh;
+  --ht-sky-horizon: linear-gradient(
+    180deg,
+    transparent 0%,
+    rgba(59, 130, 246, 0.12) 30%,
+    rgba(254, 215, 170, 0.18) 62%,
+    rgba(30, 58, 138, 0.35) 100%
+  );
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .home-sky-moon-scene {
+    transition: none;
+  }
+
+  .home-time-theme,
+  .home-time-theme * {
+    transition-duration: 0.01ms !important;
+  }
+
+  .home-time-theme .home-time-control__icon {
+    animation: none !important;
+  }
+
+  .home-sky-sun-scene,
+  .home-sky-sun-atmosphere,
+  .home-sky-sun-god-rays,
+  .home-sky-sun-sunset-bloom,
+  .home-sky-sun-sunset-rays,
+  .home-sky-sunset-horizon-glow,
+  .home-sky-sun-rays,
+  .home-sky-sun-glow,
+  .home-sky-sun-haze,
+  .home-sky-sun-sunset-haze,
+  .home-sky-moon-scene,
+  .home-sky-moon-outer-glow,
+  .home-sky-moon-inner-glow,
+  .home-sky-stars {
+    animation: none !important;
+  }
+}
+
+/* Marketing CTA fallback on pages without time-of-day theme */
+:not(.home-time-theme) .ht-cta-section {
+  background: #f8fafc;
+}
+
+:not(.home-time-theme) .ht-cta-banner {
+  background: linear-gradient(125deg, #0284c7 0%, #2563eb 50%, #4f46e5 100%);
+  color: #ffffff;
+  box-shadow: 0 24px 48px rgba(37, 99, 235, 0.22);
+}
+
+:not(.home-time-theme) .ht-cta-eyebrow {
+  color: #dbeafe;
+}
+
+:not(.home-time-theme) .ht-cta-title {
+  color: #ffffff;
+}
+
+:not(.home-time-theme) .ht-cta-muted {
+  color: #eff6ff;
+}
+
+:not(.home-time-theme) .ht-cta-btn {
+  background: #ffffff;
+  color: #0f172a;
+}

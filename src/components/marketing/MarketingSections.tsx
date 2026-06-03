@@ -33,9 +33,9 @@ export function SectionIntro({
 }) {
   return (
     <div className={align === "center" ? "mx-auto max-w-3xl text-center" : "max-w-3xl"}>
-      <p className="text-sm font-black uppercase tracking-[0.28em] text-blue-600">{eyebrow}</p>
-      <h2 className="mt-4 text-4xl font-black tracking-tight text-slate-950 sm:text-5xl">{title}</h2>
-      <p className="mt-5 text-lg leading-8 text-slate-600">{description}</p>
+      <p className="ht-section-eyebrow text-sm font-black uppercase tracking-[0.28em] text-blue-600">{eyebrow}</p>
+      <h2 className="ht-section-title mt-4 text-4xl font-black tracking-tight text-slate-950 sm:text-5xl">{title}</h2>
+      <p className="ht-section-desc mt-5 text-lg leading-8 text-slate-600">{description}</p>
     </div>
   );
 }
@@ -110,20 +110,40 @@ export function ProductMockup() {
   );
 }
 
-export function HomeHero() {
+export function HomeHero({ timeThemed = false }: { timeThemed?: boolean }) {
   return (
-    <section className="relative isolate">
-      <div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_20%_10%,rgba(37,99,235,0.5),transparent_30%),radial-gradient(circle_at_78%_8%,rgba(124,58,237,0.35),transparent_28%),linear-gradient(180deg,#020617_0%,#0f172a_72%,#f8fafc_72%,#f8fafc_100%)]" />
+    <section className="home-time-hero relative isolate">
+      {!timeThemed && (
+        <div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_20%_10%,rgba(37,99,235,0.5),transparent_30%),radial-gradient(circle_at_78%_8%,rgba(124,58,237,0.35),transparent_28%),linear-gradient(180deg,#020617_0%,#0f172a_72%,#f8fafc_72%,#f8fafc_100%)]" />
+      )}
       <div className="mx-auto grid max-w-7xl items-center gap-12 px-5 pb-20 pt-14 sm:px-8 lg:grid-cols-[0.94fr_1.06fr] lg:pb-28 lg:pt-20">
         <div className="max-w-3xl">
-          <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-cyan-300/30 bg-cyan-300/10 px-4 py-2 text-sm font-semibold text-cyan-100 shadow-2xl shadow-cyan-950/40">
+          <div
+            className={
+              timeThemed
+                ? "home-time-hero-badge mb-6 inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold shadow-2xl"
+                : "mb-6 inline-flex items-center gap-2 rounded-full border border-cyan-300/30 bg-cyan-300/10 px-4 py-2 text-sm font-semibold text-cyan-100 shadow-2xl shadow-cyan-950/40"
+            }
+          >
             <span className="h-2 w-2 rounded-full bg-emerald-300 shadow-[0_0_18px_rgba(110,231,183,0.9)]" />
             Jira alternative with AI delivery support
           </div>
-          <h1 className="text-5xl font-black leading-[0.95] tracking-tight text-white sm:text-6xl lg:text-7xl">
+          <h1
+            className={
+              timeThemed
+                ? "home-time-hero-title text-5xl font-black leading-[0.95] tracking-tight sm:text-6xl lg:text-7xl"
+                : "text-5xl font-black leading-[0.95] tracking-tight text-white sm:text-6xl lg:text-7xl"
+            }
+          >
             Your product delivery command center.
           </h1>
-          <p className="mt-6 max-w-2xl text-lg leading-8 text-slate-300">
+          <p
+            className={
+              timeThemed
+                ? "home-time-hero-subtitle mt-6 max-w-2xl text-lg leading-8"
+                : "mt-6 max-w-2xl text-lg leading-8 text-slate-300"
+            }
+          >
             Join 5,000+ teams using Tasker for sprint planning, AI insights,
             real-time collaboration, and end-to-end full-stack delivery support.
           </p>
@@ -131,23 +151,41 @@ export function HomeHero() {
             <Link
               href="/auth/signup"
               onClick={() => trackMarketingEvent("cta_click", { location: "hero", label: "Start free" })}
-              className="rounded-full bg-gradient-to-r from-cyan-300 via-blue-400 to-purple-400 px-7 py-3 text-center text-sm font-black text-slate-950 shadow-2xl shadow-blue-500/30 transition hover:-translate-y-1"
+              className={
+                timeThemed
+                  ? "home-time-btn-primary rounded-full px-7 py-3 text-center text-sm font-black transition hover:-translate-y-1"
+                  : "rounded-full bg-gradient-to-r from-cyan-300 via-blue-400 to-purple-400 px-7 py-3 text-center text-sm font-black text-slate-950 shadow-2xl shadow-blue-500/30 transition hover:-translate-y-1"
+              }
             >
               Start Free Trial
             </Link>
             <a
               href="#demo"
               onClick={() => trackMarketingEvent("cta_click", { location: "hero", label: "Watch demo" })}
-              className="rounded-full border border-white/15 px-7 py-3 text-center text-sm font-bold text-white transition hover:-translate-y-1 hover:bg-white/10"
+              className={
+                timeThemed
+                  ? "home-time-btn-secondary rounded-full border px-7 py-3 text-center text-sm font-bold transition hover:-translate-y-1"
+                  : "rounded-full border border-white/15 px-7 py-3 text-center text-sm font-bold text-white transition hover:-translate-y-1 hover:bg-white/10"
+              }
             >
               Watch demo
             </a>
           </div>
-          <div className="mt-8 flex flex-wrap gap-3 text-xs font-bold uppercase tracking-[0.18em] text-slate-200">
+          <div
+            className={
+              timeThemed
+                ? "mt-8 flex flex-wrap gap-3 text-xs font-bold uppercase tracking-[0.18em]"
+                : "mt-8 flex flex-wrap gap-3 text-xs font-bold uppercase tracking-[0.18em] text-slate-200"
+            }
+          >
             {["GDPR compliant", "SOC2 Type II", "SSO ready", "99.9% uptime"].map((badge) => (
               <span
                 key={badge}
-                className="rounded-full border border-cyan-200/35 bg-slate-950/70 px-3 py-2 text-cyan-100 shadow-lg shadow-slate-950/30 backdrop-blur"
+                className={
+                  timeThemed
+                    ? "home-time-trust-badge rounded-full border px-3 py-2 shadow-lg backdrop-blur"
+                    : "rounded-full border border-cyan-200/35 bg-slate-950/70 px-3 py-2 text-cyan-100 shadow-lg shadow-slate-950/30 backdrop-blur"
+                }
               >
                 {badge}
               </span>
@@ -233,25 +271,23 @@ export function InteractiveDemo() {
                   setActiveStep(index);
                   trackMarketingEvent("feature_explored", { step: step.title });
                 }}
-                className={`w-full rounded-2xl border p-4 text-left transition ${
-                  activeStep === index
-                    ? "border-blue-500 bg-blue-50 shadow-lg shadow-blue-100"
-                    : "border-slate-200 bg-white hover:border-blue-200"
+                className={`ht-step w-full rounded-2xl border p-4 text-left transition ${
+                  activeStep === index ? "ht-step-active" : ""
                 }`}
               >
-                <p className="text-sm font-black text-slate-950">{index + 1}. {step.title}</p>
-                <p className="mt-1 text-sm leading-6 text-slate-600">{step.description}</p>
+                <p className="ht-step-title text-sm font-black">{index + 1}. {step.title}</p>
+                <p className="mt-1 text-sm leading-6">{step.description}</p>
               </button>
             ))}
           </div>
         </div>
 
-        <div className="rounded-[2rem] bg-slate-950 p-5 text-white shadow-2xl shadow-slate-200">
+        <div className="ht-demo-shell rounded-[2rem] p-5 shadow-2xl">
           <div className="mb-5 flex items-center justify-between">
-            <p className="text-sm font-black text-cyan-200">Guided preview</p>
+            <p className="ht-demo-label text-sm font-black">Guided preview</p>
             <span className="rounded-full bg-white/10 px-3 py-1 text-xs">{activeStep + 1}/5</span>
           </div>
-          <div className="relative min-h-[360px] overflow-hidden rounded-[1.5rem] bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900 p-5 ring-1 ring-white/10">
+          <div className="ht-demo-inner relative min-h-[360px] overflow-hidden rounded-[1.5rem] p-5 ring-1 ring-white/10">
             <div className="absolute right-8 top-8 h-28 w-28 rounded-full bg-cyan-400/20 blur-2xl" />
             <div className="relative grid gap-4 md:grid-cols-[1fr_0.72fr]">
               <div className="space-y-3">
@@ -291,31 +327,31 @@ export function SocialProof() {
     <section className="marketing-section pattern-diagonal bg-slate-50 px-5 text-slate-950 sm:px-8">
       <div className="relative mx-auto max-w-7xl">
         <div className="mb-12 text-center">
-          <p className="text-sm font-black uppercase tracking-[0.28em] text-blue-600">
+          <p className="ht-section-eyebrow text-sm font-black uppercase tracking-[0.28em] text-blue-600">
             Social proof
           </p>
-          <h2 className="mt-4 text-4xl font-black tracking-tight text-slate-950">
+          <h2 className="ht-section-title mt-4 text-4xl font-black tracking-tight text-slate-950">
             Trusted by 5,000+ product and engineering teams.
           </h2>
-          <p className="mt-4 text-base text-slate-600">
+          <p className="ht-section-desc mt-4 text-base text-slate-600">
             Rated 4.8/5 by teams replacing scattered trackers with one delivery workspace.
           </p>
         </div>
         <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
           {trustStats.map((stat) => (
-            <div key={stat.label} className="rounded-3xl border border-slate-200 bg-white p-6 text-center shadow-sm">
-              <p className="text-4xl font-black text-blue-600">{stat.value}</p>
-              <p className="mt-2 text-sm font-bold uppercase tracking-[0.16em] text-slate-500">{stat.label}</p>
+            <div key={stat.label} className="ht-stat-card rounded-3xl border p-6 text-center shadow-sm">
+              <p className="text-4xl font-black" style={{ color: "var(--ht-accent)" }}>{stat.value}</p>
+              <p className="mt-2 text-sm font-bold uppercase tracking-[0.16em] ht-panel-muted-text">{stat.label}</p>
             </div>
           ))}
         </div>
 
-        <div className="mt-12 overflow-hidden rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="ht-marquee-wrap mt-12 overflow-hidden rounded-3xl border p-5 shadow-sm">
           <div className="marketing-marquee flex min-w-max gap-4">
             {[...customerLogos, ...customerLogos].map((logo, index) => (
               <span
                 key={`${logo}-${index}`}
-                className="grid h-20 w-44 place-items-center rounded-2xl bg-slate-100 text-sm font-black text-slate-500 grayscale transition hover:bg-blue-50 hover:text-blue-600 hover:grayscale-0"
+                className="ht-logo-chip grid h-20 w-44 place-items-center rounded-2xl border text-sm font-black grayscale transition duration-300 hover:grayscale-0"
               >
                 {logo}
               </span>
@@ -325,11 +361,11 @@ export function SocialProof() {
 
         <div className="mt-12 grid gap-5 lg:grid-cols-3">
           {testimonials.map((testimonial) => (
-            <blockquote key={testimonial.name} className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-              <p className="text-sm leading-7 text-slate-700">"{testimonial.quote}"</p>
+            <blockquote key={testimonial.name} className="ht-quote-card rounded-3xl border p-6 shadow-sm">
+              <p className="text-sm leading-7 ht-panel-muted-text">"{testimonial.quote}"</p>
               <footer className="mt-5">
-                <p className="font-black text-slate-950">{testimonial.name}</p>
-                <p className="text-sm text-slate-500">{testimonial.role}</p>
+                <p className="ht-quote-name font-black">{testimonial.name}</p>
+                <p className="text-sm ht-panel-muted-text">{testimonial.role}</p>
               </footer>
             </blockquote>
           ))}
@@ -359,16 +395,16 @@ export function TrustSecuritySection() {
   ];
 
   return (
-    <section className="marketing-section bg-slate-950 px-5 text-white sm:px-8">
+    <section className="marketing-section ht-trust-section bg-slate-950 px-5 text-white sm:px-8">
       <div className="mx-auto grid max-w-7xl gap-10 lg:grid-cols-[0.9fr_1.1fr] lg:items-center">
         <div>
-          <p className="text-sm font-black uppercase tracking-[0.28em] text-cyan-200">
+          <p className="ht-section-eyebrow text-sm font-black uppercase tracking-[0.28em] text-cyan-200">
             Security and trust
           </p>
-          <h2 className="mt-4 text-4xl font-black tracking-tight sm:text-5xl">
+          <h2 className="ht-section-title mt-4 text-4xl font-black tracking-tight sm:text-5xl">
             Your data is treated like business-critical infrastructure.
           </h2>
-          <p className="mt-5 text-lg leading-8 text-slate-300">
+          <p className="ht-section-desc mt-5 text-lg leading-8 text-slate-300">
             Tasker is built to protect customer information with encryption, controlled access,
             and privacy-aware operating practices inspired by leading European standards and
             India’s evolving data protection framework.
@@ -379,13 +415,13 @@ export function TrustSecuritySection() {
           {trustHighlights.map((item) => (
             <article
               key={item.title}
-              className="rounded-3xl border border-white/10 bg-white/[0.06] p-6 shadow-2xl shadow-slate-950/20"
+              className="ht-spotlight-item rounded-3xl border p-6 shadow-2xl"
             >
-              <div className="mb-4 inline-flex rounded-full bg-cyan-300/10 px-3 py-1 text-xs font-black uppercase tracking-[0.18em] text-cyan-200">
+              <div className="ht-spotlight-eyebrow mb-4 inline-flex rounded-full px-3 py-1 text-xs font-black uppercase tracking-[0.18em]">
                 Trust layer
               </div>
-              <h3 className="text-xl font-black text-white">{item.title}</h3>
-              <p className="mt-3 text-sm leading-7 text-slate-300">{item.description}</p>
+              <h3 className="ht-spotlight-title text-xl font-black">{item.title}</h3>
+              <p className="ht-spotlight-muted mt-3 text-sm leading-7">{item.description}</p>
             </article>
           ))}
         </div>
@@ -396,6 +432,11 @@ export function TrustSecuritySection() {
 
 export function PricingSection() {
   const [yearly, setYearly] = useState(true);
+  const defaultFocusedIndex = Math.max(
+    pricingPlans.findIndex((plan) => plan.popular),
+    0,
+  );
+  const [focusedPlanIndex, setFocusedPlanIndex] = useState(defaultFocusedIndex);
 
   return (
     <section className="marketing-section bg-slate-100 px-5 text-slate-950 sm:px-8">
@@ -422,15 +463,17 @@ export function PricingSection() {
         </div>
 
         <div className="mt-12 grid gap-5 lg:grid-cols-4">
-          {pricingPlans.map((plan) => {
+          {pricingPlans.map((plan, index) => {
             const price = plan.priceMonthly === null ? null : yearly ? Math.round(plan.priceMonthly * 10) : plan.priceMonthly;
+            const isFocused = focusedPlanIndex === index;
             return (
               <article
                 key={plan.name}
-                className={`relative rounded-[2rem] border p-6 shadow-sm ${
-                  plan.popular
-                    ? "border-blue-500 bg-slate-950 text-white shadow-2xl shadow-blue-100"
-                    : "border-slate-200 bg-white text-slate-950"
+                onMouseEnter={() => setFocusedPlanIndex(index)}
+                onFocus={() => setFocusedPlanIndex(index)}
+                tabIndex={0}
+                className={`ht-pricing-card relative rounded-[2rem] border p-6 shadow-sm outline-none ${
+                  isFocused ? "ht-pricing-card-active" : ""
                 }`}
               >
                 {plan.popular && (
@@ -438,8 +481,8 @@ export function PricingSection() {
                     Most popular
                   </span>
                 )}
-                <h3 className="text-2xl font-black">{plan.name}</h3>
-                <p className={`mt-3 min-h-[72px] text-sm leading-6 ${plan.popular ? "text-slate-300" : "text-slate-600"}`}>
+                <h3 className="ht-pricing-name text-2xl font-black">{plan.name}</h3>
+                <p className="ht-pricing-desc mt-3 min-h-[72px] text-sm leading-6">
                   {plan.description}
                 </p>
                 <div className="mt-6">
@@ -448,7 +491,7 @@ export function PricingSection() {
                   ) : (
                     <p className="text-4xl font-black">
                       ${price}
-                      <span className="text-sm font-bold text-slate-500">/{yearly ? "user/year" : "user/month"}</span>
+                      <span className="ht-pricing-desc text-sm font-bold">/{yearly ? "user/year" : "user/month"}</span>
                     </p>
                   )}
                 </div>
@@ -456,7 +499,7 @@ export function PricingSection() {
                   href={plan.href}
                   onClick={() => trackMarketingEvent(plan.name === "Enterprise" ? "contact_sales" : "cta_click", { plan: plan.name })}
                   className={`mt-6 block rounded-full px-5 py-3 text-center text-sm font-black transition hover:-translate-y-1 ${
-                    plan.popular ? "bg-white text-slate-950" : "bg-slate-950 text-white"
+                    isFocused ? "ht-btn-solid" : "ht-btn-solid opacity-90"
                   }`}
                 >
                   {plan.cta}
@@ -473,7 +516,7 @@ export function PricingSection() {
             );
           })}
         </div>
-        <p className="mt-8 text-center text-sm font-bold text-slate-500">
+        <p className="mt-8 text-center text-sm font-bold ht-panel-muted-text">
           Includes a money-back guarantee for paid plans.
         </p>
       </div>
@@ -504,7 +547,7 @@ export function FaqSection() {
 }
 
 export function TeamSection() {
-  return <LeadershipTeamSection />;
+  return <LeadershipTeamSection timeThemed />;
 }
 
 export function SolutionsSection() {
@@ -519,22 +562,22 @@ export function SolutionsSection() {
         />
         <div className="grid gap-4 sm:grid-cols-2">
           {solutions.map((solution) => (
-            <div key={solution} className="rounded-3xl border border-slate-200 bg-slate-50 p-6 shadow-sm">
+            <div key={solution} className="ht-solution-card rounded-3xl border p-6 shadow-sm">
               <span className="mb-5 block h-1.5 w-16 rounded-full bg-gradient-to-r from-cyan-400 to-blue-600" />
-              <h3 className="text-lg font-black">{solution}</h3>
-              <p className="mt-3 text-sm leading-6 text-slate-600">
+              <h3 className="ht-solution-title text-lg font-black">{solution}</h3>
+              <p className="mt-3 text-sm leading-6 ht-panel-muted-text">
                 Strategy, UX, engineering, automation, deployment, and support delivered by one accountable team.
               </p>
             </div>
           ))}
         </div>
       </div>
-      <div className="mx-auto mt-14 max-w-7xl rounded-[2rem] bg-slate-950 p-8 text-white shadow-2xl shadow-slate-200">
+      <div className="ht-spotlight-strip mx-auto mt-14 max-w-7xl rounded-[2rem] border p-8 shadow-2xl">
         <div className="grid gap-6 md:grid-cols-4">
           {engagementModels.map((model) => (
-            <div key={model} className="rounded-2xl bg-white/10 p-5 ring-1 ring-white/10">
-              <p className="text-sm font-black text-cyan-200">{model}</p>
-              <p className="mt-3 text-sm leading-6 text-slate-300">
+            <div key={model} className="ht-spotlight-item rounded-2xl border p-5">
+              <p className="ht-spotlight-eyebrow text-sm font-black">{model}</p>
+              <p className="ht-spotlight-muted mt-3 text-sm leading-6">
                 Flexible delivery model built around your timeline, team, budget, and product maturity.
               </p>
             </div>
@@ -580,13 +623,13 @@ export function CaseStudies() {
         />
         <div className="mt-12 grid gap-5 lg:grid-cols-3">
           {caseStudies.map((study) => (
-            <article key={study.company} className="rounded-[2rem] bg-slate-950 p-6 text-white shadow-2xl shadow-slate-200">
-              <p className="text-sm font-black text-cyan-200">{study.company}</p>
-              <h3 className="mt-4 text-2xl font-black">{study.title}</h3>
+            <article key={study.company} className="ht-spotlight-card rounded-[2rem] border p-6 shadow-2xl">
+              <p className="ht-spotlight-eyebrow text-sm font-black">{study.company}</p>
+              <h3 className="ht-spotlight-title mt-4 text-2xl font-black">{study.title}</h3>
               <p className="mt-4 rounded-full bg-emerald-400/15 px-4 py-2 text-sm font-black text-emerald-200">
                 {study.result}
               </p>
-              <p className="mt-5 text-sm leading-7 text-slate-300">{study.summary}</p>
+              <p className="ht-spotlight-muted mt-5 text-sm leading-7">{study.summary}</p>
             </article>
           ))}
         </div>
@@ -725,10 +768,10 @@ export function LeadCaptureForms({ mode = "all" }: { mode?: "all" | "contact" })
   return (
     <section className="marketing-section bg-slate-50 px-5 text-slate-950 sm:px-8">
       <div className="mx-auto grid max-w-7xl gap-8 lg:grid-cols-2">
-        <div className="rounded-[2rem] bg-slate-950 p-8 text-white shadow-2xl shadow-slate-200">
-          <p className="text-sm font-black uppercase tracking-[0.28em] text-cyan-200">Lead capture</p>
-          <h2 className="mt-4 text-4xl font-black">Book a demo or talk to sales.</h2>
-          <p className="mt-5 text-sm leading-7 text-slate-300">
+        <div className="ht-spotlight-panel rounded-[2rem] border p-8 shadow-2xl">
+          <p className="ht-spotlight-eyebrow text-sm font-black uppercase tracking-[0.28em]">Lead capture</p>
+          <h2 className="ht-spotlight-title mt-4 text-4xl font-black">Book a demo or talk to sales.</h2>
+          <p className="ht-spotlight-muted mt-5 text-sm leading-7">
             Tell us about your team, use case, and delivery goals. We will follow up with a tailored plan,
             pricing recommendation, and implementation roadmap.
           </p>
@@ -769,42 +812,42 @@ export function LeadCaptureForms({ mode = "all" }: { mode?: "all" | "contact" })
 
         <div className="grid gap-6">
           {mode === "all" && (
-            <form className="rounded-[2rem] border border-slate-200 bg-slate-50 p-8 shadow-sm" onSubmit={handleNewsletterSubmit}>
+            <form className="ht-panel-muted rounded-[2rem] border p-8 shadow-sm" onSubmit={handleNewsletterSubmit}>
               <h3 className="text-2xl font-black">Get the free AI project checklist.</h3>
-              <p className="mt-3 text-sm leading-6 text-slate-600">
+              <p className="mt-3 text-sm leading-6 ht-panel-muted-text">
                 Join the newsletter for project management playbooks, AI workflow ideas, and delivery templates.
               </p>
               <div className="mt-6 flex flex-col gap-3 sm:flex-row">
                 <input
-                  className="min-w-0 flex-1 rounded-full border border-slate-300 px-5 py-3 text-sm outline-none focus:ring-2 focus:ring-blue-500"
+                  className="ht-input min-w-0 flex-1 rounded-full border px-5 py-3 text-sm outline-none focus:ring-2 focus:ring-blue-500"
                   type="email"
                   placeholder="Email address"
                   required
                   value={newsletterEmail}
                   onChange={(event) => setNewsletterEmail(event.target.value)}
                 />
-                <button className="rounded-full bg-slate-950 px-6 py-3 text-sm font-black text-white disabled:cursor-not-allowed disabled:opacity-70" type="submit" disabled={isSubmitting}>
+                <button className="ht-btn-solid rounded-full px-6 py-3 text-sm font-black disabled:cursor-not-allowed disabled:opacity-70" type="submit" disabled={isSubmitting}>
                   {isSubmitting ? "Submitting..." : "Subscribe"}
                 </button>
               </div>
             </form>
           )}
 
-          <form className="rounded-[2rem] border border-slate-200 bg-white p-8 shadow-sm" onSubmit={handleSalesSubmit}>
+          <form className="ht-panel rounded-[2rem] border p-8 shadow-sm" onSubmit={handleSalesSubmit}>
             <h3 className="text-2xl font-black">Contact sales</h3>
-            <p className="mt-3 text-sm leading-6 text-slate-600">
+            <p className="mt-3 text-sm leading-6 ht-panel-muted-text">
               Need enterprise security, SSO, procurement, or delivery services? Send requirements and we will respond.
             </p>
             <div className="mt-6 grid gap-3">
               <input
-                className="rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-blue-500"
+                className="ht-input rounded-xl border px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="Full name"
                 required
                 value={salesForm.fullName}
                 onChange={(event) => setSalesForm((prev) => ({ ...prev, fullName: event.target.value }))}
               />
               <input
-                className="rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-blue-500"
+                className="ht-input rounded-xl border px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-blue-500"
                 type="email"
                 placeholder="Work email"
                 required
@@ -812,14 +855,14 @@ export function LeadCaptureForms({ mode = "all" }: { mode?: "all" | "contact" })
                 onChange={(event) => setSalesForm((prev) => ({ ...prev, workEmail: event.target.value }))}
               />
               <input
-                className="rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-blue-500"
+                className="ht-input rounded-xl border px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="Company and role"
                 required
                 value={salesForm.companyRole}
                 onChange={(event) => setSalesForm((prev) => ({ ...prev, companyRole: event.target.value }))}
               />
               <select
-                className="rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-blue-500"
+                className="ht-select rounded-xl border px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-blue-500"
                 value={salesForm.companySize}
                 onChange={(event) => setSalesForm((prev) => ({ ...prev, companySize: event.target.value }))}
               >
@@ -828,12 +871,12 @@ export function LeadCaptureForms({ mode = "all" }: { mode?: "all" | "contact" })
                 <option value="enterprise">Enterprise</option>
               </select>
               <textarea
-                className="min-h-24 rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-blue-500"
+                className="ht-textarea min-h-24 rounded-xl border px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="Tell us your requirement"
                 value={salesForm.message}
                 onChange={(event) => setSalesForm((prev) => ({ ...prev, message: event.target.value }))}
               />
-              <button className="rounded-full bg-blue-600 px-6 py-3 text-sm font-black text-white disabled:cursor-not-allowed disabled:opacity-70" type="submit" disabled={isSubmitting}>
+              <button className="ht-btn-accent rounded-full px-6 py-3 text-sm font-black disabled:cursor-not-allowed disabled:opacity-70" type="submit" disabled={isSubmitting}>
                 {isSubmitting ? "Submitting..." : "Send requirements"}
               </button>
             </div>
@@ -969,20 +1012,25 @@ export function AboutStory() {
 
 export function MarketingCta() {
   return (
-    <section className="bg-slate-100 px-5 py-20 text-slate-950 sm:px-8">
-      <div className="mx-auto max-w-7xl overflow-hidden rounded-[2.5rem] bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 p-8 text-white shadow-2xl shadow-blue-200 md:p-12">
+    <section className="ht-cta-section px-5 py-20 sm:px-8">
+      <div className="ht-cta-banner mx-auto max-w-7xl overflow-hidden rounded-[2.5rem] p-8 md:p-12">
         <div className="grid gap-8 lg:grid-cols-[1fr_auto] lg:items-center">
           <div>
-            <p className="text-sm font-black uppercase tracking-[0.28em] text-cyan-100">Ready to build</p>
-            <h2 className="mt-4 text-4xl font-black tracking-tight sm:text-5xl">
+            <p className="ht-cta-eyebrow text-sm font-black uppercase tracking-[0.28em]">
+              Ready to build
+            </p>
+            <h2 className="ht-cta-title mt-4 text-4xl font-black tracking-tight sm:text-5xl">
               Launch your next project with a beautiful delivery system.
             </h2>
-            <p className="mt-5 max-w-3xl text-lg leading-8 text-blue-50">
+            <p className="ht-cta-muted mt-5 max-w-3xl text-lg leading-8">
               Use Tasker as your project command center, then partner with our team to deliver full-stack web,
               AI, and automation solutions end to end.
             </p>
           </div>
-          <Link href="/auth/signup" className="rounded-full bg-white px-8 py-4 text-center text-sm font-black text-slate-950 shadow-xl transition hover:-translate-y-1 hover:bg-cyan-50">
+          <Link
+            href="/auth/signup"
+            className="ht-cta-btn rounded-full px-8 py-4 text-center text-sm font-black transition hover:-translate-y-1"
+          >
             Start free
           </Link>
         </div>

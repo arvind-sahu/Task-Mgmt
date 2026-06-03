@@ -62,6 +62,59 @@ export function relativeDeadline(
   return `in ${days} days`;
 }
 
+/** Calendar-day difference: positive = future, negative = past. */
+export function daysUntilDeadline(
+  value: Date | string | null | undefined,
+  now: Date = new Date(),
+): number | null {
+  if (!value) return null;
+  const d = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(d.getTime())) return null;
+
+  const startOfDay = (x: Date) =>
+    new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+  const day = 24 * 60 * 60 * 1000;
+  return Math.round((startOfDay(d) - startOfDay(now)) / day);
+}
+
+const BOARD_MONTHS = [
+  "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+] as const;
+
+/** Board due-date text, e.g. "7 Jun" (day + abbreviated month). */
+export function formatBoardDueDate(
+  value: Date | string | null | undefined,
+): string {
+  if (!value) return "";
+  const d = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(d.getTime())) return "";
+  return `${d.getDate()} ${BOARD_MONTHS[d.getMonth()]}`;
+}
+
+/** @deprecated Use formatBoardDueDate for task board chips. */
+export function formatShortDate(value: Date | string | null | undefined): string {
+  return formatBoardDueDate(value);
+}
+
+/**
+ * Board due-date chip: "1d"/"2d" when within 2 days, "Today" for same day,
+ * otherwise a short date when more than 2 days out. Returns "" when overdue
+ * (show the overdue badge instead).
+ */
+export function boardDeadlineLabel(
+  value: Date | string | null | undefined,
+  now: Date = new Date(),
+): string {
+  const days = daysUntilDeadline(value, now);
+  if (days == null) return "";
+  if (days < 0) return "";
+  if (days === 0) return "Today";
+  if (days === 1) return "1d";
+  if (days === 2) return "2d";
+  return formatBoardDueDate(value);
+}
+
 /**
  * Compact day-based label for task cards: "Today", "1 day", "2 days", "7 days ago".
  */

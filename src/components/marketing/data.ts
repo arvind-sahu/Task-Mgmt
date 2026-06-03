@@ -149,7 +149,7 @@ export const pricingPlans = [
   },
   {
     name: "Pro",
-    priceMonthly: 29,
+    priceMonthly: 1,
     description: "For growing teams that need richer planning and reporting.",
     cta: "Start Pro",
     href: "/auth/signup",
@@ -158,7 +158,7 @@ export const pricingPlans = [
   },
   {
     name: "Business",
-    priceMonthly: 59,
+    priceMonthly: 2,
     description: "Advanced controls for high-growth product organizations.",
     cta: "Start Business",
     href: "/auth/signup",

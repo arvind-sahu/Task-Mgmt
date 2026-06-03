@@ -46,6 +46,10 @@ function makeCtx(opts: DbMocks) {
         codeHash: "$2a$10$B2q9xL6guB8xQJ0I95r8Auj7mXlv5wVCK8SPoaqe7i0rGUNShUMy2", // hash for "123456"
       }),
       update: vi.fn().mockResolvedValue({ id: "otp_1", consumedAt: new Date() }),
+      updateMany: vi.fn().mockResolvedValue({ count: 0 }),
+    },
+    loginAudit: {
+      create: vi.fn().mockResolvedValue({ id: "audit_1" }),
     },
     $transaction: vi.fn(async (fn: (tx: unknown) => Promise<unknown>) =>
       fn({
@@ -56,6 +60,9 @@ function makeCtx(opts: DbMocks) {
       }),
     ),
     rateLimitHit: {
+      create: vi.fn().mockResolvedValue({ id: "hit-1" }),
+      count: vi.fn().mockResolvedValue(0),
+      findFirst: vi.fn().mockResolvedValue(null),
       deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
     },
   } as unknown as PrismaClient;
@@ -64,6 +71,7 @@ function makeCtx(opts: DbMocks) {
     db,
     session: null,
     clientIp: "127.0.0.1",
+    clientUserAgent: "vitest",
     mocks: { findUnique, create, update },
   };
 }
@@ -140,5 +148,42 @@ describe("user.register", () => {
         companyName: "Tasker",
       }),
     ).rejects.toThrow();
+  });
+});
+
+describe("user.sendLoginOtp", () => {
+  it("rejects unknown email before sending OTP", async () => {
+    const caller = createCaller(makeCtx({}));
+    await expect(
+      caller.user.sendLoginOtp({
+        email: "missing@example.com",
+        password: "longenough",
+      }),
+    ).rejects.toMatchObject({
+      code: "UNAUTHORIZED",
+      message: "Invalid email or password",
+    });
+  });
+
+  it("rejects wrong password before sending OTP", async () => {
+    const passwordHash = await bcrypt.hash("correctpass", 10);
+    const caller = createCaller(
+      makeCtx({
+        findUnique: vi.fn().mockResolvedValue({
+          id: "u1",
+          email: "alice@example.com",
+          password: passwordHash,
+        }),
+      }),
+    );
+    await expect(
+      caller.user.sendLoginOtp({
+        email: "alice@example.com",
+        password: "wrongpass",
+      }),
+    ).rejects.toMatchObject({
+      code: "UNAUTHORIZED",
+      message: "Invalid email or password",
+    });
   });
 });

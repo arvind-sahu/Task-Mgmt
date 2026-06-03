@@ -1,20 +1,27 @@
 import { useRef, useState } from "react";
 
-import { readFileAsDataUrl } from "~/utils/attachments";
+import { isAllowedAttachmentType } from "~/utils/attachments";
+import { uploadFileWithPresignedUrl } from "~/utils/s3Upload";
 
 type FileUploadButtonProps = {
   label?: string;
   disabled?: boolean;
+  requestUploadUrl: (input: {
+    fileName: string;
+    mimeType: string;
+    contentLength: number;
+  }) => Promise<{ uploadUrl: string; objectKey: string }>;
   onUploaded: (file: {
     fileName: string;
     mimeType: string;
-    dataUrl: string;
+    storageKey: string;
   }) => void | Promise<void>;
 };
 
 export function FileUploadButton({
   label = "Add image or PDF",
   disabled,
+  requestUploadUrl,
   onUploaded,
 }: FileUploadButtonProps) {
   const inputRef = useRef<HTMLInputElement>(null);
@@ -26,14 +33,23 @@ export function FileUploadButton({
     e.target.value = "";
     if (!file) return;
 
+    if (!isAllowedAttachmentType(file.type)) {
+      setError("Only images (JPEG, PNG, GIF, WebP) and PDF files are allowed.");
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setError("File must be 5MB or smaller.");
+      return;
+    }
+
     setError(null);
     setLoading(true);
     try {
-      const dataUrl = await readFileAsDataUrl(file);
+      const uploaded = await uploadFileWithPresignedUrl(file, requestUploadUrl);
       await onUploaded({
-        fileName: file.name,
-        mimeType: file.type,
-        dataUrl,
+        fileName: uploaded.fileName,
+        mimeType: uploaded.mimeType,
+        storageKey: uploaded.objectKey,
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Upload failed");

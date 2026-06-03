@@ -1,11 +1,14 @@
 import Link from "next/link";
-import { TaskPriority } from "@prisma/client";
 
 import { type RouterOutputs } from "~/utils/api";
 import { PriorityBadge, priorityCardStyles } from "./Badges";
 import { CachedAvatar } from "./CachedAvatar";
-import { TagChip } from "./TagChip";
-import { deadlineDayLabel, isOverdue } from "~/utils/date";
+import {
+  isTaskCompleted,
+  TaskCompletedTick,
+  TaskDeadlineBadge,
+  TaskMetaCounts,
+} from "./TaskIndicators";
 import { initialsFromName } from "~/utils/avatar";
 
 type TaskListItem = RouterOutputs["task"]["list"][number];
@@ -21,14 +24,16 @@ export default function TaskCard({
   onOpen,
   searchQuery = "",
 }: TaskCardProps) {
-  const overdue = isOverdue(task.deadline);
-  const deadlineLabel = deadlineDayLabel(task.deadline);
+  const completed = isTaskCompleted(task.status);
 
   const content = (
     <>
       <div className="flex items-start justify-between gap-2">
-        <h4 className="line-clamp-2 text-[13px] font-semibold leading-snug text-heading">
-          <HighlightedText text={task.title} query={searchQuery} />
+        <h4 className="flex min-w-0 flex-1 items-start gap-1.5 text-[13px] font-semibold leading-snug text-heading">
+          {completed && <TaskCompletedTick className="mt-0.5" />}
+          <span className="line-clamp-2 min-w-0">
+            <HighlightedText text={task.title} query={searchQuery} />
+          </span>
         </h4>
         <PriorityBadge priority={task.priority} />
       </div>
@@ -54,7 +59,7 @@ export default function TaskCard({
                   className="app-avatar grid h-6 w-6 place-items-center overflow-hidden rounded-full text-[10px] font-semibold ring-2 ring-[var(--surface-elevated)]"
                 >
                   <CachedAvatar
-                    src={a.image}
+                    user={a}
                     alt={a.name ?? a.email}
                     className="h-full w-full object-cover"
                     fallback={initialsFromName(a.name, a.email)}
@@ -69,49 +74,15 @@ export default function TaskCard({
             </div>
           )}
         </div>
-        {deadlineLabel && (
-          <span
-            className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] leading-4 ring-1 ${
-              overdue
-                ? "font-medium ring-[var(--danger-text)]/30"
-                : deadlineLabel === "Today"
-                  ? "font-medium ring-[var(--warning-border)]"
-                  : "chip"
-            }`}
-            style={
-              overdue
-                ? {
-                    color: "var(--danger-text)",
-                    backgroundColor: "var(--danger-hover-bg)",
-                  }
-                : deadlineLabel === "Today"
-                  ? {
-                      color: "var(--warning-text)",
-                      backgroundColor: "var(--warning-bg)",
-                    }
-                  : undefined
-            }
-          >
-            {deadlineLabel}
-          </span>
-        )}
-      </div>
 
-      {task.tags.length > 0 && (
-        <div
-          className="mt-2 flex flex-wrap gap-1 border-t pt-2"
-          style={{ borderColor: "var(--border-muted)" }}
-        >
-          {task.tags.map((t) => (
-            <TagChip key={t.id} name={t.name} color={t.color} size="sm" />
-          ))}
+        <div className="flex shrink-0 items-center gap-2">
+          <TaskMetaCounts
+            commentCount={task._count.comments}
+            attachmentCount={task._count.attachments}
+          />
+          <TaskDeadlineBadge deadline={task.deadline} status={task.status} />
         </div>
-      )}
-      {task._count.comments > 0 && (
-        <p className="mt-2 text-[10px] text-muted">
-          {task._count.comments} comment{task._count.comments === 1 ? "" : "s"}
-        </p>
-      )}
+      </div>
     </>
   );
 

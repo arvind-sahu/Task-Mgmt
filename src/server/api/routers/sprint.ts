@@ -3,6 +3,7 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 
 import { assertProjectAccess } from "~/server/api/access";
+import { publicUserSelect } from "~/server/api/userSelect";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import {
   assertValidStartDayOfWeek,
@@ -374,9 +375,9 @@ export const sprintRouter = createTRPCRouter({
           status: TaskStatus.BACKLOG,
         },
         include: {
-          assignees: { select: { id: true, name: true, email: true, image: true } },
+          assignees: { select: publicUserSelect },
           tags: true,
-          creator: { select: { id: true, name: true, email: true, image: true } },
+          creator: { select: publicUserSelect },
           sprint: true,
           _count: { select: { comments: true } },
         },

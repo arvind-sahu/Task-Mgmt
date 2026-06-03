@@ -8,6 +8,7 @@ import { ThemeProvider } from "~/contexts/theme";
 import { MarketingAnalytics } from "~/components/marketing/MarketingAnalytics";
 
 import "~/styles/globals.css";
+import "~/styles/home-time-themes.css";
 
 const MyApp: AppType<{ session: Session | null }> = ({
   Component,

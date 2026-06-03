@@ -42,6 +42,12 @@ export const env = createEnv({
     AUTH_GITHUB_SECRET: z.string().min(1).optional(),
     LINKEDIN_CLIENT_ID: z.string().min(1).optional(),
     LINKEDIN_CLIENT_SECRET: z.string().min(1).optional(),
+
+    // S3-only credentials (separate from deploy IAM keys used by SST/CI).
+    AWS_S3_ACCESS_KEY_ID: z.string().min(1).optional(),
+    AWS_S3_SECRET_ACCESS_KEY: z.string().min(1).optional(),
+    AWS_S3_REGION: z.string().min(1).optional(),
+    AWS_S3_BUCKET_NAME: z.string().min(1).optional(),
   },
 
   client: {
@@ -72,6 +78,10 @@ export const env = createEnv({
       process.env.AUTH_GITHUB_SECRET ?? process.env.GITHUB_SECRET,
     LINKEDIN_CLIENT_ID: process.env.LINKEDIN_CLIENT_ID,
     LINKEDIN_CLIENT_SECRET: process.env.LINKEDIN_CLIENT_SECRET,
+    AWS_S3_ACCESS_KEY_ID: process.env.AWS_S3_ACCESS_KEY_ID,
+    AWS_S3_SECRET_ACCESS_KEY: process.env.AWS_S3_SECRET_ACCESS_KEY,
+    AWS_S3_REGION: process.env.AWS_S3_REGION,
+    AWS_S3_BUCKET_NAME: process.env.AWS_S3_BUCKET_NAME,
     NEXT_PUBLIC_GA_ID: process.env.NEXT_PUBLIC_GA_ID,
     NEXT_PUBLIC_HOTJAR_ID: process.env.NEXT_PUBLIC_HOTJAR_ID,
   },

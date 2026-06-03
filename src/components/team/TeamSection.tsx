@@ -17,7 +17,7 @@ function getDesktopSpanClass(index: number, total: number) {
   return "xl:col-span-12 xl:max-w-md xl:justify-self-center";
 }
 
-export function LeadershipTeamSection() {
+export function LeadershipTeamSection({ timeThemed = false }: { timeThemed?: boolean }) {
   const { status } = useSession();
   const canViewEmail = status === "authenticated";
   const sectionRef = useRef<HTMLElement | null>(null);
@@ -64,7 +64,11 @@ export function LeadershipTeamSection() {
           </div>
           <Link
             href="/team"
-            className="self-start rounded-full border border-blue-200 bg-white px-5 py-2.5 text-sm font-semibold text-blue-700 transition hover:border-blue-300 hover:bg-blue-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500"
+            className={
+              timeThemed
+                ? "home-time-btn-secondary self-start rounded-full border px-5 py-2.5 text-sm font-semibold transition hover:-translate-y-0.5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500"
+                : "self-start rounded-full border border-blue-200 bg-white px-5 py-2.5 text-sm font-semibold text-blue-700 transition hover:border-blue-300 hover:bg-blue-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500"
+            }
           >
             View All Team
           </Link>
@@ -73,7 +77,7 @@ export function LeadershipTeamSection() {
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 md:grid-cols-3 md:gap-6 xl:grid-cols-12 xl:gap-7">
           {leadershipTeamMembers.map((member, index) => (
             <div key={member.id} className={getDesktopSpanClass(index, leadershipTeamMembers.length)}>
-              <TeamCard member={member} index={index} isVisible={isVisible} canViewEmail={canViewEmail} />
+              <TeamCard member={member} index={index} isVisible={isVisible} canViewEmail={canViewEmail} homeTimeThemed={timeThemed} />
             </div>
           ))}
         </div>

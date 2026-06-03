@@ -3,6 +3,7 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 
 import { assertProjectAccess } from "~/server/api/access";
+import { publicUserSelect } from "~/server/api/userSelect";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { notifyUsers } from "~/server/notifications";
 import { sanitizePlainText } from "~/server/security/sanitize";
@@ -34,7 +35,7 @@ export const commentRouter = createTRPCRouter({
           authorId: ctx.session.user.id,
         },
         include: {
-          author: { select: { id: true, name: true, email: true, image: true } },
+          author: { select: publicUserSelect },
           attachments: true,
         },
       });
@@ -84,7 +85,7 @@ export const commentRouter = createTRPCRouter({
         where: { id: input.id },
         data: { body: sanitizePlainText(input.body) },
         include: {
-          author: { select: { id: true, name: true, email: true, image: true } },
+          author: { select: publicUserSelect },
           attachments: true,
         },
       });

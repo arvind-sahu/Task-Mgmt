@@ -1,6 +1,13 @@
 import { api } from "~/utils/api";
 import { formatDateTime } from "~/utils/date";
 
+function loginAuditMethodLabel(method: string) {
+  if (method === "credentials_password_failed") return "Failed password";
+  if (method === "credentials_otp_failed") return "Failed OTP";
+  if (method === "credentials") return "Email sign-in";
+  return method.replace(/_/g, " ");
+}
+
 function deviceIcon(deviceType: string | null | undefined) {
   if (deviceType === "mobile") return "📱";
   if (deviceType === "tablet") return "📱";
@@ -89,8 +96,14 @@ export function SecurityPanel() {
                       <span className="font-medium text-heading">
                         {log.deviceLabel ?? "Unknown device"}
                       </span>
-                      <span className="chip rounded-full px-2 py-0.5 text-xs capitalize">
-                        {log.method}
+                      <span
+                        className={`chip rounded-full px-2 py-0.5 text-xs capitalize ${
+                          log.method.includes("failed")
+                            ? "text-[var(--danger-text)]"
+                            : ""
+                        }`}
+                      >
+                        {loginAuditMethodLabel(log.method)}
                       </span>
                     </div>
                     <p className="mt-1 text-xs text-muted">

@@ -29,6 +29,7 @@ import { sanitizeEmailErrorForDisplay } from "~/utils/emailErrors";
 interface CreateContextOptions {
   session: Session | null;
   clientIp: string;
+  clientUserAgent?: string;
 }
 
 /**
@@ -46,6 +47,7 @@ const createInnerTRPCContext = (opts: CreateContextOptions) => {
     session: opts.session,
     db,
     clientIp: opts.clientIp,
+    clientUserAgent: opts.clientUserAgent,
   };
 };
 
@@ -64,6 +66,10 @@ export const createTRPCContext = async (opts: CreateNextContextOptions) => {
   return createInnerTRPCContext({
     session,
     clientIp: getClientIp(req),
+    clientUserAgent:
+      typeof req.headers["user-agent"] === "string"
+        ? req.headers["user-agent"]
+        : undefined,
   });
 };
 
