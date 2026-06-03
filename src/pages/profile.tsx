@@ -1,3 +1,4 @@
+import { signOut } from "next-auth/react";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import type { GetServerSidePropsContext } from "next";
 import { useRouter } from "next/router";
@@ -8,6 +9,8 @@ import { api } from "~/utils/api";
 import { initialsFromName } from "~/utils/avatar";
 import { SecurityPanel } from "~/components/SecurityPanel";
 import ThemePicker from "~/components/ThemePicker";
+import { CachedAvatar } from "~/components/CachedAvatar";
+import { uploadProfileImageWithPresignedUrl } from "~/utils/s3Upload";
 
 /** A common (non-exhaustive) timezone list for the profile dropdown. */
 const TIMEZONES = [
@@ -35,9 +38,11 @@ export default function ProfilePage() {
 
   const [name, setName] = useState("");
   const [companyName, setCompanyName] = useState("");
+  const [jobTitle, setJobTitle] = useState("");
+  const [department, setDepartment] = useState("");
   const [bio, setBio] = useState("");
   const [timezone, setTimezone] = useState("UTC");
-  const [image, setImage] = useState("");
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [imageError, setImageError] = useState<string | null>(null);
@@ -58,9 +63,10 @@ export default function ProfilePage() {
     if (me.data) {
       setName(me.data.name ?? "");
       setCompanyName(me.data.companyName ?? "");
+      setJobTitle(me.data.jobTitle ?? "");
+      setDepartment(me.data.department ?? "");
       setBio(me.data.bio ?? "");
       setTimezone(me.data.timezone ?? "UTC");
-      setImage(me.data.image ?? "");
     }
   }, [me.data]);
 
@@ -71,42 +77,55 @@ export default function ProfilePage() {
       setTimeout(() => setSaved(false), 2000);
     },
   });
+  const getImageUploadUrl = api.user.getImageUploadUrl.useMutation();
+  const confirmProfileImage = api.user.confirmProfileImage.useMutation({
+    onSuccess: async () => {
+      await utils.user.me.invalidate();
+    },
+  });
+  const clearProfileImage = api.user.clearProfileImage.useMutation({
+    onSuccess: async () => {
+      await utils.user.me.invalidate();
+    },
+  });
 
   function submit(e: FormEvent) {
     e.preventDefault();
     update.mutate({
       name,
       companyName: companyName || undefined,
+      jobTitle: jobTitle,
+      department: department,
       bio: bio || undefined,
       timezone,
-      image: image || null,
     });
-  }
-
-  async function savePhoto(nextImage: string | null) {
-    setImage(nextImage ?? "");
-    await update.mutateAsync({ image: nextImage });
   }
 
   async function handleImageUpload(file: File) {
     setImageError(null);
-    if (!file.type.startsWith("image/")) return;
-    if (file.size > 4 * 1024 * 1024) {
-      setImageError("Please upload an image up to 4MB.");
-      return;
-    }
+    const localPreview = URL.createObjectURL(file);
+    setPreviewUrl(localPreview);
     setUploadingImage(true);
     try {
-      const dataUrl = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(String(reader.result ?? ""));
-        reader.onerror = () => reject(new Error("Failed to read selected image"));
-        reader.readAsDataURL(file);
-      });
-      await savePhoto(dataUrl);
+      const objectKey = await uploadProfileImageWithPresignedUrl(file, (input) =>
+        getImageUploadUrl.mutateAsync(input),
+      );
+      await confirmProfileImage.mutateAsync({ objectKey });
+    } catch (err) {
+      setImageError(
+        err instanceof Error ? err.message : "Failed to upload profile photo.",
+      );
     } finally {
+      URL.revokeObjectURL(localPreview);
+      setPreviewUrl(null);
       setUploadingImage(false);
     }
+  }
+
+  async function handleRemovePhoto() {
+    setImageError(null);
+    await clearProfileImage.mutateAsync();
+    setPhotoMenuOpen(false);
   }
 
   useEffect(() => {
@@ -125,7 +144,7 @@ export default function ProfilePage() {
   }, [photoMenuOpen]);
 
   return (
-    <Layout title="Profile">
+    <Layout title="Profile" contentClassName="app-main relative z-0 mx-auto w-full min-w-0 max-w-[1600px] flex-1 overflow-x-hidden overflow-y-auto px-3 py-4 sm:px-5 sm:py-5 lg:px-6">
       <div className="min-w-0 max-w-full">
       <div className="mb-5 sm:mb-6">
         <h1 className="text-xl font-semibold sm:text-2xl">Profile & preferences</h1>
@@ -194,12 +213,19 @@ export default function ProfilePage() {
               className="app-avatar grid h-16 w-16 place-items-center overflow-hidden rounded-full text-xl font-semibold transition hover:opacity-90"
               title="Update profile photo"
             >
-              {image ? (
+              {previewUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
-                  src={image}
+                  src={previewUrl}
                   alt={name || "Profile"}
                   className="h-full w-full object-cover"
+                />
+              ) : me.data ? (
+                <CachedAvatar
+                  user={me.data}
+                  alt={name || "Profile"}
+                  className="h-full w-full object-cover"
+                  fallback={initials}
                 />
               ) : (
                 initials
@@ -216,23 +242,7 @@ export default function ProfilePage() {
                 </button>
                 <button
                   type="button"
-                  onClick={async () => {
-                    const url = window.prompt("Enter direct image URL");
-                    if (!url) return;
-                    setImageError(null);
-                    await savePhoto(url.trim());
-                    setPhotoMenuOpen(false);
-                  }}
-                  className="w-full rounded-md px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-100"
-                >
-                  Use photo URL
-                </button>
-                <button
-                  type="button"
-                  onClick={async () => {
-                    await savePhoto(null);
-                    setPhotoMenuOpen(false);
-                  }}
+                  onClick={() => void handleRemovePhoto()}
                   className="w-full rounded-md px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50"
                 >
                   Remove photo
@@ -293,6 +303,29 @@ export default function ProfilePage() {
           <p className="mt-1 text-xs text-slate-500">
             Used to scope teammate search and project invites to your organization.
           </p>
+        </div>
+
+        <div className="grid gap-5 sm:grid-cols-2">
+          <div>
+            <label className="label">Job title</label>
+            <input
+              className="input mt-1"
+              value={jobTitle}
+              onChange={(e) => setJobTitle(e.target.value)}
+              maxLength={120}
+              placeholder="e.g. Product Manager"
+            />
+          </div>
+          <div>
+            <label className="label">Department</label>
+            <input
+              className="input mt-1"
+              value={department}
+              onChange={(e) => setDepartment(e.target.value)}
+              maxLength={120}
+              placeholder="e.g. Engineering"
+            />
+          </div>
         </div>
 
         <div>
@@ -357,6 +390,21 @@ export default function ProfilePage() {
         </div>
         </form>
       )}
+
+      <div className="card mt-6 w-full max-w-2xl p-4">
+        <h2 className="text-sm font-semibold text-heading">Account</h2>
+        <p className="mt-1 text-sm text-muted">
+          Sign out of Tasker on this device.
+        </p>
+        <button
+          type="button"
+          onClick={() => void signOut({ callbackUrl: "/auth/signin" })}
+          className="mt-3 rounded-md px-4 py-2 text-sm font-medium transition hover:bg-[var(--danger-hover-bg)]"
+          style={{ color: "var(--danger-text)" }}
+        >
+          Sign out
+        </button>
+      </div>
       </div>
     </Layout>
   );

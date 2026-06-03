@@ -15,6 +15,7 @@ import {
 } from "~/server/oauth";
 import { api } from "~/utils/api";
 import { getTrpcMutationErrorMessage } from "~/utils/trpcError";
+import { isLoginLockoutError } from "~/utils/loginLockout";
 
 /**
  * Email + password sign-in page. Talks to the NextAuth Credentials provider
@@ -45,7 +46,17 @@ export default function SignInPage({ oauthProviders }: SignInPageProps) {
   const verifyingRef = useRef(false);
 
   const sendLoginOtp = api.user.sendLoginOtp.useMutation();
+  const submitLoginOtp = api.user.submitLoginOtp.useMutation();
   const emailInvalid = emailTouched && email.length > 0 && !email.includes("@");
+
+  function resetToPasswordStep(message: string) {
+    setOtpRequested(false);
+    setOtp("");
+    setPassword("");
+    setInfo(null);
+    setError(message);
+    verifyingRef.current = false;
+  }
 
   async function handlePasswordSubmit(e: FormEvent) {
     e.preventDefault();
@@ -56,12 +67,12 @@ export default function SignInPage({ oauthProviders }: SignInPageProps) {
       setOtp("");
       setOtpRequested(true);
     } catch (err) {
-      setError(
-        getTrpcMutationErrorMessage(
-          err,
-          "Could not send the verification code. Please try again.",
-        ),
-      );
+      const message = getTrpcMutationErrorMessage(err, "Invalid email or password.");
+      if (isLoginLockoutError(err)) {
+        resetToPasswordStep(message);
+        return;
+      }
+      setError(message);
     }
   }
 
@@ -74,25 +85,38 @@ export default function SignInPage({ oauthProviders }: SignInPageProps) {
       setError(null);
       setLoading(true);
 
-      const res = await signIn("credentials", {
-        email,
-        password,
-        otp: code,
-        redirect: false,
-        callbackUrl,
-      });
+      try {
+        await submitLoginOtp.mutateAsync({ email, password, otp: code });
 
-      setLoading(false);
-      verifyingRef.current = false;
+        const res = await signIn("credentials", {
+          email,
+          password,
+          redirect: false,
+          callbackUrl,
+        });
 
-      if (!res || res.error) {
-        setError("Invalid email, password, or verification code.");
-        return;
+        if (!res || res.error) {
+          setError("Sign-in could not be completed. Please try again.");
+          return;
+        }
+
+        void router.push(res.url ?? callbackUrl);
+      } catch (err) {
+        const message = getTrpcMutationErrorMessage(
+          err,
+          "Invalid email, password, or verification code.",
+        );
+        if (isLoginLockoutError(err)) {
+          resetToPasswordStep(message);
+          return;
+        }
+        setError(message);
+      } finally {
+        setLoading(false);
+        verifyingRef.current = false;
       }
-
-      void router.push(res.url ?? callbackUrl);
     },
-    [callbackUrl, email, password, router],
+    [callbackUrl, email, password, router, submitLoginOtp],
   );
 
   async function handleOtpSubmit(e: FormEvent) {
@@ -109,12 +133,15 @@ export default function SignInPage({ oauthProviders }: SignInPageProps) {
       await sendLoginOtp.mutateAsync({ email, password });
       setInfo("A new verification code was sent to your email.");
     } catch (err) {
-      setError(
-        getTrpcMutationErrorMessage(
-          err,
-          "Could not resend the verification code. Please try again.",
-        ),
+      const message = getTrpcMutationErrorMessage(
+        err,
+        "Could not resend the verification code. Please try again.",
       );
+      if (isLoginLockoutError(err)) {
+        resetToPasswordStep(message);
+        return;
+      }
+      setError(message);
     }
   }
 

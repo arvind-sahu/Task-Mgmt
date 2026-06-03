@@ -8,14 +8,45 @@ import {
   publicProcedure,
 } from "~/server/api/trpc";
 import { EmailDeliveryError } from "~/server/emailErrors";
-import { LOGIN_OTP_SENT_MESSAGE } from "~/server/auth";
+import {
+  INVALID_CREDENTIALS_MESSAGE,
+  LOGIN_OTP_SENT_MESSAGE,
+} from "~/server/auth";
 import { normalizeCompanyName, companyNamesMatch } from "~/server/company";
 import { issueEmailOtp, verifyEmailOtp } from "~/server/otp";
+import {
+  assertLoginNotLocked,
+  clearLoginFailures,
+  recordLoginPasswordFailure,
+  recordLoginOtpFailure,
+  type LoginSecurityScope,
+} from "~/server/security/loginSecurity";
 import {
   sanitizeOptionalPlainText,
   sanitizePlainText,
 } from "~/server/security/sanitize";
+import { publicUserSelect } from "~/server/api/userSelect";
+import {
+  createPresignedUploadUrl,
+  deleteObjectByKey,
+  isAllowedUserImageUrl,
+  isS3Configured,
+  isUserImageKeyForUser,
+  resolveLegacyUserImageKey,
+  userImageKey,
+} from "~/server/storage/s3";
 import { EMAIL_DELIVERY_FAILED_MESSAGE } from "~/utils/emailErrors";
+
+function loginSecurityScope(
+  ctx: { clientIp: string; clientUserAgent?: string },
+  email: string,
+): LoginSecurityScope {
+  return {
+    email,
+    ip: ctx.clientIp,
+    userAgent: ctx.clientUserAgent,
+  };
+}
 
 // Reusable input shapes — exported so tests can import the same schemas.
 export const registerInput = z.object({
@@ -40,25 +71,13 @@ const companyNameSchema = z.string().min(2).max(120);
 export const updateProfileInput = z.object({
   name: z.string().min(1).max(80).optional(),
   companyName: companyNameSchema.optional(),
+  jobTitle: z.string().max(120).optional(),
+  department: z.string().max(120).optional(),
   bio: z.string().max(500).optional(),
   timezone: z.string().max(64).optional(),
-  image: z
-    .string()
-    .refine(
-      (value) => {
-        if (value.startsWith("data:image/")) return true;
-        try {
-          const parsed = new URL(value);
-          return parsed.protocol === "http:" || parsed.protocol === "https:";
-        } catch {
-          return false;
-        }
-      },
-      { message: "Provide a valid http(s) image URL or uploaded image data" },
-    )
-    .optional()
-    .nullable(),
 });
+
+const objectKeySchema = z.string().min(1).max(512);
 
 export const userRouter = createTRPCRouter({
   /** Public registration endpoint. Hashes the password with bcrypt. */
@@ -174,52 +193,86 @@ export const userRouter = createTRPCRouter({
     )
     .mutation(async ({ ctx, input }) => {
       const email = input.email.toLowerCase();
+      const scope = loginSecurityScope(ctx, email);
+      await assertLoginNotLocked(ctx.db, "pwd", scope);
+
       const user = await ctx.db.user.findUnique({
         where: { email },
         select: { id: true, email: true, password: true },
       });
 
-      if (user) {
-        const ok = await bcrypt.compare(input.password, user.password ?? "");
-        if (ok) {
-          try {
-            await issueEmailOtp(email, "LOGIN_2FA");
-          } catch (err) {
-            if (err instanceof EmailDeliveryError) {
-              throw new TRPCError({
-                code: "INTERNAL_SERVER_ERROR",
-                message: err.message,
-              });
-            }
-            throw err;
-          }
+      if (!user?.password) {
+        throw new TRPCError({
+          code: "UNAUTHORIZED",
+          message: INVALID_CREDENTIALS_MESSAGE,
+        });
+      }
+
+      const ok = await bcrypt.compare(input.password, user.password);
+      if (!ok) {
+        await recordLoginPasswordFailure(ctx.db, scope, user.id);
+      }
+
+      await assertLoginNotLocked(ctx.db, "otp", scope);
+
+      try {
+        await issueEmailOtp(email, "LOGIN_2FA");
+      } catch (err) {
+        if (err instanceof EmailDeliveryError) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: err.message,
+          });
         }
+        throw err;
       }
 
       return { message: LOGIN_OTP_SENT_MESSAGE };
     }),
 
-  verifyLoginOtp: publicProcedure
+  submitLoginOtp: publicProcedure
     .input(
       z.object({
         email: z.string().email(),
+        password: z.string().min(8).max(72),
         otp: z.string().regex(/^\d{6}$/, "Enter valid 6 digit OTP"),
       }),
     )
-    .mutation(async ({ input }) => {
-      const valid = await verifyEmailOtp({
-        email: input.email,
-        code: input.otp,
-        purpose: "LOGIN_2FA",
-        consume: false,
+    .mutation(async ({ ctx, input }) => {
+      const email = input.email.toLowerCase();
+      const scope = loginSecurityScope(ctx, email);
+      await assertLoginNotLocked(ctx.db, "pwd", scope);
+      await assertLoginNotLocked(ctx.db, "otp", scope);
+
+      const user = await ctx.db.user.findUnique({
+        where: { email },
+        select: { id: true, password: true },
       });
-      if (!valid) {
+
+      if (!user?.password) {
         throw new TRPCError({
           code: "UNAUTHORIZED",
-          message: "Invalid or expired OTP",
+          message: INVALID_CREDENTIALS_MESSAGE,
         });
       }
-      return { ok: true };
+
+      const passwordOk = await bcrypt.compare(input.password, user.password);
+      if (!passwordOk) {
+        await recordLoginPasswordFailure(ctx.db, scope, user.id);
+      }
+
+      const otpOk = await verifyEmailOtp({
+        email,
+        code: input.otp,
+        purpose: "LOGIN_2FA",
+        consume: true,
+      });
+      if (!otpOk) {
+        await recordLoginOtpFailure(ctx.db, scope, user.id);
+      }
+
+      await clearLoginFailures(ctx.db, scope);
+      return { ok: true as const };
     }),
 
   sendForgotPasswordOtp: publicProcedure
@@ -316,12 +369,11 @@ export const userRouter = createTRPCRouter({
     return ctx.db.user.findUnique({
       where: { id: ctx.session.user.id },
       select: {
-        id: true,
-        name: true,
-        email: true,
-        image: true,
+        ...publicUserSelect,
         bio: true,
         companyName: true,
+        jobTitle: true,
+        department: true,
         timezone: true,
         createdAt: true,
       },
@@ -334,24 +386,146 @@ export const userRouter = createTRPCRouter({
       return ctx.db.user.update({
         where: { id: ctx.session.user.id },
         data: {
-          ...input,
           name: input.name ? sanitizePlainText(input.name) : undefined,
           companyName: input.companyName
             ? normalizeCompanyName(input.companyName)
             : undefined,
+          jobTitle:
+            input.jobTitle !== undefined
+              ? (sanitizeOptionalPlainText(input.jobTitle) ?? null)
+              : undefined,
+          department:
+            input.department !== undefined
+              ? (sanitizeOptionalPlainText(input.department) ?? null)
+              : undefined,
           bio: sanitizeOptionalPlainText(input.bio),
+          timezone: input.timezone,
         },
         select: {
-          id: true,
-          name: true,
-          email: true,
-          image: true,
+          ...publicUserSelect,
+          bio: true,
+          companyName: true,
+          jobTitle: true,
+          department: true,
+          timezone: true,
+        },
+      });
+    }),
+
+  getImageUploadUrl: protectedProcedure
+    .input(
+      z.object({
+        contentType: z
+          .string()
+          .min(1)
+          .max(100)
+          .refine((value) => value.startsWith("image/"), {
+            message: "Only image uploads are allowed",
+          }),
+        contentLength: z
+          .number()
+          .int()
+          .positive()
+          .max(4 * 1024 * 1024, "Image must be 4MB or smaller"),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      if (!isS3Configured()) {
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: "Image storage is not configured on this server.",
+        });
+      }
+
+      const key = userImageKey(ctx.session.user.id, input.contentType);
+      return createPresignedUploadUrl(key, input.contentType);
+    }),
+
+  confirmProfileImage: protectedProcedure
+    .input(z.object({ objectKey: objectKeySchema }))
+    .mutation(async ({ ctx, input }) => {
+      if (!isS3Configured()) {
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: "Image storage is not configured on this server.",
+        });
+      }
+
+      if (!isUserImageKeyForUser(input.objectKey, ctx.session.user.id)) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "Invalid profile image key",
+        });
+      }
+
+      const existing = await ctx.db.user.findUnique({
+        where: { id: ctx.session.user.id },
+        select: { imageKey: true, image: true },
+      });
+
+      const previousKey = resolveLegacyUserImageKey(existing ?? {});
+      if (previousKey && previousKey !== input.objectKey) {
+        try {
+          await deleteObjectByKey(previousKey);
+        } catch {
+          // Best-effort cleanup.
+        }
+      }
+
+      return ctx.db.user.update({
+        where: { id: ctx.session.user.id },
+        data: {
+          imageKey: input.objectKey,
+          image:
+            existing?.image && !isAllowedUserImageUrl(existing.image)
+              ? existing.image
+              : null,
+        },
+        select: {
+          ...publicUserSelect,
           bio: true,
           companyName: true,
           timezone: true,
         },
       });
     }),
+
+  clearProfileImage: protectedProcedure.mutation(async ({ ctx }) => {
+    const existing = await ctx.db.user.findUnique({
+      where: { id: ctx.session.user.id },
+      select: { imageKey: true, image: true },
+    });
+
+    const previousKey = resolveLegacyUserImageKey(existing ?? {});
+    if (previousKey) {
+      try {
+        await deleteObjectByKey(previousKey);
+      } catch {
+        // Best-effort cleanup.
+      }
+    }
+
+    const legacyExternalImage =
+      existing?.image &&
+      !existing.image.startsWith("data:") &&
+      !isAllowedUserImageUrl(existing.image)
+        ? existing.image
+        : null;
+
+    return ctx.db.user.update({
+      where: { id: ctx.session.user.id },
+      data: {
+        imageKey: null,
+        image: legacyExternalImage,
+      },
+      select: {
+        ...publicUserSelect,
+        bio: true,
+        companyName: true,
+        timezone: true,
+      },
+    });
+  }),
 
   /**
    * Employee directory scoped to the signed-in user's organization.
@@ -384,7 +558,7 @@ export const userRouter = createTRPCRouter({
           ],
           NOT: { id: ctx.session.user.id },
         },
-        select: { id: true, name: true, email: true, image: true, companyName: true },
+        select: publicUserSelect,
         take: 20,
       });
     }),
