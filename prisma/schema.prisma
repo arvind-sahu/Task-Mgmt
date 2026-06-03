@@ -70,11 +70,14 @@ model User {
     name          String?
     email         String    @unique
     emailVerified DateTime?
-    image         String?
+    image         String? // OAuth / external avatar URL
+    imageKey      String? // S3 object key under user-images/
     password      String? // bcrypt hash; null for OAuth-only accounts
     bio           String?
     /// Organization the user belongs to (used to scope employee search and invites).
     companyName   String?
+    jobTitle      String?
+    department    String?
     timezone      String?   @default("UTC")
     createdAt     DateTime  @default(now())
     updatedAt     DateTime  @updatedAt
@@ -283,11 +286,14 @@ model Comment {
 
 /// Files (images, PDFs) attached to a task description or a comment.
 model TaskAttachment {
-    id        String   @id @default(cuid())
-    fileName  String
-    mimeType  String
-    dataUrl   String   @db.Text
-    createdAt DateTime @default(now())
+    id         String   @id @default(cuid())
+    fileName   String
+    mimeType   String
+    /// Legacy inline data URL or old public S3 URL — prefer storageKey for new uploads.
+    dataUrl    String?  @db.Text
+    /// S3 object key under tasks-attachments/
+    storageKey String?
+    createdAt  DateTime @default(now())
 
     taskId    String?
     task      Task?    @relation(fields: [taskId], references: [id], onDelete: Cascade)
