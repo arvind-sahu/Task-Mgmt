@@ -7,6 +7,7 @@ type TeamCardProps = {
   index: number;
   isVisible: boolean;
   canViewEmail: boolean;
+  homeTimeThemed?: boolean;
 };
 
 function clampText(text: string, maxLength: number) {
@@ -97,14 +98,24 @@ function SocialIcon({
   );
 }
 
-export function TeamCard({ member, index, isVisible, canViewEmail }: TeamCardProps) {
+export function TeamCard({
+  member,
+  index,
+  isVisible,
+  canViewEmail,
+  homeTimeThemed = false,
+}: TeamCardProps) {
   const [imageFailed, setImageFailed] = useState(false);
   const showImage = !!member.photoUrl && !imageFailed;
 
   return (
     <article
       tabIndex={0}
-      className={`group h-full rounded-2xl border border-slate-200 bg-white p-6 text-center shadow-[0_10px_25px_-5px_rgba(0,0,0,0.05)] transition duration-300 ease-out hover:-translate-y-1.5 hover:shadow-[0_20px_25px_-5px_rgba(0,0,0,0.1)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500 lg:rounded-[20px] ${
+      className={`group h-full rounded-2xl border p-6 text-center transition duration-300 ease-out hover:-translate-y-1.5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500 lg:rounded-[20px] ${
+        homeTimeThemed
+          ? "ht-team-card"
+          : "border-slate-200 bg-white shadow-[0_10px_25px_-5px_rgba(0,0,0,0.05)] hover:shadow-[0_20px_25px_-5px_rgba(0,0,0,0.1)]"
+      } ${
         isVisible ? "translate-y-0 opacity-100" : "translate-y-4 opacity-0"
       } motion-reduce:translate-y-0 motion-reduce:opacity-100`}
       style={{
@@ -135,19 +146,21 @@ export function TeamCard({ member, index, isVisible, canViewEmail }: TeamCardPro
 
       {member.department && (
         <div className="mt-4">
-          <span className="rounded-full border border-blue-100 bg-blue-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.08em] text-blue-700">
+          <span className={`rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.08em] ${
+            homeTimeThemed ? "ht-team-dept border" : "border-blue-100 bg-blue-50 text-blue-700"
+          }`}>
             {clampText(member.department, 20)}
           </span>
         </div>
       )}
 
-      <h3 className="mt-5 text-lg font-bold text-slate-900 sm:text-xl">
+      <h3 className={`mt-5 text-lg font-bold sm:text-xl ${homeTimeThemed ? "ht-team-name" : "text-slate-900"}`}>
         {clampText(member.name, 50)}
       </h3>
-      <p className="mt-1 text-sm font-semibold text-blue-600">
+      <p className={`mt-1 text-sm font-semibold ${homeTimeThemed ? "" : "text-blue-600"}`} style={homeTimeThemed ? { color: "var(--ht-accent)" } : undefined}>
         {clampText(member.title, 40)}
       </p>
-      <p className="mt-3 text-sm leading-6 text-slate-600">{clampText(member.bio, 160)}</p>
+      <p className={`mt-3 text-sm leading-6 ${homeTimeThemed ? "ht-team-bio" : "text-slate-600"}`}>{clampText(member.bio, 160)}</p>
 
       <div className="mt-5 flex items-center justify-center gap-4">
         {member.socialLinks.linkedin && (

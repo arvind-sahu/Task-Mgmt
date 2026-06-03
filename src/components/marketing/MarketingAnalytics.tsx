@@ -3,6 +3,7 @@ import { useRouter } from "next/router";
 import { useEffect, useRef } from "react";
 
 import { trackMarketingEvent } from "~/lib/analytics";
+import { subscribeMarketingScroll, getMarketingScrollProgress } from "~/utils/marketingScroll";
 
 const GA_ID = process.env.NEXT_PUBLIC_GA_ID;
 const HOTJAR_ID = process.env.NEXT_PUBLIC_HOTJAR_ID;
@@ -23,11 +24,9 @@ export function MarketingAnalytics() {
 
   useEffect(() => {
     const depths = [25, 50, 75, 100];
-    const onScroll = () => {
-      const scrollable = document.documentElement.scrollHeight - window.innerHeight;
-      if (scrollable <= 0) return;
 
-      const currentDepth = Math.round((window.scrollY / scrollable) * 100);
+    return subscribeMarketingScroll(() => {
+      const currentDepth = Math.round(getMarketingScrollProgress() * 100);
       for (const depth of depths) {
         if (currentDepth >= depth && !firedDepths.current.has(depth)) {
           firedDepths.current.add(depth);
@@ -37,10 +36,7 @@ export function MarketingAnalytics() {
           });
         }
       }
-    };
-
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
+    });
   }, []);
 
   return (
