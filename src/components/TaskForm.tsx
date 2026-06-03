@@ -203,7 +203,7 @@ export default function TaskForm({
               >
                 <span className="grid h-5 w-5 place-items-center overflow-hidden rounded-full bg-indigo-100 text-[10px] font-semibold text-indigo-700 ring-1 ring-indigo-200">
                   <CachedAvatar
-                    src={m.user.image}
+                    user={m.user}
                     alt={m.user.name ?? m.user.email}
                     className="h-full w-full object-cover"
                     fallback={initialsFromName(m.user.name, m.user.email)}

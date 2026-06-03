@@ -3,6 +3,7 @@ import { InviteStatus, NotificationType, ProjectRole, SprintPlan } from "@prisma
 import { z } from "zod";
 
 import { assertProjectAccess } from "~/server/api/access";
+import { publicUserSelect } from "~/server/api/userSelect";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { createNotification } from "~/server/notifications";
 import { companyNamesMatch } from "~/server/company";
@@ -162,7 +163,7 @@ export const projectRouter = createTRPCRouter({
         OR: [{ ownerId: userId }, { members: { some: { userId } } }],
       },
       include: {
-        owner: { select: { id: true, name: true, email: true, image: true } },
+        owner: { select: publicUserSelect },
         _count: { select: { tasks: true, members: true } },
       },
       orderBy: { updatedAt: "desc" },
@@ -181,12 +182,12 @@ export const projectRouter = createTRPCRouter({
         where: { id: input.id },
         include: {
           owner: {
-            select: { id: true, name: true, email: true, image: true },
+            select: publicUserSelect,
           },
           members: {
             include: {
               user: {
-                select: { id: true, name: true, email: true, image: true },
+                select: publicUserSelect,
               },
             },
           },

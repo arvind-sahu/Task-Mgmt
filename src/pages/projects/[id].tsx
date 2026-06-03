@@ -1,14 +1,16 @@
 import { useRouter } from "next/router";
 import { SprintPlan, TaskStatus } from "@prisma/client";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { GetServerSidePropsContext } from "next";
 
 import EmptyState from "~/components/EmptyState";
 import Layout from "~/components/Layout";
+import { projectTabsForId } from "~/config/appNav";
 import { CachedAvatar } from "~/components/CachedAvatar";
 import { ProjectSettingsPanel } from "~/components/ProjectSettingsPanel";
 import TaskCard from "~/components/TaskCard";
 import { TaskCommentsSection } from "~/components/TaskCommentsSection";
+import { isTaskCompleted, TaskCompletedTick } from "~/components/TaskIndicators";
 import { TagChip } from "~/components/TagChip";
 import { canManageProject } from "~/utils/projectRole";
 import TaskForm, { type TaskFormValues } from "~/components/TaskForm";
@@ -34,6 +36,7 @@ import { readSprintPanelOpen, writeSprintPanelOpen } from "~/utils/panelPrefs";
 export default function ProjectDetail() {
   const router = useRouter();
   const id = typeof router.query.id === "string" ? router.query.id : "";
+  const showSettingsView = router.query.view === "settings";
 
   const utils = api.useUtils();
   const project = api.project.byId.useQuery({ id }, { enabled: !!id });
@@ -60,16 +63,15 @@ export default function ProjectDetail() {
   }
 
   const [showCreate, setShowCreate] = useState(false);
-  const [showSettings, setShowSettings] = useState(false);
   const [activeSprintId, setActiveSprintId] = useState("");
   const [taskSearch, setTaskSearch] = useState("");
-  const [selectedTagId, setSelectedTagId] = useState<string | null>(null);
   const [selectedMemberIds, setSelectedMemberIds] = useState<string[]>([]);
   const [memberSearch, setMemberSearch] = useState("");
   const [memberMenuId, setMemberMenuId] = useState<string | null>(null);
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const topScrollRef = useRef<HTMLDivElement | null>(null);
   const boardScrollRef = useRef<HTMLDivElement | null>(null);
+  const [boardOverflowsX, setBoardOverflowsX] = useState(false);
 
   const resolvedSprintId =
     activeSprintId || currentSprint.data?.id || null;
@@ -77,15 +79,13 @@ export default function ProjectDetail() {
     () => ({
       projectId: id,
       sprintId: resolvedSprintId,
-      tagId: selectedTagId || undefined,
     }),
-    [id, resolvedSprintId, selectedTagId],
+    [id, resolvedSprintId],
   );
   const tasksReady =
     currentSprint.isFetched &&
     (currentSprint.data == null || resolvedSprintId != null);
 
-  const tags = api.tag.list.useQuery({ projectId: id }, { enabled: !!id });
   const tasks = api.task.list.useQuery(taskListInput, {
     enabled: !!id && tasksReady,
     staleTime: 30_000,
@@ -117,7 +117,16 @@ export default function ProjectDetail() {
 
   useEffect(() => {
     setSelectedTaskId(null);
-  }, [taskSearch, selectedTagId, selectedMemberIds]);
+  }, [taskSearch, selectedMemberIds]);
+
+  useEffect(() => {
+    if (!id || router.query.view !== "settings" || project.isLoading || !project.data) {
+      return;
+    }
+    if (!canManageProject(project.data.currentUserRole)) {
+      void router.replace(`/projects/${id}`, undefined, { shallow: true });
+    }
+  }, [id, project.data, project.isLoading, router]);
 
   const invalidateSprints = () => {
     void utils.sprint.current.invalidate({ projectId: id });
@@ -224,13 +233,59 @@ export default function ProjectDetail() {
     }
   }
 
-  function scrollBoardWithWheel(delta: number) {
-    const top = topScrollRef.current;
+  function handleBoardWheel(event: React.WheelEvent<HTMLDivElement>) {
     const board = boardScrollRef.current;
-    if (!top || !board) return;
-    top.scrollLeft += delta;
-    board.scrollLeft = top.scrollLeft;
+    if (!board || board.scrollWidth <= board.clientWidth + 1) return;
+
+    const delta =
+      Math.abs(event.deltaX) > Math.abs(event.deltaY)
+        ? event.deltaX
+        : event.shiftKey
+          ? event.deltaY
+          : 0;
+    if (delta === 0) return;
+
+    const maxScroll = board.scrollWidth - board.clientWidth;
+    const next = board.scrollLeft + delta;
+    if (next < 0 || next > maxScroll) return;
+
+    event.preventDefault();
+    board.scrollLeft = next;
+    syncBoardScroll("board");
   }
+
+  useLayoutEffect(() => {
+    const board = boardScrollRef.current;
+    if (!board || selectedTaskId) {
+      setBoardOverflowsX(false);
+      return;
+    }
+
+    const measure = () => {
+      setBoardOverflowsX(board.scrollWidth > board.clientWidth + 1);
+    };
+
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(board);
+    return () => observer.disconnect();
+  }, [
+    filteredTasks.length,
+    selectedTaskId,
+    showCreate,
+    showSprintPanel,
+    taskSearch,
+  ]);
+
+  useLayoutEffect(() => {
+    const board = boardScrollRef.current;
+    const top = topScrollRef.current;
+    if (!board || !top || !boardOverflowsX) return;
+    const track = top.querySelector(".task-board-track");
+    if (track instanceof HTMLElement) {
+      track.style.width = `${board.scrollWidth}px`;
+    }
+  }, [boardOverflowsX, filteredTasks.length, showSprintPanel, taskSearch]);
 
   function handleCreate(values: TaskFormValues) {
     createTask.mutate({
@@ -315,10 +370,11 @@ export default function ProjectDetail() {
     <Layout
       title={project.data.name}
       headerTitle={project.data.name}
-      compactBrand
-      contentClassName="mx-auto w-full min-w-0 max-w-none flex-1 px-2 py-2 sm:px-3 lg:px-4"
+      projectColor={project.data.color}
+      projectTabs={projectTabsForId(id)}
+      contentClassName="app-main mx-auto flex h-full min-h-0 w-full min-w-0 max-w-none flex-1 flex-col overflow-hidden px-2 py-2 sm:px-3 lg:px-4"
     >
-      {showCreate && (
+      {showCreate && !showSettingsView && (
         <div className="card mb-3">
           <h2 className="mb-4 text-lg font-semibold">Create task</h2>
           <TaskForm
@@ -345,13 +401,13 @@ export default function ProjectDetail() {
       )}
 
       <div
-        className={`grid grid-cols-1 gap-3 ${
+        className={`grid min-h-0 flex-1 grid-cols-1 gap-3 ${
           showSprintPanel
             ? "xl:grid-cols-[14rem_minmax(0,1fr)_12.8rem] 2xl:grid-cols-[15rem_minmax(0,1fr)_13.6rem]"
             : "xl:grid-cols-[minmax(0,1fr)_12.8rem] 2xl:grid-cols-[minmax(0,1fr)_13.6rem]"
         }`}
       >
-        {showSprintPanel ? (
+        {showSprintPanel && !showSettingsView ? (
           <aside className="space-y-4">
             <SprintSidebar
               canManage={canManage}
@@ -391,39 +447,44 @@ export default function ProjectDetail() {
           </aside>
         ) : null}
 
-        <section className="min-w-0">
-          <div className="mb-3 flex flex-col gap-2 lg:flex-row lg:items-end lg:justify-between">
-            <div className="flex min-w-0 items-start gap-2">
-              <button
-                type="button"
-                onClick={toggleSprintPanel}
-                className="btn-ghost shrink-0 px-2 py-1.5 text-xs"
-                aria-expanded={showSprintPanel}
-                aria-label={showSprintPanel ? "Hide sprint panel" : "Show sprint panel"}
+        <section className="flex min-h-0 min-w-0 flex-col">
+          {showSettingsView && canManage ? (
+            <div className="min-h-0 flex-1 overflow-y-auto">
+              <ProjectSettingsPanel
+                projectId={id}
+                initial={{
+                  name: project.data.name,
+                  description: project.data.description,
+                  color: project.data.color,
+                  sprintPlan: project.data.sprintPlan,
+                  sprintStartDayOfWeek: project.data.sprintStartDayOfWeek,
+                  sprintDurationWeeks: project.data.sprintDurationWeeks,
+                }}
               >
-                {showSprintPanel ? "◀ Hide sprints" : "▶ Sprints"}
-              </button>
-              <div className="min-w-0">
-                <p className="text-xs font-semibold uppercase tracking-wide text-muted">
-                  Task board
-                </p>
-                <h2 className="flex min-w-0 flex-wrap items-baseline gap-x-2 text-lg font-semibold text-heading">
-                  <span className="truncate">
-                    {activeSprint ? activeSprint.name : "Backlog tasks"}
-                  </span>
-                  {selectedMemberLabels.length > 0 && (
-                    <span className="text-xs font-normal text-muted">
-                      Showing tasks assigned to{" "}
-                      <span className="font-semibold text-heading">
-                        {selectedMemberLabels.join(", ")}
-                      </span>
-                      <span className="mx-1.5 opacity-40">·</span>
-                    </span>
-                  )}
-                </h2>
-              </div>
+                <TagsPanel projectId={id} canManage={canManage} />
+              </ProjectSettingsPanel>
             </div>
-            <div className="flex shrink-0 items-center gap-2">
+          ) : (
+            <>
+          <div className="mb-2 flex shrink-0 flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={toggleSprintPanel}
+              className="btn-ghost shrink-0 px-2 py-1.5 text-xs"
+              aria-expanded={showSprintPanel}
+              aria-label={showSprintPanel ? "Hide sprint panel" : "Show sprint panel"}
+            >
+              {showSprintPanel ? "◀ Hide sprints" : "▶ Sprints"}
+            </button>
+            {selectedMemberLabels.length > 0 && (
+              <p className="min-w-0 text-xs text-muted">
+                Assigned to{" "}
+                <span className="font-semibold text-heading">
+                  {selectedMemberLabels.join(", ")}
+                </span>
+              </p>
+            )}
+            <div className="ml-auto flex shrink-0 items-center gap-2">
               <div className="relative w-56 sm:w-64">
                 <span
                   className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
@@ -462,49 +523,6 @@ export default function ProjectDetail() {
               </button>
             </div>
           </div>
-          <div className="mb-3 flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              className={`rounded-full px-3 py-1 text-xs font-semibold ring-1 ring-inset transition ${
-                selectedTagId === null
-                  ? "chip-active"
-                  : "chip interactive-hover"
-              }`}
-              onClick={() => setSelectedTagId(null)}
-            >
-              All tags
-            </button>
-            {tags.data?.map((tag) => {
-              const selected = selectedTagId === tag.id;
-              return (
-                <button
-                  key={tag.id}
-                  type="button"
-                  className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold ring-1 ring-inset transition ${
-                    selected ? "ring-2" : "interactive-hover"
-                  }`}
-                  style={{
-                    color: selected ? "white" : tag.color,
-                    backgroundColor: selected ? tag.color : `${tag.color}12`,
-                    borderColor: tag.color,
-                  }}
-                  onClick={() =>
-                    setSelectedTagId((current) =>
-                      current === tag.id ? null : tag.id,
-                    )
-                  }
-                >
-                  <span
-                    className="h-2 w-2 rounded-full"
-                    style={{
-                      backgroundColor: selected ? "white" : tag.color,
-                    }}
-                  />
-                  {tag.name}
-                </button>
-              );
-            })}
-          </div>
           {selectedTaskId ? (
             <TaskDetailPanel
               task={selectedTask.data}
@@ -517,28 +535,22 @@ export default function ProjectDetail() {
               onSubmit={handleTaskEdit}
             />
           ) : (
-            <>
-              <div
-                ref={topScrollRef}
-                className="mb-2 h-4 overflow-x-auto overflow-y-hidden"
-                onScroll={() => syncBoardScroll("top")}
-                aria-label="Task board horizontal scroll"
-              >
-                <div className="h-1 min-w-[86rem]" />
-              </div>
+            <div className="task-board-shell flex min-h-0 flex-1 flex-col">
+              {boardOverflowsX && (
+                <div
+                  ref={topScrollRef}
+                  className="mb-2 h-4 shrink-0 overflow-x-auto overflow-y-hidden task-board-scroll-top"
+                  onScroll={() => syncBoardScroll("top")}
+                  aria-label="Task board horizontal scroll"
+                >
+                  <div className="task-board-track h-1" />
+                </div>
+              )}
               <div
                 ref={boardScrollRef}
-                className="overflow-x-hidden pb-2"
+                className="task-board-scroll min-h-0 w-full min-w-0 flex-1 pb-2"
                 onScroll={() => syncBoardScroll("board")}
-                onWheel={(event) => {
-                  const delta =
-                    Math.abs(event.deltaX) > Math.abs(event.deltaY)
-                      ? event.deltaX
-                      : event.deltaY;
-                  if (delta === 0) return;
-                  event.preventDefault();
-                  scrollBoardWithWheel(delta);
-                }}
+                onWheel={handleBoardWheel}
               >
                 {taskSearch.trim() && filteredTasks.length === 0 && (
                   <div className="mb-3 rounded-2xl border border-dashed p-5 text-center text-sm text-muted" style={{ borderColor: "var(--border)" }}>
@@ -550,20 +562,20 @@ export default function ProjectDetail() {
                     </p>
                   </div>
                 )}
-                <div className="grid min-w-[86rem] grid-cols-5 gap-3">
+                <div className="task-board-grid grid h-full min-w-[86rem] grid-cols-5 gap-3">
                 {TASK_STATUSES.map((s) => {
                   const colTasks = filteredTasks.filter((t) => t.status === s);
                   return (
                     <div
                       key={s}
-                      className="task-column rounded-xl p-3"
+                      className="task-column flex min-h-0 flex-col rounded-xl p-3"
                       onDragOver={(e) => e.preventDefault()}
                       onDrop={(e) => {
                         const taskId = e.dataTransfer.getData("text/plain");
                         if (taskId) setStatus.mutate({ id: taskId, status: s });
                       }}
                     >
-                      <div className="mb-3 flex items-center justify-between px-1">
+                      <div className="mb-3 flex shrink-0 items-center justify-between px-1">
                         <h3 className="text-sm font-semibold text-heading">
                           {statusLabel[s]}
                         </h3>
@@ -571,7 +583,7 @@ export default function ProjectDetail() {
                           {colTasks.length}
                         </span>
                       </div>
-                      <div className="space-y-2">
+                      <div className="task-column-body min-h-0 flex-1 space-y-2 overflow-y-auto overflow-x-hidden">
                         {colTasks.length === 0 && (
                           <p className="px-2 py-3 text-xs text-slate-400">
                             {taskSearch.trim()
@@ -600,31 +612,13 @@ export default function ProjectDetail() {
                 })}
                 </div>
               </div>
+            </div>
+          )}
             </>
           )}
         </section>
 
         <aside className="space-y-3">
-          {canManage && (
-            <button
-              type="button"
-              onClick={() => setShowSettings((value) => !value)}
-              className={`inline-flex w-full items-center justify-center gap-2 rounded-xl border px-3 py-2 text-sm font-semibold shadow-sm transition ${
-                showSettings
-                  ? "border-indigo-300 bg-indigo-50 text-indigo-700"
-                  : "border-slate-200 bg-white text-slate-700 hover:border-indigo-300 hover:text-indigo-700"
-              }`}
-              aria-expanded={showSettings}
-            >
-              <span
-                aria-hidden="true"
-                className="grid h-6 w-6 place-items-center rounded-lg border border-current text-xs"
-              >
-                G
-              </span>
-              Project settings
-            </button>
-          )}
           <ProjectMembersPanel
             projectId={id}
             members={projectMembers}
@@ -654,21 +648,6 @@ export default function ProjectDetail() {
             }
             onCloseMenu={() => setMemberMenuId(null)}
           />
-          {canManage && showSettings && (
-            <ProjectSettingsPanel
-              projectId={id}
-              initial={{
-                name: project.data.name,
-                description: project.data.description,
-                color: project.data.color,
-                sprintPlan: project.data.sprintPlan,
-                sprintStartDayOfWeek: project.data.sprintStartDayOfWeek,
-                sprintDurationWeeks: project.data.sprintDurationWeeks,
-              }}
-            >
-              <TagsPanel projectId={id} canManage={canManage} />
-            </ProjectSettingsPanel>
-          )}
         </aside>
       </div>
     </Layout>
@@ -802,10 +781,6 @@ function TaskDetailPanel({
   const suppressNextTextBlurRef = useRef(false);
   const project = api.project.byId.useQuery(
     { id: task?.projectId ?? "" },
-    { enabled: !!task?.projectId },
-  );
-  const tags = api.tag.list.useQuery(
-    { projectId: task?.projectId ?? "" },
     { enabled: !!task?.projectId },
   );
 
@@ -968,44 +943,48 @@ function TaskDetailPanel({
               ←
             </button>
             {titleEditing ? (
-              <textarea
-                className="editable-field-editing min-w-0 flex-1 resize-none rounded-xl px-2 py-1 text-xl font-semibold leading-7 outline-none"
-                value={title}
-                onChange={(event) => setTitle(event.target.value)}
-                onBlur={() => {
-                  if (suppressNextTextBlurRef.current) {
-                    suppressNextTextBlurRef.current = false;
-                    return;
-                  }
-                  setTitleEditing(false);
-                  saveTextField({ title });
-                }}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter") {
-                    event.preventDefault();
+              <div className="flex min-w-0 flex-1 items-start gap-2">
+                {isTaskCompleted(status) && <TaskCompletedTick className="mt-1.5" />}
+                <textarea
+                  className="editable-field-editing min-w-0 flex-1 resize-none rounded-xl px-2 py-1 text-xl font-semibold leading-7 outline-none"
+                  value={title}
+                  onChange={(event) => setTitle(event.target.value)}
+                  onBlur={() => {
+                    if (suppressNextTextBlurRef.current) {
+                      suppressNextTextBlurRef.current = false;
+                      return;
+                    }
                     setTitleEditing(false);
                     saveTextField({ title });
-                  }
-                  if (event.key === "Escape") {
-                    event.preventDefault();
-                    suppressNextTextBlurRef.current = true;
-                    setTitle(task.title);
-                    setTitleEditing(false);
-                  }
-                }}
-                maxLength={200}
-                rows={2}
-                autoFocus
-                aria-label="Task title"
-              />
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      event.preventDefault();
+                      setTitleEditing(false);
+                      saveTextField({ title });
+                    }
+                    if (event.key === "Escape") {
+                      event.preventDefault();
+                      suppressNextTextBlurRef.current = true;
+                      setTitle(task.title);
+                      setTitleEditing(false);
+                    }
+                  }}
+                  maxLength={200}
+                  rows={2}
+                  autoFocus
+                  aria-label="Task title"
+                />
+              </div>
             ) : (
               <button
                 type="button"
-                className="editable-field line-clamp-2 min-w-0 flex-1 rounded-xl px-2 py-1 text-left text-xl font-semibold leading-7 text-heading"
+                className="editable-field flex min-w-0 flex-1 items-start gap-2 rounded-xl px-2 py-1 text-left text-xl font-semibold leading-7 text-heading"
                 onClick={() => setTitleEditing(true)}
                 title={title}
               >
-                {title}
+                {isTaskCompleted(status) && <TaskCompletedTick className="mt-1.5 shrink-0" />}
+                <span className="line-clamp-2 min-w-0">{title}</span>
               </button>
             )}
           </div>
@@ -1022,7 +1001,7 @@ function TaskDetailPanel({
                   >
                     <span className="app-avatar grid h-6 w-6 place-items-center overflow-hidden rounded-full text-[10px] font-semibold">
                       <CachedAvatar
-                        src={member.user.image}
+                        user={member.user}
                         alt={member.user.name ?? member.user.email}
                         className="h-full w-full object-cover"
                         fallback={initialsFromName(
@@ -1185,7 +1164,7 @@ function TaskDetailPanel({
                 >
                   <span className="app-avatar grid h-6 w-6 place-items-center overflow-hidden rounded-full text-[10px] font-semibold">
                     <CachedAvatar
-                      src={member.user.image}
+                      user={member.user}
                       alt={member.user.name ?? member.user.email}
                       className="h-full w-full object-cover"
                       fallback={initialsFromName(
@@ -1195,32 +1174,6 @@ function TaskDetailPanel({
                     />
                   </span>
                   {member.user.name ?? member.user.email}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        <div>
-          <label className="label">Tags</label>
-          <div className="mt-2 flex flex-wrap gap-2">
-            {tags.data?.length === 0 && (
-              <p className="text-xs text-slate-500">No tags yet.</p>
-            )}
-            {tags.data?.map((tag) => {
-              const selected = tagIds.includes(tag.id);
-              return (
-                <button
-                  type="button"
-                  key={tag.id}
-                  onClick={() =>
-                    setTagIds((current) => toggleValue(current, tag.id))
-                  }
-                  className={`rounded-full transition ${
-                    selected ? "ring-2 ring-[var(--accent)]" : "interactive-hover opacity-80 hover:opacity-100"
-                  }`}
-                >
-                  <TagChip name={tag.name} color={tag.color} size="md" />
                 </button>
               );
             })}
@@ -2021,7 +1974,7 @@ function MemberAvatar({ member }: { member: ProjectMemberItem }) {
   return (
     <span className="app-avatar grid h-7 w-7 shrink-0 place-items-center overflow-hidden rounded-full text-[10px] font-bold ring-2 ring-[var(--surface)]">
       <CachedAvatar
-        src={member.user.image}
+        user={member.user}
         alt={label}
         className="h-full w-full object-cover"
         fallback={initials}

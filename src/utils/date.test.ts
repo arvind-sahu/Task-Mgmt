@@ -3,7 +3,9 @@ import { describe, expect, it } from "vitest";
 import {
   formatDate,
   formatDateTime,
+  boardDeadlineLabel,
   deadlineDayLabel,
+  formatBoardDueDate,
   isOverdue,
   relativeDeadline,
   wasEdited,
@@ -60,6 +62,38 @@ describe("relativeDeadline", () => {
     expect(relativeDeadline(new Date(2024, 5, 10, 10, 0, 0), now)).toMatch(
       /ago/,
     );
+  });
+});
+
+describe("boardDeadlineLabel", () => {
+  const now = new Date(2024, 5, 15, 12, 0, 0);
+
+  it("returns Today for same calendar day", () => {
+    expect(boardDeadlineLabel(new Date(2024, 5, 15, 23, 0, 0), now)).toBe(
+      "Today",
+    );
+  });
+
+  it("returns compact day labels within 2 days", () => {
+    expect(boardDeadlineLabel(new Date(2024, 5, 16, 10, 0, 0), now)).toBe("1d");
+    expect(boardDeadlineLabel(new Date(2024, 5, 17, 10, 0, 0), now)).toBe("2d");
+  });
+
+  it("returns a short date when more than 2 days out", () => {
+    expect(boardDeadlineLabel(new Date(2024, 5, 20, 10, 0, 0), now)).toBe(
+      "20 Jun",
+    );
+  });
+
+  it("returns empty string for overdue dates", () => {
+    expect(boardDeadlineLabel(new Date(2024, 5, 10, 10, 0, 0), now)).toBe("");
+  });
+});
+
+describe("formatBoardDueDate", () => {
+  it("formats as day then abbreviated month", () => {
+    expect(formatBoardDueDate(new Date(2024, 5, 7))).toBe("7 Jun");
+    expect(formatBoardDueDate(new Date(2024, 0, 15))).toBe("15 Jan");
   });
 });
 
