@@ -344,6 +344,9 @@ export default function ProjectDetail() {
   }
 
   const canManage = canManageProject(project.data.currentUserRole);
+  const projectTabs = canManage
+    ? projectTabsForId(id)
+    : projectTabsForId(id).filter((tab) => tab.key !== "settings");
   const pendingInvites: PendingInvite[] =
     canManage && "invites" in project.data
       ? project.data.invites
@@ -371,7 +374,17 @@ export default function ProjectDetail() {
       title={project.data.name}
       headerTitle={project.data.name}
       projectColor={project.data.color}
-      projectTabs={projectTabsForId(id)}
+      projectTabs={projectTabs}
+      projectTaskSearch={
+        showSettingsView
+          ? undefined
+          : {
+              value: taskSearch,
+              onChange: setTaskSearch,
+              filteredCount: filteredTasks.length,
+              totalCount: sprintTasks.length,
+            }
+      }
       contentClassName="app-main mx-auto flex h-full min-h-0 w-full min-w-0 max-w-none flex-1 flex-col overflow-hidden px-2 py-2 sm:px-3 lg:px-4"
     >
       {showCreate && !showSettingsView && (
@@ -485,33 +498,6 @@ export default function ProjectDetail() {
               </p>
             )}
             <div className="ml-auto flex shrink-0 items-center gap-2">
-              <div className="relative w-56 sm:w-64">
-                <span
-                  className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
-                  aria-hidden="true"
-                >
-                  🔍
-                </span>
-                <input
-                  className="input h-9 pl-9 pr-[4.5rem] text-xs"
-                  placeholder="Search tasks..."
-                  value={taskSearch}
-                  onChange={(event) => setTaskSearch(event.target.value)}
-                />
-                {taskSearch && (
-                  <button
-                    type="button"
-                    className="absolute right-14 top-1/2 -translate-y-1/2 rounded px-1 text-sm font-bold text-slate-400 transition hover:text-slate-700"
-                    onClick={() => setTaskSearch("")}
-                    aria-label="Clear task search"
-                  >
-                    ×
-                  </button>
-                )}
-                <span className="chip absolute right-2 top-1/2 -translate-y-1/2 rounded px-1.5 py-0.5 text-[10px] font-semibold">
-                  {filteredTasks.length}/{sprintTasks.length}
-                </span>
-              </div>
               <button
                 type="button"
                 onClick={() => setShowCreate((s) => !s)}

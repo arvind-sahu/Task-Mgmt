@@ -147,17 +147,33 @@ export function HomeHero({ timeThemed = false }: { timeThemed?: boolean }) {
             Join 5,000+ teams using Tasker for sprint planning, AI insights,
             real-time collaboration, and end-to-end full-stack delivery support.
           </p>
-          <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+          <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
             <Link
-              href="/auth/signup"
-              onClick={() => trackMarketingEvent("cta_click", { location: "hero", label: "Start free" })}
+              href="/auth/company-signup"
+              onClick={() =>
+                trackMarketingEvent("cta_click", {
+                  location: "hero",
+                  label: "Create company workspace",
+                })
+              }
               className={
                 timeThemed
                   ? "home-time-btn-primary rounded-full px-7 py-3 text-center text-sm font-black transition hover:-translate-y-1"
                   : "rounded-full bg-gradient-to-r from-cyan-300 via-blue-400 to-purple-400 px-7 py-3 text-center text-sm font-black text-slate-950 shadow-2xl shadow-blue-500/30 transition hover:-translate-y-1"
               }
             >
-              Start Free Trial
+              Create company workspace
+            </Link>
+            <Link
+              href="/auth/signup"
+              onClick={() => trackMarketingEvent("cta_click", { location: "hero", label: "Start free" })}
+              className={
+                timeThemed
+                  ? "home-time-btn-secondary rounded-full border px-7 py-3 text-center text-sm font-bold transition hover:-translate-y-1"
+                  : "rounded-full border border-white/15 px-7 py-3 text-center text-sm font-bold text-white transition hover:-translate-y-1 hover:bg-white/10"
+              }
+            >
+              Join as individual
             </Link>
             <a
               href="#demo"

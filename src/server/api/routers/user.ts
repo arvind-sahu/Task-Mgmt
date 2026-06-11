@@ -80,31 +80,17 @@ export const updateProfileInput = z.object({
 const objectKeySchema = z.string().min(1).max(512);
 
 export const userRouter = createTRPCRouter({
-  /** Public registration endpoint. Hashes the password with bcrypt. */
-  register: publicProcedure
-    .input(registerInput)
-    .mutation(async ({ ctx, input }) => {
-      const email = input.email.toLowerCase();
-      const existing = await ctx.db.user.findUnique({ where: { email } });
-      if (existing) {
-        throw new TRPCError({
-          code: "CONFLICT",
-          message: "An account with this email already exists",
-        });
-      }
-
-      const passwordHash = await bcrypt.hash(input.password, 10);
-
-      const user = await ctx.db.user.create({
-        data: {
-          name: sanitizePlainText(input.name),
-          email,
-          password: passwordHash,
-        },
-        select: { id: true, email: true, name: true },
-      });
-      return user;
-    }),
+  /**
+   * Direct registration is disabled — accounts are created only after email OTP
+   * verification via `verifySignupOtpAndRegister`.
+   */
+  register: publicProcedure.input(registerInput).mutation(() => {
+    throw new TRPCError({
+      code: "PRECONDITION_FAILED",
+      message:
+        "Email verification is required. Request a code on the sign-up page, then verify it.",
+    });
+  }),
 
   sendSignupOtp: publicProcedure
     .input(
@@ -177,6 +163,7 @@ export const userRouter = createTRPCRouter({
           name: sanitizePlainText(input.name),
           email,
           password: passwordHash,
+          emailVerified: new Date(),
           companyName: normalizeCompanyName(input.companyName),
         },
         select: { id: true, email: true, name: true, companyName: true },

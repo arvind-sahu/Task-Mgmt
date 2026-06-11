@@ -7,6 +7,7 @@ import { useMemo, useState } from "react";
 import { PriorityBadge } from "~/components/Badges";
 import Layout from "~/components/Layout";
 import { StatusSelect } from "~/components/StatusSelect";
+import { TaskMetaCounts } from "~/components/TaskIndicators";
 import { requireAuth } from "~/server/auth";
 import { api } from "~/utils/api";
 import { isOverdue, relativeDeadline } from "~/utils/date";
@@ -118,6 +119,10 @@ export default function MyTasksPage() {
                   </div>
                 </Link>
                 <div className="flex flex-wrap items-center gap-2 sm:ml-auto">
+                  <TaskMetaCounts
+                    commentCount={t._count?.comments ?? 0}
+                    attachmentCount={t._count?.attachments ?? 0}
+                  />
                   <PriorityBadge priority={t.priority} />
                   <StatusSelect
                     status={t.status}

@@ -13,6 +13,7 @@ import { type Session } from "next-auth";
 import { ZodError } from "zod";
 
 import { getServerAuthSession } from "~/server/auth";
+import { parseCompanyIdFromCookie } from "~/server/company/workspace";
 import { db } from "~/server/db";
 import { assertRateLimit, toRateLimitTrpcError } from "~/server/rateLimit";
 import { getClientIp } from "~/server/security/clientIp";
@@ -30,6 +31,7 @@ interface CreateContextOptions {
   session: Session | null;
   clientIp: string;
   clientUserAgent?: string;
+  activeCompanyId?: string;
 }
 
 /**
@@ -48,6 +50,7 @@ const createInnerTRPCContext = (opts: CreateContextOptions) => {
     db,
     clientIp: opts.clientIp,
     clientUserAgent: opts.clientUserAgent,
+    activeCompanyId: opts.activeCompanyId,
   };
 };
 
@@ -63,6 +66,9 @@ export const createTRPCContext = async (opts: CreateNextContextOptions) => {
   // Get the session from the server using the getServerSession wrapper function
   const session = await getServerAuthSession({ req, res });
 
+  const cookieHeader =
+    typeof req.headers.cookie === "string" ? req.headers.cookie : undefined;
+
   return createInnerTRPCContext({
     session,
     clientIp: getClientIp(req),
@@ -70,6 +76,7 @@ export const createTRPCContext = async (opts: CreateNextContextOptions) => {
       typeof req.headers["user-agent"] === "string"
         ? req.headers["user-agent"]
         : undefined,
+    activeCompanyId: parseCompanyIdFromCookie(cookieHeader),
   });
 };
 

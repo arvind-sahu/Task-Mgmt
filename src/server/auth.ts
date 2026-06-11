@@ -1,4 +1,5 @@
 import { PrismaAdapter } from "@auth/prisma-adapter";
+import { InviteStatus } from "@prisma/client";
 import { type NextApiRequest } from "next";
 import { type GetServerSidePropsContext } from "next";
 import {
@@ -53,19 +54,44 @@ export const credentialsSchema = z.object({
     .string()
     .regex(/^\d{6}$/, "Enter valid 6 digit OTP")
     .optional(),
-  authFlow: z.enum(["signup"]).optional(),
+  authFlow: z.enum(["signup", "company-signup", "invite"]).optional(),
+  /** Required when `authFlow` is `invite` — must match a recently accepted company invite. */
+  inviteToken: z.string().min(1).optional(),
 });
 
-async function hasRecentSignupVerification(email: string) {
+async function hasRecentOtpVerification(
+  email: string,
+  purpose: "SIGNUP_VERIFY" | "COMPANY_SIGNUP_VERIFY",
+) {
   const record = await db.emailOtp.findFirst({
     where: {
       email: email.toLowerCase(),
-      purpose: "SIGNUP_VERIFY",
+      purpose,
       consumedAt: { gte: new Date(Date.now() - SIGNUP_LOGIN_GRACE_MS) },
     },
     orderBy: { consumedAt: "desc" },
   });
   return !!record;
+}
+
+async function hasRecentSignupVerification(email: string) {
+  return hasRecentOtpVerification(email, "SIGNUP_VERIFY");
+}
+
+async function hasRecentCompanySignupVerification(email: string) {
+  return hasRecentOtpVerification(email, "COMPANY_SIGNUP_VERIFY");
+}
+
+async function hasRecentAcceptedCompanyInvite(email: string, token: string) {
+  const invite = await db.companyInvite.findFirst({
+    where: {
+      token,
+      email: email.toLowerCase(),
+      status: InviteStatus.ACCEPTED,
+      respondedAt: { gte: new Date(Date.now() - SIGNUP_LOGIN_GRACE_MS) },
+    },
+  });
+  return !!invite;
 }
 
 /**
@@ -144,6 +170,7 @@ export function createAuthOptions(req?: NextApiRequest): NextAuthOptions {
         password: { label: "Password", type: "password" },
         otp: { label: "OTP", type: "text" },
         authFlow: { label: "Auth flow", type: "text" },
+        inviteToken: { label: "Invite token", type: "text" },
       },
       async authorize(raw) {
         const parsed = credentialsSchema.safeParse(raw);
@@ -161,9 +188,36 @@ export function createAuthOptions(req?: NextApiRequest): NextAuthOptions {
         );
         if (!passwordOk) return null;
 
-        if (parsed.data.authFlow === "signup") {
-          const recentlyVerified = await hasRecentSignupVerification(normalizedEmail);
-          if (!recentlyVerified) return null;
+        const flow = parsed.data.authFlow;
+
+        if (flow === "signup") {
+          if (!(await hasRecentSignupVerification(normalizedEmail))) return null;
+          return {
+            id: user.id,
+            email: user.email,
+            name: user.name,
+          };
+        }
+
+        if (flow === "company-signup") {
+          if (!(await hasRecentCompanySignupVerification(normalizedEmail))) {
+            return null;
+          }
+          return {
+            id: user.id,
+            email: user.email,
+            name: user.name,
+          };
+        }
+
+        if (flow === "invite") {
+          const token = parsed.data.inviteToken;
+          if (
+            !token ||
+            !(await hasRecentAcceptedCompanyInvite(normalizedEmail, token))
+          ) {
+            return null;
+          }
           return {
             id: user.id,
             email: user.email,

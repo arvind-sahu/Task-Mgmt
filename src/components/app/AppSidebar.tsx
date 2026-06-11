@@ -43,6 +43,7 @@ function NavLink({
       href={item.href}
       onClick={onNavigate}
       title={collapsed ? item.label : undefined}
+      data-tour={item.tourId}
       className={`app-sidebar-link group relative flex items-center gap-3 rounded-lg px-2.5 py-2 text-sm font-medium transition ${
         active ? "app-sidebar-link-active" : ""
       } ${collapsed ? "justify-center px-2" : ""}`}
@@ -77,6 +78,9 @@ export function AppSidebar({
   onCloseMobile,
 }: AppSidebarProps) {
   const router = useRouter();
+  const workspace = api.company.workspaceContext.useQuery(undefined, {
+    staleTime: 60_000,
+  });
   const projects = api.project.list.useQuery(undefined, {
     staleTime: 60_000,
   });
@@ -136,6 +140,32 @@ export function AppSidebar({
             />
           ))}
         </div>
+
+        {(workspace.data?.canManageCompany || workspace.data?.canInviteUsers) && (
+          <div className="mb-2 space-y-0.5">
+            <NavLink
+              item={{
+                href: "/company/users",
+                label: "Company users",
+                icon: (
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.75"
+                    className="h-[18px] w-[18px] shrink-0"
+                    aria-hidden
+                  >
+                    <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2M9 11a4 4 0 100-8 4 4 0 000 8zM23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" />
+                  </svg>
+                ),
+              }}
+              active={isActive(router.pathname, router.asPath, "/company/users")}
+              collapsed={effectiveCollapsed}
+              onNavigate={onCloseMobile}
+            />
+          </div>
+        )}
 
         <div className="my-3 border-t" style={{ borderColor: "var(--nav-border)" }} />
 

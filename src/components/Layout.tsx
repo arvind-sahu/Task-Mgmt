@@ -2,11 +2,16 @@ import { useSession } from "next-auth/react";
 import Head from "next/head";
 import Link from "next/link";
 import { useRouter } from "next/router";
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 
 import { AppSidebar } from "~/components/app/AppSidebar";
 import { AppTopBar } from "~/components/app/AppTopBar";
+import { WelcomeTour } from "~/components/onboarding/WelcomeTour";
 import { type ProjectTab } from "~/config/appNav";
+import {
+  isWelcomeTourDone,
+  shouldStartWelcomeTour,
+} from "~/config/welcomeTour";
 import { useSidebarState } from "~/hooks/useSidebarState";
 import { api } from "~/utils/api";
 
@@ -17,6 +22,12 @@ interface LayoutProps {
   headerTitle?: string;
   projectColor?: string;
   projectTabs?: ProjectTab[];
+  projectTaskSearch?: {
+    value: string;
+    onChange: (value: string) => void;
+    filteredCount: number;
+    totalCount: number;
+  };
 }
 
 /**
@@ -30,6 +41,7 @@ export default function Layout({
   headerTitle,
   projectColor,
   projectTabs,
+  projectTaskSearch,
 }: LayoutProps) {
   const { data: session, status } = useSession();
   const me = api.user.me.useQuery(undefined, {
@@ -40,14 +52,40 @@ export default function Layout({
   const { collapsed, mobileOpen, toggleCollapsed, openMobile, closeMobile } =
     useSidebarState();
   const router = useRouter();
+  const [tourOpen, setTourOpen] = useState(false);
+
+  const workspace = api.company.workspaceContext.useQuery(undefined, {
+    enabled: !!session,
+    staleTime: 60_000,
+  });
+
+  const isAuthed = status === "authenticated" && !!session?.user;
+  const showGuestNav = status === "unauthenticated";
 
   useEffect(() => {
     closeMobile();
     window.scrollTo({ top: 0, left: 0, behavior: "instant" });
   }, [router.pathname, router.asPath, closeMobile]);
 
-  const isAuthed = status === "authenticated" && !!session?.user;
-  const showGuestNav = status === "unauthenticated";
+  useEffect(() => {
+    if (
+      workspace.data?.needsOnboarding &&
+      router.pathname !== "/onboarding/company"
+    ) {
+      void router.replace("/onboarding/company");
+    }
+  }, [workspace.data?.needsOnboarding, router]);
+
+  useEffect(() => {
+    if (!isAuthed || workspace.data?.needsOnboarding) return;
+    if (router.pathname === "/onboarding/company") return;
+    if (isWelcomeTourDone()) return;
+
+    if (shouldStartWelcomeTour()) {
+      const timer = window.setTimeout(() => setTourOpen(true), 600);
+      return () => window.clearTimeout(timer);
+    }
+  }, [isAuthed, workspace.data?.needsOnboarding, router.pathname]);
 
   return (
     <>
@@ -72,6 +110,7 @@ export default function Layout({
               headerTitle={headerTitle}
               projectColor={projectColor}
               projectTabs={projectTabs}
+              projectTaskSearch={projectTaskSearch}
               onOpenMobileMenu={openMobile}
               onCloseMobileMenu={closeMobile}
             />
@@ -117,6 +156,10 @@ export default function Layout({
           </main>
         </div>
       </div>
+
+      {isAuthed && (
+        <WelcomeTour open={tourOpen} onClose={() => setTourOpen(false)} />
+      )}
     </>
   );
 }

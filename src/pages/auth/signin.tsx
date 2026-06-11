@@ -303,6 +303,15 @@ export default function SignInPage({ oauthProviders }: SignInPageProps) {
                     Create one
                   </Link>
                 </p>
+                <p>
+                  Setting up a team?{" "}
+                  <Link
+                    href="/auth/company-signup"
+                    className="font-bold text-purple-600 underline-offset-4 hover:underline"
+                  >
+                    Create company workspace
+                  </Link>
+                </p>
               </div>
             </>
           ) : (

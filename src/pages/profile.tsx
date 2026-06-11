@@ -252,8 +252,7 @@ export default function ProfilePage() {
             <input
               ref={fileInputRef}
               type="file"
-              accept="image/*"
-              capture="user"
+              accept="image/jpeg,image/png,image/gif,image/webp"
               className="hidden"
               onChange={async (e) => {
                 const input = e.currentTarget;

@@ -42,6 +42,13 @@ export default function TaskDetail() {
   const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
   const [editingCommentBody, setEditingCommentBody] = useState("");
 
+  const refreshTaskCaches = async () => {
+    await utils.task.byId.invalidate({ id });
+    await utils.task.list.invalidate();
+    await utils.task.myTasks.invalidate();
+    await utils.task.myUpcoming.invalidate();
+  };
+
   const update = api.task.update.useMutation({
     onSuccess: async () => {
       await utils.task.byId.invalidate({ id });
@@ -58,16 +65,16 @@ export default function TaskDetail() {
   });
   const addComment = api.comment.create.useMutation({
     onSuccess: async () => {
-      await utils.task.byId.invalidate({ id });
+      await refreshTaskCaches();
       setComment("");
     },
   });
   const delComment = api.comment.delete.useMutation({
-    onSuccess: () => utils.task.byId.invalidate({ id }),
+    onSuccess: () => refreshTaskCaches(),
   });
   const updateComment = api.comment.update.useMutation({
     onSuccess: async () => {
-      await utils.task.byId.invalidate({ id });
+      await refreshTaskCaches();
       setEditingCommentId(null);
       setEditingCommentBody("");
     },
@@ -81,14 +88,14 @@ export default function TaskDetail() {
     },
   });
   const addTaskAttachment = api.attachment.createForTask.useMutation({
-    onSuccess: () => utils.task.byId.invalidate({ id }),
+    onSuccess: () => refreshTaskCaches(),
   });
   const addCommentAttachment = api.attachment.createForComment.useMutation({
-    onSuccess: () => utils.task.byId.invalidate({ id }),
+    onSuccess: () => refreshTaskCaches(),
   });
   const requestAttachmentUploadUrl = api.attachment.getUploadUrl.useMutation();
   const delAttachment = api.attachment.delete.useMutation({
-    onSuccess: () => utils.task.byId.invalidate({ id }),
+    onSuccess: () => refreshTaskCaches(),
   });
   const deletingAttachmentId =
     delAttachment.variables && typeof delAttachment.variables === "object"
