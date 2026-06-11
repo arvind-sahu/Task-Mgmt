@@ -1,4 +1,4 @@
-import { signIn, getSession } from "next-auth/react";
+import { getSession, signIn } from "next-auth/react";
 import Head from "next/head";
 import Link from "next/link";
 import { useRouter } from "next/router";
@@ -7,26 +7,20 @@ import type { GetServerSidePropsContext } from "next";
 
 import { AuthShell } from "~/components/auth/AuthShell";
 import { OtpInput } from "~/components/auth/OtpInput";
-import { OAuthButtons } from "~/components/auth/OAuthButtons";
 import { getServerAuthSession } from "~/server/auth";
-import {
-  getOAuthProvidersForAuthPage,
-  type OAuthProviderOption,
-} from "~/server/oauth";
 import { api } from "~/utils/api";
 import { getTrpcMutationErrorMessage } from "~/utils/trpcError";
+import { setWorkspaceCookie } from "~/utils/workspaceCookie";
 
-type SignUpPageProps = {
-  oauthProviders: OAuthProviderOption[];
-};
-
-export default function SignUpPage({ oauthProviders }: SignUpPageProps) {
+export default function CompanySignUpPage() {
   const router = useRouter();
+  const [companyName, setCompanyName] = useState("");
+  const [emailDomain, setEmailDomain] = useState("");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
-  const [companyName, setCompanyName] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [agreeTerms, setAgreeTerms] = useState(false);
   const [otp, setOtp] = useState("");
   const [otpStep, setOtpStep] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -35,25 +29,46 @@ export default function SignUpPage({ oauthProviders }: SignUpPageProps) {
   const [loading, setLoading] = useState(false);
   const verifyingRef = useRef(false);
 
-  const sendSignupOtp = api.user.sendSignupOtp.useMutation();
-  const verifySignupOtpAndRegister =
-    api.user.verifySignupOtpAndRegister.useMutation();
+  const sendOtp = api.company.sendCompanySignupOtp.useMutation();
+  const verifyCreate = api.company.verifyAndCreateWorkspace.useMutation();
+
+  const formReady =
+    agreeTerms &&
+    password === confirmPassword &&
+    confirmPassword.length > 0 &&
+    companyName.trim().length >= 2 &&
+    emailDomain.trim().length >= 3 &&
+    name.trim().length > 0 &&
+    email.includes("@");
 
   async function handleSendOtp(e: FormEvent) {
     e.preventDefault();
     setInfo(null);
     setError(null);
 
+    if (!agreeTerms) {
+      setError("Please agree to the terms to continue.");
+      return;
+    }
     if (password !== confirmPassword) {
       setError("Passwords do not match. Please re-enter them.");
       return;
     }
 
     try {
-      await sendSignupOtp.mutateAsync({ name, email, password, companyName });
+      await sendOtp.mutateAsync({
+        companyName,
+        emailDomain,
+        name,
+        email,
+        password,
+        agreeTerms: true,
+      });
       setOtp("");
       setOtpStep(true);
-      setInfo("We sent a 6-digit verification code to your email. Enter it below to create your account.");
+      setInfo(
+        "We sent a 6-digit verification code to your work email. Enter it below to create your workspace.",
+      );
     } catch (err) {
       setError(
         getTrpcMutationErrorMessage(
@@ -74,40 +89,61 @@ export default function SignUpPage({ oauthProviders }: SignUpPageProps) {
       setLoading(true);
 
       try {
-        await verifySignupOtpAndRegister.mutateAsync({
+        const result = await verifyCreate.mutateAsync({
+          companyName,
+          emailDomain,
           name,
           email,
           password,
-          companyName,
           otp: code,
+          agreeTerms: true,
         });
+
+        setWorkspaceCookie(result.companyId);
+
+        const signInResult = await signIn("credentials", {
+          email,
+          password,
+          authFlow: "company-signup",
+          redirect: false,
+        });
+
+        if (signInResult?.error) {
+          setError(
+            "Workspace created, but automatic sign-in failed. Please sign in.",
+          );
+          void router.push("/auth/signin");
+          return;
+        }
+
+        await getSession();
+
+        if (result.needsOnboarding) {
+          void router.replace("/onboarding/company");
+        } else {
+          void router.replace("/dashboard");
+        }
       } catch (err) {
-        setLoading(false);
+        setError(
+          getTrpcMutationErrorMessage(
+            err,
+            "Invalid or expired code. Request a new code and try again.",
+          ),
+        );
+      } finally {
         verifyingRef.current = false;
-        setError(getTrpcMutationErrorMessage(err, "Could not create account"));
-        return;
+        setLoading(false);
       }
-
-      const res = await signIn("credentials", {
-        email,
-        password,
-        authFlow: "signup",
-        redirect: false,
-      });
-
-      setLoading(false);
-      verifyingRef.current = false;
-
-      if (!res || res.error) {
-        setError("Account created, but automatic sign-in failed. Please sign in.");
-        void router.push("/auth/signin");
-        return;
-      }
-
-      await getSession();
-      void router.replace("/dashboard");
     },
-    [companyName, email, name, password, router, verifySignupOtpAndRegister],
+    [
+      companyName,
+      emailDomain,
+      email,
+      name,
+      password,
+      router,
+      verifyCreate,
+    ],
   );
 
   async function handleVerifyAndCreate(e: FormEvent) {
@@ -121,8 +157,15 @@ export default function SignUpPage({ oauthProviders }: SignUpPageProps) {
     setOtp("");
     verifyingRef.current = false;
     try {
-      await sendSignupOtp.mutateAsync({ name, email, password, companyName });
-      setInfo("A new verification code was sent to your email.");
+      await sendOtp.mutateAsync({
+        companyName,
+        emailDomain,
+        name,
+        email,
+        password,
+        agreeTerms: true,
+      });
+      setInfo("A new verification code was sent to your work email.");
     } catch (err) {
       setError(
         getTrpcMutationErrorMessage(
@@ -144,14 +187,14 @@ export default function SignUpPage({ oauthProviders }: SignUpPageProps) {
   return (
     <>
       <Head>
-        <title>Sign up · Tasker</title>
+        <title>Create company workspace · Tasker</title>
       </Head>
       <AuthShell
-        title={otpStep ? "Enter the verification code" : "Create your account"}
+        title={otpStep ? "Enter the verification code" : "Create your company workspace"}
         subtitle={
           otpStep
-            ? "Check your inbox for the 6-digit code. Your account is created only after verification."
-            : "Fill in your details and we will email you a code before any account is created."
+            ? "Check your inbox for the 6-digit code. Your workspace is created only after verification."
+            : "You will become the root administrator. We will email you a code before any account is created."
         }
         compact={otpStep}
       >
@@ -160,23 +203,59 @@ export default function SignUpPage({ oauthProviders }: SignUpPageProps) {
             <>
               <form onSubmit={handleSendOtp} className="space-y-4">
                 <div>
-                  <label className="label" htmlFor="name">
-                    Name
+                  <label className="label" htmlFor="company-name">
+                    Company name
                   </label>
                   <input
-                    id="name"
+                    id="company-name"
+                    className="brand-input mt-1.5 h-11 text-sm"
+                    value={companyName}
+                    onChange={(e) => setCompanyName(e.target.value)}
+                    required
+                    maxLength={120}
+                  />
+                </div>
+                <div>
+                  <label className="label" htmlFor="email-domain">
+                    Company email domain
+                  </label>
+                  <div className="mt-1.5 flex items-center gap-1">
+                    <span className="text-sm text-slate-500">@</span>
+                    <input
+                      id="email-domain"
+                      className="brand-input h-11 flex-1 text-sm"
+                      placeholder="acme.com"
+                      value={emailDomain}
+                      onChange={(e) =>
+                        setEmailDomain(e.target.value.replace(/^@+/, ""))
+                      }
+                      required
+                      maxLength={120}
+                    />
+                  </div>
+                  <p className="mt-1 text-xs text-slate-500">
+                    Your work email must use this domain (e.g. you@acme.com).
+                  </p>
+                </div>
+                <div>
+                  <label className="label" htmlFor="full-name">
+                    Your full name
+                  </label>
+                  <input
+                    id="full-name"
                     className="brand-input mt-1.5 h-11 text-sm"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     required
+                    maxLength={80}
                   />
                 </div>
                 <div>
-                  <label className="label" htmlFor="email">
-                    Email
+                  <label className="label" htmlFor="work-email">
+                    Work email
                   </label>
                   <input
-                    id="email"
+                    id="work-email"
                     type="email"
                     className="brand-input mt-1.5 h-11 text-sm"
                     value={email}
@@ -186,42 +265,23 @@ export default function SignUpPage({ oauthProviders }: SignUpPageProps) {
                   />
                 </div>
                 <div>
-                  <label className="label" htmlFor="company-name">
-                    Company
-                  </label>
-                  <input
-                    id="company-name"
-                    className="brand-input mt-1.5 h-11 text-sm"
-                    value={companyName}
-                    onChange={(e) => setCompanyName(e.target.value)}
-                    required
-                    minLength={2}
-                    maxLength={120}
-                    placeholder="Tasker"
-                    autoComplete="organization"
-                  />
-                  <p className="mt-1 text-xs text-slate-500">
-                    Teammate search and invites are limited to people in your company.
-                  </p>
-                </div>
-                <div>
                   <label className="label" htmlFor="password">
                     Password (min 8 characters)
                   </label>
-                  <div className="relative mt-1">
+                  <div className="relative mt-1.5">
                     <input
                       id="password"
                       type={showPassword ? "text" : "password"}
-                      className="brand-input h-11 pr-12 text-sm"
+                      className="brand-input h-11 w-full pr-12 text-sm"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
-                      minLength={8}
                       required
+                      minLength={8}
                       autoComplete="new-password"
                     />
                     <button
                       type="button"
-                      onClick={() => setShowPassword((prev) => !prev)}
+                      onClick={() => setShowPassword((s) => !s)}
                       className="absolute right-3 top-1/2 -translate-y-1/2 rounded-lg px-2 py-1 text-xs font-bold text-slate-500 transition hover:bg-blue-50 hover:text-blue-600"
                       aria-label={showPassword ? "Hide password" : "Show password"}
                     >
@@ -229,7 +289,6 @@ export default function SignUpPage({ oauthProviders }: SignUpPageProps) {
                     </button>
                   </div>
                 </div>
-
                 <div>
                   <label className="label" htmlFor="confirm-password">
                     Confirm password
@@ -240,11 +299,12 @@ export default function SignUpPage({ oauthProviders }: SignUpPageProps) {
                     className="brand-input mt-1.5 h-11 text-sm"
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
-                    onPaste={(e) => e.preventDefault()}
                     minLength={8}
                     required
                     autoComplete="new-password"
-                    aria-invalid={confirmPassword.length > 0 && password !== confirmPassword}
+                    aria-invalid={
+                      confirmPassword.length > 0 && password !== confirmPassword
+                    }
                   />
                   {confirmPassword.length > 0 && password !== confirmPassword && (
                     <p className="mt-2 text-sm font-semibold text-red-600">
@@ -252,6 +312,17 @@ export default function SignUpPage({ oauthProviders }: SignUpPageProps) {
                     </p>
                   )}
                 </div>
+                <label className="flex items-start gap-2 text-sm text-slate-600">
+                  <input
+                    type="checkbox"
+                    checked={agreeTerms}
+                    onChange={(e) => setAgreeTerms(e.target.checked)}
+                    className="mt-1"
+                  />
+                  <span>
+                    I agree to Tasker&apos;s terms of service and privacy policy.
+                  </span>
+                </label>
 
                 {error && (
                   <p className="rounded-xl bg-red-50 px-4 py-3 text-sm font-semibold text-red-700 ring-1 ring-red-200">
@@ -261,14 +332,10 @@ export default function SignUpPage({ oauthProviders }: SignUpPageProps) {
 
                 <button
                   type="submit"
-                  disabled={
-                    sendSignupOtp.isPending ||
-                    password !== confirmPassword ||
-                    !confirmPassword
-                  }
+                  disabled={sendOtp.isPending || !formReady}
                   className="brand-button-primary h-11 w-full"
                 >
-                  {sendSignupOtp.isPending ? (
+                  {sendOtp.isPending ? (
                     <span className="inline-flex items-center gap-2">
                       <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />
                       Sending code...
@@ -278,8 +345,6 @@ export default function SignUpPage({ oauthProviders }: SignUpPageProps) {
                   )}
                 </button>
               </form>
-
-              <OAuthButtons providers={oauthProviders} callbackUrl="/dashboard" />
 
               <p className="mt-4 text-center text-sm text-slate-600">
                 Already have an account?{" "}
@@ -291,12 +356,12 @@ export default function SignUpPage({ oauthProviders }: SignUpPageProps) {
                 </Link>
               </p>
               <p className="mt-2 text-center text-sm text-slate-600">
-                Creating a company workspace?{" "}
+                Joining as an individual?{" "}
                 <Link
-                  href="/auth/company-signup"
+                  href="/auth/signup"
                   className="font-bold text-purple-600 underline-offset-4 hover:underline"
                 >
-                  Company sign up
+                  Personal sign up
                 </Link>
               </p>
             </>
@@ -304,7 +369,9 @@ export default function SignUpPage({ oauthProviders }: SignUpPageProps) {
             <form onSubmit={handleVerifyAndCreate} className="space-y-4">
               <div className="rounded-2xl bg-slate-50 px-4 py-3 text-center">
                 <p className="text-sm text-slate-600">We sent a 6-digit code to</p>
-                <p className="mt-1 break-all text-sm font-black text-slate-900">{email}</p>
+                <p className="mt-1 break-all text-sm font-black text-slate-900">
+                  {email}
+                </p>
                 <button
                   type="button"
                   onClick={handleEditDetails}
@@ -315,16 +382,16 @@ export default function SignUpPage({ oauthProviders }: SignUpPageProps) {
               </div>
 
               <div>
-                <p id="otp-label" className="label text-center">
+                <p id="company-otp-label" className="label text-center">
                   Verification code
                 </p>
                 <div className="mt-3">
                   <OtpInput
-                    id="otp"
+                    id="company-otp"
                     value={otp}
                     onChange={setOtp}
                     onComplete={(code) => void submitOtp(code)}
-                    disabled={loading || verifySignupOtpAndRegister.isPending}
+                    disabled={loading || verifyCreate.isPending}
                   />
                 </div>
               </div>
@@ -343,13 +410,11 @@ export default function SignUpPage({ oauthProviders }: SignUpPageProps) {
               <button
                 type="submit"
                 disabled={
-                  loading ||
-                  verifySignupOtpAndRegister.isPending ||
-                  otp.length !== 6
+                  loading || verifyCreate.isPending || otp.length !== 6
                 }
                 className="brand-button-primary h-11 w-full"
               >
-                {loading || verifySignupOtpAndRegister.isPending ? (
+                {loading || verifyCreate.isPending ? (
                   <span className="inline-flex items-center gap-2">
                     <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />
                     Verifying & signing you in...
@@ -364,10 +429,10 @@ export default function SignUpPage({ oauthProviders }: SignUpPageProps) {
                 <button
                   type="button"
                   onClick={() => void handleResendOtp()}
-                  disabled={sendSignupOtp.isPending}
+                  disabled={sendOtp.isPending}
                   className="font-bold text-purple-600 underline-offset-4 hover:underline disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  {sendSignupOtp.isPending ? "Sending..." : "Resend OTP"}
+                  {sendOtp.isPending ? "Sending..." : "Resend OTP"}
                 </button>
               </p>
             </form>
@@ -383,9 +448,5 @@ export async function getServerSideProps(ctx: GetServerSidePropsContext) {
   if (session) {
     return { redirect: { destination: "/dashboard", permanent: false } };
   }
-  return {
-    props: {
-      oauthProviders: getOAuthProvidersForAuthPage(),
-    },
-  };
+  return { props: {} };
 }

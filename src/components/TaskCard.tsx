@@ -44,8 +44,8 @@ export default function TaskCard({
         </p>
       )}
 
-      <div className="mt-2.5 flex items-center justify-between gap-2">
-        <div className="flex min-w-0 items-center">
+      <div className="mt-2.5 grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-1.5">
+        <div className="flex min-w-0 items-center justify-start">
           {task.assignees.length === 0 ? (
             <span className="chip rounded-full px-2 py-0.5 text-[10px] font-medium">
               No assignee
@@ -75,11 +75,14 @@ export default function TaskCard({
           )}
         </div>
 
-        <div className="flex shrink-0 items-center gap-2">
+        <div className="flex items-center justify-center px-0.5">
           <TaskMetaCounts
-            commentCount={task._count.comments}
-            attachmentCount={task._count.attachments}
+            commentCount={task._count?.comments ?? 0}
+            attachmentCount={task._count?.attachments ?? 0}
           />
+        </div>
+
+        <div className="flex items-center justify-end">
           <TaskDeadlineBadge deadline={task.deadline} status={task.status} />
         </div>
       </div>

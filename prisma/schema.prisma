@@ -93,8 +93,83 @@ model User {
     notifications       Notification[]
     loginAudits         LoginAudit[]
     invitesSent         ProjectInvite[] @relation("InvitesSent")
+    companyMemberships  CompanyMember[]
+    rootOfCompany       Company?          @relation("CompanyRoot")
+    companyInvitesSent  CompanyInvite[]   @relation("CompanyInvitesSent")
 
     @@index([companyName])
+}
+
+enum CompanyPlan {
+    FREE
+    PRO
+    BUSINESS
+    ENTERPRISE
+}
+
+enum CompanyRole {
+    ROOT
+    SUPER_ADMIN
+    MANAGER
+    MEMBER
+    VIEWER
+}
+
+/// Organization workspace — first signup user becomes ROOT via `rootUserId`.
+model Company {
+    id               String      @id @default(cuid())
+    name             String
+    slug             String      @unique
+    emailDomain      String
+    logoUrl          String?
+    timezone         String      @default("UTC")
+    plan             CompanyPlan @default(FREE)
+    setupCompletedAt DateTime?
+    createdAt        DateTime    @default(now())
+    updatedAt        DateTime    @updatedAt
+
+    rootUserId String @unique
+    rootUser   User   @relation("CompanyRoot", fields: [rootUserId], references: [id], onDelete: Restrict)
+
+    members  CompanyMember[]
+    invites  CompanyInvite[]
+    projects Project[]
+
+    @@index([emailDomain])
+}
+
+model CompanyMember {
+    id       String      @id @default(cuid())
+    role     CompanyRole
+    joinedAt DateTime    @default(now())
+
+    companyId String
+    company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+    userId    String
+    user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    @@unique([companyId, userId])
+    @@index([userId])
+}
+
+model CompanyInvite {
+    id          String       @id @default(cuid())
+    email       String
+    role        CompanyRole
+    status      InviteStatus @default(PENDING)
+    token       String       @unique @default(cuid())
+    expiresAt   DateTime
+    createdAt   DateTime     @default(now())
+    respondedAt DateTime?
+
+    companyId   String
+    company     Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+    invitedById String
+    invitedBy   User    @relation("CompanyInvitesSent", fields: [invitedById], references: [id], onDelete: Cascade)
+
+    @@index([email, status])
+    @@index([companyId])
+    @@index([token])
 }
 
 enum SprintPlan {
@@ -119,6 +194,9 @@ model Project {
     ownerId String
     owner   User   @relation("ProjectOwner", fields: [ownerId], references: [id], onDelete: Cascade)
 
+    companyId String?
+    company   Company? @relation(fields: [companyId], references: [id], onDelete: SetNull)
+
     members ProjectMember[]
     tasks   Task[]
     sprints Sprint[]
@@ -126,12 +204,14 @@ model Project {
     invites ProjectInvite[]
 
     @@index([ownerId])
+    @@index([companyId])
 }
 
 enum ProjectRole {
     OWNER
     ADMIN
     MEMBER
+    VIEWER
 }
 
 /// Join table mapping users to projects with a role. The `(userId, projectId)`
@@ -169,6 +249,7 @@ enum EmailOtpPurpose {
     LOGIN_2FA
     FORGOT_PASSWORD
     SIGNUP_VERIFY
+    COMPANY_SIGNUP_VERIFY
 }
 
 enum NotificationType {

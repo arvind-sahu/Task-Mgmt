@@ -2,9 +2,10 @@ import { TRPCError } from "@trpc/server";
 import { db } from "~/server/db";
 
 type DbClient = typeof db;
-export type ProjectRole = "OWNER" | "ADMIN" | "MEMBER";
+export type ProjectRole = "OWNER" | "ADMIN" | "MEMBER" | "VIEWER";
 
 const roleRank: Record<ProjectRole, number> = {
+  VIEWER: 0,
   MEMBER: 1,
   ADMIN: 2,
   OWNER: 3,

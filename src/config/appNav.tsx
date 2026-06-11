@@ -6,6 +6,8 @@ export type AppNavItem = {
   icon: ReactNode;
   badgeKey?: "inbox";
   comingSoon?: boolean;
+  /** Target for the in-app welcome tour (`data-tour`). */
+  tourId?: string;
 };
 
 function Icon({ d }: { d: string }) {
@@ -29,6 +31,7 @@ export const primaryNavItems: AppNavItem[] = [
   {
     href: "/dashboard",
     label: "Dashboard",
+    tourId: "nav-dashboard",
     icon: (
       <Icon d="M3 10.5L12 3l9 7.5V20a1 1 0 01-1 1h-5v-6H9v6H4a1 1 0 01-1-1v-9.5z" />
     ),
@@ -36,11 +39,13 @@ export const primaryNavItems: AppNavItem[] = [
   {
     href: "/my-tasks",
     label: "My Tasks",
+    tourId: "nav-my-tasks",
     icon: <Icon d="M9 11l3 3L22 4M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11" />,
   },
   {
     href: "/inbox",
     label: "Inbox",
+    tourId: "nav-inbox",
     icon: (
       <Icon d="M22 12H16l-3 9-3-9H2M4 6h16a2 2 0 012 2v4H2V8a2 2 0 012-2z" />
     ),
@@ -49,6 +54,7 @@ export const primaryNavItems: AppNavItem[] = [
   {
     href: "/projects",
     label: "Projects",
+    tourId: "nav-projects",
     icon: (
       <Icon d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z" />
     ),

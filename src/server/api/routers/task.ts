@@ -131,6 +131,51 @@ async function assertAssigneesBelongToProject(
   }
 }
 
+type TaskWithMetaCounts = {
+  id: string;
+  _count: { comments: number; attachments: number };
+};
+
+/** Include comment attachments in task attachment totals for board badges. */
+async function enrichTasksWithAttachmentTotals<T extends TaskWithMetaCounts>(
+  db: TaskDb,
+  tasks: T[],
+): Promise<T[]> {
+  if (tasks.length === 0) return tasks;
+
+  const taskIds = tasks.map((task) => task.id);
+  const linkedAttachments = await db.taskAttachment.findMany({
+    where: {
+      OR: [
+        { taskId: { in: taskIds } },
+        { comment: { taskId: { in: taskIds } } },
+      ],
+    },
+    select: {
+      taskId: true,
+      comment: { select: { taskId: true } },
+    },
+  });
+
+  const attachmentTotals = new Map<string, number>();
+  for (const att of linkedAttachments) {
+    const ownerTaskId = att.taskId ?? att.comment?.taskId;
+    if (!ownerTaskId) continue;
+    attachmentTotals.set(
+      ownerTaskId,
+      (attachmentTotals.get(ownerTaskId) ?? 0) + 1,
+    );
+  }
+
+  return tasks.map((task) => ({
+    ...task,
+    _count: {
+      ...task._count,
+      attachments: attachmentTotals.get(task.id) ?? task._count.attachments,
+    },
+  }));
+}
+
 export const taskRouter = createTRPCRouter({
   list: protectedProcedure.input(listInput).query(async ({ ctx, input }) => {
     const userId = ctx.session.user.id;
@@ -165,36 +210,7 @@ export const taskRouter = createTRPCRouter({
       ],
     });
 
-    if (tasks.length === 0) return tasks;
-
-    const taskIds = tasks.map((t) => t.id);
-    const linkedAttachments = await ctx.db.taskAttachment.findMany({
-      where: {
-        OR: [
-          { taskId: { in: taskIds } },
-          { comment: { taskId: { in: taskIds } } },
-        ],
-      },
-      select: {
-        taskId: true,
-        comment: { select: { taskId: true } },
-      },
-    });
-
-    const attachmentTotals = new Map<string, number>();
-    for (const att of linkedAttachments) {
-      const ownerTaskId = att.taskId ?? att.comment?.taskId;
-      if (!ownerTaskId) continue;
-      attachmentTotals.set(ownerTaskId, (attachmentTotals.get(ownerTaskId) ?? 0) + 1);
-    }
-
-    return tasks.map((task) => ({
-      ...task,
-      _count: {
-        ...task._count,
-        attachments: attachmentTotals.get(task.id) ?? task._count.attachments,
-      },
-    }));
+    return enrichTasksWithAttachmentTotals(ctx.db, tasks);
   }),
 
   byId: protectedProcedure
@@ -225,9 +241,9 @@ export const taskRouter = createTRPCRouter({
     }),
 
   /** Recent tasks across every project the user has access to (for the dashboard). */
-  myUpcoming: protectedProcedure.query(({ ctx }) => {
+  myUpcoming: protectedProcedure.query(async ({ ctx }) => {
     const userId = ctx.session.user.id;
-    return ctx.db.task.findMany({
+    const tasks = await ctx.db.task.findMany({
       where: {
         status: { not: TaskStatus.DONE },
         OR: [
@@ -248,6 +264,7 @@ export const taskRouter = createTRPCRouter({
       ],
       take: 25,
     });
+    return enrichTasksWithAttachmentTotals(ctx.db, tasks);
   }),
 
   /** All open tasks assigned to the current user (My Tasks page). */
@@ -264,7 +281,7 @@ export const taskRouter = createTRPCRouter({
       const userId = ctx.session.user.id;
       const search = input?.search?.trim();
 
-      return ctx.db.task.findMany({
+      const tasks = await ctx.db.task.findMany({
         where: {
           assignees: { some: { id: userId } },
           status: input?.includeDone ? undefined : { not: TaskStatus.DONE },
@@ -287,6 +304,7 @@ export const taskRouter = createTRPCRouter({
         ],
         take: 100,
       });
+      return enrichTasksWithAttachmentTotals(ctx.db, tasks);
     }),
 
   create: protectedProcedure

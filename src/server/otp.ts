@@ -8,7 +8,11 @@ import {
 } from "~/server/emailErrors";
 import { db } from "~/server/db";
 
-type OtpPurpose = "LOGIN_2FA" | "FORGOT_PASSWORD" | "SIGNUP_VERIFY";
+type OtpPurpose =
+  | "LOGIN_2FA"
+  | "FORGOT_PASSWORD"
+  | "SIGNUP_VERIFY"
+  | "COMPANY_SIGNUP_VERIFY";
 
 const OTP_EXPIRY_MINUTES = 10;
 
@@ -46,7 +50,9 @@ async function sendEmailOtp(email: string, code: string, purpose: OtpPurpose) {
           ? "Your Tasker login verification code"
           : purpose === "FORGOT_PASSWORD"
             ? "Your Tasker password reset code"
-            : "Your Tasker sign up verification code",
+            : purpose === "COMPANY_SIGNUP_VERIFY"
+              ? "Verify your work email for Tasker"
+              : "Your Tasker sign up verification code",
       html: `
       <div style="font-family: Arial, sans-serif; line-height:1.5; color:#111827;">
         <h2 style="margin-bottom: 8px;">Tasker verification code</h2>

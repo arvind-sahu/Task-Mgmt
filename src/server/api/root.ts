@@ -1,4 +1,5 @@
 import { attachmentRouter } from "~/server/api/routers/attachment";
+import { companyRouter } from "~/server/api/routers/company";
 import { commentRouter } from "~/server/api/routers/comment";
 import { dashboardRouter } from "~/server/api/routers/dashboard";
 import { leadRequestRouter } from "~/server/api/routers/leadRequest";
@@ -20,6 +21,7 @@ import { createCallerFactory, createTRPCRouter } from "~/server/api/trpc";
  *  - comment: task-level discussion
  */
 export const appRouter = createTRPCRouter({
+  company: companyRouter,
   user: userRouter,
   project: projectRouter,
   sprint: sprintRouter,

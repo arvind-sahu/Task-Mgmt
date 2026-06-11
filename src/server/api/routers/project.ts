@@ -7,6 +7,12 @@ import { publicUserSelect } from "~/server/api/userSelect";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { createNotification } from "~/server/notifications";
 import { companyNamesMatch } from "~/server/company";
+import { emailMatchesDomain } from "~/server/company/domain";
+import {
+  canCreateCompanyProjects,
+  hasMinCompanyRole,
+} from "~/server/company/permissions";
+import { requireActiveCompany } from "~/server/company/workspace";
 import {
   durationWeeksForPlan,
   SPRINT_DAY_LABELS,
@@ -44,29 +50,78 @@ async function inviteMemberByEmail(
   const email = input.email.toLowerCase();
   const project = await ctx.db.project.findUniqueOrThrow({
     where: { id: input.projectId },
-    select: { name: true },
+    select: { name: true, companyId: true },
   });
-
-  const inviter = await ctx.db.user.findUnique({
-    where: { id: ctx.session.user.id },
-    select: { companyName: true },
-  });
-  if (!inviter?.companyName) {
-    throw new TRPCError({
-      code: "PRECONDITION_FAILED",
-      message:
-        "Add your company name in Profile settings before inviting teammates.",
-    });
-  }
 
   const user = await ctx.db.user.findUnique({ where: { email } });
-  if (user) {
-    if (!companyNamesMatch(inviter.companyName, user.companyName)) {
+  if (project.companyId) {
+    const inviterMembership = await ctx.db.companyMember.findUnique({
+      where: {
+        companyId_userId: {
+          companyId: project.companyId,
+          userId: ctx.session.user.id,
+        },
+      },
+    });
+    if (
+      !inviterMembership ||
+      !hasMinCompanyRole(inviterMembership.role, "MANAGER")
+    ) {
+      throw new TRPCError({
+        code: "FORBIDDEN",
+        message: "Only managers can invite people to this project",
+      });
+    }
+
+    const company = await ctx.db.company.findUniqueOrThrow({
+      where: { id: project.companyId },
+      select: { emailDomain: true },
+    });
+
+    if (user) {
+      const targetMembership = await ctx.db.companyMember.findUnique({
+        where: {
+          companyId_userId: {
+            companyId: project.companyId,
+            userId: user.id,
+          },
+        },
+      });
+      if (!targetMembership) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message:
+            "Invite them to your company workspace first, then add them to this project.",
+        });
+      }
+    } else if (!emailMatchesDomain(email, company.emailDomain)) {
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: `Invites must use your company email domain (@${company.emailDomain})`,
+      });
+    }
+  } else {
+    const inviter = await ctx.db.user.findUnique({
+      where: { id: ctx.session.user.id },
+      select: { companyName: true },
+    });
+    if (!inviter?.companyName) {
+      throw new TRPCError({
+        code: "PRECONDITION_FAILED",
+        message:
+          "Add your company name in Profile settings before inviting teammates.",
+      });
+    }
+
+    if (user && !companyNamesMatch(inviter.companyName, user.companyName)) {
       throw new TRPCError({
         code: "FORBIDDEN",
         message: "You can only add people from your own company.",
       });
     }
+  }
+
+  if (user) {
 
     const member = await ctx.db.projectMember.upsert({
       where: {
@@ -158,8 +213,15 @@ function normalizeSprintSettings(input: {
 export const projectRouter = createTRPCRouter({
   list: protectedProcedure.query(async ({ ctx }) => {
     const userId = ctx.session.user.id;
+    const active = await requireActiveCompany(
+      ctx.db,
+      userId,
+      ctx.activeCompanyId,
+    );
+
     return ctx.db.project.findMany({
       where: {
+        companyId: active.companyId,
         OR: [{ ownerId: userId }, { members: { some: { userId } } }],
       },
       include: {
@@ -209,6 +271,18 @@ export const projectRouter = createTRPCRouter({
     .input(createInput)
     .mutation(async ({ ctx, input }) => {
       const userId = ctx.session.user.id;
+      const active = await requireActiveCompany(
+        ctx.db,
+        userId,
+        ctx.activeCompanyId,
+      );
+      if (!canCreateCompanyProjects(active.role)) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "You do not have permission to create projects",
+        });
+      }
+
       return ctx.db.$transaction(async (tx) => {
         const sprintSettings = normalizeSprintSettings(input);
         const project = await tx.project.create({
@@ -220,6 +294,7 @@ export const projectRouter = createTRPCRouter({
             sprintStartDayOfWeek: sprintSettings.sprintStartDayOfWeek,
             sprintDurationWeeks: sprintSettings.sprintDurationWeeks ?? 1,
             ownerId: userId,
+            companyId: active.companyId,
           },
         });
         await tx.projectMember.create({

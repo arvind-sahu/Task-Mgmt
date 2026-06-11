@@ -12,6 +12,10 @@ import {
 const objectKeySchema = z.string().min(1).max(512);
 
 export const storageRouter = createTRPCRouter({
+  status: protectedProcedure.query(() => ({
+    configured: isS3Configured(),
+  })),
+
   /**
    * Batch-resolve S3 object keys to short-lived presigned GET URLs.
    * Clients cache results locally — the server never proxies file bytes.

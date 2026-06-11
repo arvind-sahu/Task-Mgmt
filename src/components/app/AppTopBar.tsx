@@ -5,14 +5,24 @@ import { useEffect, useRef, useState } from "react";
 
 import { NotificationsBell } from "~/components/NotificationsBell";
 import { CachedAvatar } from "~/components/CachedAvatar";
+import { ProjectTaskSearchInput } from "~/components/app/ProjectTaskSearchInput";
 import { type ProjectTab, isProjectTabActive } from "~/config/appNav";
 import { api } from "~/utils/api";
 import { initialsFromName } from "~/utils/avatar";
+import { setWorkspaceCookie } from "~/utils/workspaceCookie";
+
+type ProjectTaskSearchProps = {
+  value: string;
+  onChange: (value: string) => void;
+  filteredCount: number;
+  totalCount: number;
+};
 
 type AppTopBarProps = {
   headerTitle?: string;
   projectColor?: string;
   projectTabs?: ProjectTab[];
+  projectTaskSearch?: ProjectTaskSearchProps;
   onOpenMobileMenu?: () => void;
   onCloseMobileMenu?: () => void;
 };
@@ -21,6 +31,7 @@ export function AppTopBar({
   headerTitle,
   projectColor,
   projectTabs,
+  projectTaskSearch,
   onOpenMobileMenu,
   onCloseMobileMenu,
 }: AppTopBarProps) {
@@ -31,7 +42,18 @@ export function AppTopBar({
     staleTime: 5 * 60 * 1000,
     placeholderData: (previous) => previous,
   });
+  const workspace = api.company.workspaceContext.useQuery(undefined, {
+    enabled: !!session,
+    staleTime: 60_000,
+  });
+  const switchWorkspace = api.company.switchWorkspace.useMutation({
+    onSuccess: (data) => {
+      setWorkspaceCookie(data.companyId);
+      void router.reload();
+    },
+  });
   const [menuOpen, setMenuOpen] = useState(false);
+  const [workspaceOpen, setWorkspaceOpen] = useState(false);
   const [search, setSearch] = useState("");
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -131,38 +153,50 @@ export function AppTopBar({
           </nav>
         )}
 
-        <div className="ml-auto flex min-w-0 shrink-0 items-center gap-1 sm:gap-2">
-          <form onSubmit={submitSearch} className="hidden sm:block">
-            <label className="sr-only" htmlFor="global-search">
-              Search tasks
-            </label>
-            <div className="app-topbar-search relative">
-              <svg
-                viewBox="0 0 24 24"
-                className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-              >
-                <circle cx="11" cy="11" r="7" />
-                <path d="M20 20l-3-3" strokeLinecap="round" />
-              </svg>
-              <input
-                id="global-search"
-                type="search"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search tasks…"
-                className="input w-36 py-1.5 pl-8 text-xs lg:w-48 xl:w-56"
-              />
-            </div>
-          </form>
+        <div className="ml-auto flex min-w-0 shrink items-center gap-1 sm:gap-2">
+          {projectTaskSearch ? (
+            <ProjectTaskSearchInput
+              value={projectTaskSearch.value}
+              onChange={projectTaskSearch.onChange}
+              filteredCount={projectTaskSearch.filteredCount}
+              totalCount={projectTaskSearch.totalCount}
+              className="hidden min-w-0 flex-1 sm:block sm:max-w-xs md:max-w-sm lg:max-w-md"
+            />
+          ) : (
+            <form onSubmit={submitSearch} className="hidden sm:block">
+              <label className="sr-only" htmlFor="global-search">
+                Search tasks
+              </label>
+              <div className="app-topbar-search relative">
+                <svg
+                  viewBox="0 0 24 24"
+                  className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                >
+                  <circle cx="11" cy="11" r="7" />
+                  <path d="M20 20l-3-3" strokeLinecap="round" />
+                </svg>
+                <input
+                  id="global-search"
+                  data-tour="global-search"
+                  type="search"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Search tasks…"
+                  className="input w-36 py-1.5 pl-8 text-xs lg:w-48 xl:w-56"
+                />
+              </div>
+            </form>
+          )}
 
           <NotificationsBell />
 
           <div className="relative" ref={menuRef}>
             <button
               type="button"
+              data-tour="profile-menu"
               onClick={() => setMenuOpen((prev) => !prev)}
               className="app-nav-link flex items-center gap-1.5 rounded-full border border-transparent p-0.5 transition sm:pr-2"
               aria-label="Open profile menu"
@@ -190,6 +224,51 @@ export function AppTopBar({
                   <p className="text-sm font-semibold text-heading">{displayName ?? "User"}</p>
                   <p className="truncate text-xs text-muted">{displayEmail}</p>
                 </div>
+                {workspace.data && workspace.data.workspaces.length > 0 && (
+                  <div
+                    className="border-b p-1"
+                    style={{ borderColor: "var(--border-muted)" }}
+                  >
+                    <button
+                      type="button"
+                      className="app-dropdown-item flex w-full items-center justify-between rounded-md px-3 py-2 text-sm"
+                      onClick={() => setWorkspaceOpen((o) => !o)}
+                    >
+                      <span>Switch workspace</span>
+                      <span className="text-xs text-muted">▾</span>
+                    </button>
+                    {workspaceOpen && (
+                      <ul className="max-h-40 overflow-y-auto py-1">
+                        {workspace.data.workspaces.map((w) => (
+                          <li key={w.id}>
+                            <button
+                              type="button"
+                              className={`app-dropdown-item w-full rounded-md px-3 py-2 text-left text-sm ${
+                                w.id === workspace.data.activeCompanyId
+                                  ? "font-semibold"
+                                  : ""
+                              }`}
+                              disabled={switchWorkspace.isPending}
+                              onClick={() => {
+                                if (w.id === workspace.data?.activeCompanyId) {
+                                  setWorkspaceOpen(false);
+                                  return;
+                                }
+                                switchWorkspace.mutate({ companyId: w.id });
+                                closeMenus();
+                              }}
+                            >
+                              {w.name}
+                              <span className="ml-1 text-xs text-muted">
+                                ({w.role.replace("_", " ").toLowerCase()})
+                              </span>
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                )}
                 <div className="p-1">
                   <Link
                     href="/profile"
@@ -228,6 +307,21 @@ export function AppTopBar({
           </div>
         </div>
       </div>
+
+      {projectTaskSearch && (
+        <div
+          className="border-t px-3 py-2 sm:hidden"
+          style={{ borderColor: "var(--nav-border)" }}
+        >
+          <ProjectTaskSearchInput
+            value={projectTaskSearch.value}
+            onChange={projectTaskSearch.onChange}
+            filteredCount={projectTaskSearch.filteredCount}
+            totalCount={projectTaskSearch.totalCount}
+            id="project-task-search-mobile"
+          />
+        </div>
+      )}
 
       {showProjectTabs && (
         <nav

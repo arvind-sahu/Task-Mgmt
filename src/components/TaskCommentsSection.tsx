@@ -41,30 +41,35 @@ export function TaskCommentsSection({
   const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
   const [editingCommentBody, setEditingCommentBody] = useState("");
 
-  const invalidate = () => void utils.task.byId.invalidate({ id: taskId });
+  const refreshTaskCaches = () => {
+    void utils.task.byId.invalidate({ id: taskId });
+    void utils.task.list.invalidate();
+    void utils.task.myTasks.invalidate();
+    void utils.task.myUpcoming.invalidate();
+  };
 
   const addComment = api.comment.create.useMutation({
     onSuccess: () => {
-      invalidate();
+      refreshTaskCaches();
       setComment("");
     },
   });
   const delComment = api.comment.delete.useMutation({
-    onSuccess: invalidate,
+    onSuccess: refreshTaskCaches,
   });
   const updateComment = api.comment.update.useMutation({
     onSuccess: () => {
-      invalidate();
+      refreshTaskCaches();
       setEditingCommentId(null);
       setEditingCommentBody("");
     },
   });
   const addCommentAttachment = api.attachment.createForComment.useMutation({
-    onSuccess: invalidate,
+    onSuccess: refreshTaskCaches,
   });
   const requestAttachmentUploadUrl = api.attachment.getUploadUrl.useMutation();
   const delAttachment = api.attachment.delete.useMutation({
-    onSuccess: invalidate,
+    onSuccess: refreshTaskCaches,
   });
 
   const deletingAttachmentId =

@@ -7,6 +7,7 @@ import {
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
 export const USER_IMAGES_PREFIX = "user-images/";
+export const COMPANY_LOGOS_PREFIX = "company-logos/";
 export const TASK_ATTACHMENTS_PREFIX = "tasks-attachments/";
 
 export const UPLOAD_URL_TTL_SECONDS = 300;
@@ -75,6 +76,11 @@ export function userImageKey(userId: string, mimeType: string): string {
   return `${USER_IMAGES_PREFIX}${userId}/${Date.now()}.${ext}`;
 }
 
+export function companyLogoKey(companyId: string, mimeType: string): string {
+  const ext = extensionFromMime(mimeType);
+  return `${COMPANY_LOGOS_PREFIX}${companyId}/${Date.now()}.${ext}`;
+}
+
 export function taskAttachmentKey(userId: string, fileName: string): string {
   const safeName = fileName.replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 120);
   return `${TASK_ATTACHMENTS_PREFIX}${userId}/${Date.now()}-${safeName}`;
@@ -108,6 +114,14 @@ export function isTaskAttachmentKeyForUser(key: string, userId: string): boolean
 
 export function isAllowedUserImageKey(key: string): boolean {
   return key.startsWith(USER_IMAGES_PREFIX);
+}
+
+export function isCompanyLogoKeyForCompany(key: string, companyId: string): boolean {
+  return key.startsWith(`${COMPANY_LOGOS_PREFIX}${companyId}/`);
+}
+
+export function isAllowedCompanyLogoKey(key: string): boolean {
+  return key.startsWith(COMPANY_LOGOS_PREFIX);
 }
 
 export function isAllowedTaskAttachmentKey(key: string): boolean {

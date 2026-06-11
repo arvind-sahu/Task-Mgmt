@@ -16,8 +16,10 @@ const COLOR_PRESETS = [
 ];
 
 export default function ProjectsPage() {
+  const workspace = api.company.workspaceContext.useQuery();
   const projects = api.project.list.useQuery();
   const utils = api.useUtils();
+  const canCreate = workspace.data?.canCreateProjects ?? false;
 
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -47,12 +49,14 @@ export default function ProjectsPage() {
             Group tasks and collaborate with your team
           </p>
         </div>
-        <button
-          onClick={() => setShowForm((s) => !s)}
-          className="btn-primary"
-        >
-          {showForm ? "Cancel" : "New project"}
-        </button>
+        {canCreate && (
+          <button
+            onClick={() => setShowForm((s) => !s)}
+            className="btn-primary"
+          >
+            {showForm ? "Cancel" : "New project"}
+          </button>
+        )}
       </div>
 
       {showForm && (
