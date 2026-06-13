@@ -595,6 +595,25 @@
   .task-board-shell {
     min-height: 0;
   }
+  .task-detail-shell {
+    min-height: 0;
+    scrollbar-width: thin;
+    scrollbar-color: var(--scrollbar-thumb) var(--surface-muted);
+  }
+  .task-detail-shell::-webkit-scrollbar {
+    width: 8px;
+  }
+  .task-detail-shell::-webkit-scrollbar-track {
+    background: var(--surface-muted);
+    border-radius: 9999px;
+  }
+  .task-detail-shell::-webkit-scrollbar-thumb {
+    background: var(--scrollbar-thumb);
+    border-radius: 9999px;
+  }
+  .task-detail-shell::-webkit-scrollbar-thumb:hover {
+    background: var(--scrollbar-thumb-hover);
+  }
   .task-board-scroll {
     width: 100%;
     min-width: 0;
@@ -1542,6 +1561,120 @@
 
 .scroll-reveal--fade.scroll-reveal--in .scroll-reveal__body {
   filter: none;
+}
+
+/* Rich text (Jira-style descriptions and comments) */
+.rich-text-editor {
+  padding: 0.75rem;
+  outline: none;
+}
+
+.rich-text-editor p {
+  margin: 0 0 0.75rem;
+}
+
+.rich-text-editor p:last-child {
+  margin-bottom: 0;
+}
+
+.rich-text-editor ul,
+.rich-text-editor ol {
+  margin: 0.5rem 0 0.75rem;
+  padding-left: 1.25rem;
+}
+
+.rich-text-editor h2,
+.rich-text-editor h3 {
+  margin: 0.75rem 0 0.5rem;
+  font-weight: 600;
+}
+
+.rich-text-editor strong,
+.rich-text-editor b,
+.rich-text-content strong,
+.rich-text-content b {
+  font-weight: 700;
+}
+
+.rich-text-editor em,
+.rich-text-editor i,
+.rich-text-content em,
+.rich-text-content i {
+  font-style: italic;
+}
+
+.rich-text-editor ul[data-list-style="disc"],
+.rich-text-content ul[data-list-style="disc"] {
+  list-style-type: disc;
+}
+
+.rich-text-editor ul[data-list-style="circle"],
+.rich-text-content ul[data-list-style="circle"] {
+  list-style-type: circle;
+}
+
+.rich-text-editor ol[data-list-style="decimal"],
+.rich-text-content ol[data-list-style="decimal"] {
+  list-style-type: decimal;
+}
+
+.rich-text-editor ol[data-list-style="lower-alpha"],
+.rich-text-content ol[data-list-style="lower-alpha"] {
+  list-style-type: lower-alpha;
+}
+
+.rich-text-editor ol[data-list-style="upper-alpha"],
+.rich-text-content ol[data-list-style="upper-alpha"] {
+  list-style-type: upper-alpha;
+}
+
+.rich-text-editor ol[data-list-style="lower-roman"],
+.rich-text-content ol[data-list-style="lower-roman"] {
+  list-style-type: lower-roman;
+}
+
+.rich-text-editor ol[data-list-style="upper-roman"],
+.rich-text-content ol[data-list-style="upper-roman"] {
+  list-style-type: upper-roman;
+}
+
+.rich-text-editor .rich-text-image,
+.rich-text-content img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 0.75rem 0;
+  border-radius: 0.5rem;
+}
+
+.rich-text-content p {
+  margin: 0 0 0.75rem;
+}
+
+.rich-text-content p:last-child {
+  margin-bottom: 0;
+}
+
+.rich-text-content ul,
+.rich-text-content ol {
+  margin: 0.5rem 0 0.75rem;
+  padding-left: 1.25rem;
+}
+
+.rich-text-content blockquote {
+  margin: 0.5rem 0;
+  padding-left: 0.75rem;
+  border-left: 3px solid var(--border);
+  color: var(--text-muted);
+}
+
+.rich-text-content a {
+  color: var(--accent-muted-text);
+  text-decoration: underline;
+}
+
+.rich-text-editor .ProseMirror-selectednode {
+  outline: 2px solid var(--accent-muted-text);
 }
 
 @media (prefers-reduced-motion: reduce) {

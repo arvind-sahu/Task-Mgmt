@@ -2,9 +2,9 @@ import { TaskPriority, TaskStatus } from "@prisma/client";
 import { useState, type FormEvent } from "react";
 
 import { TASK_PRIORITIES, TASK_STATUSES, statusLabel } from "./Badges";
-import { CachedAvatar } from "./CachedAvatar";
+import { AssigneePicker } from "./AssigneePicker";
+import { SprintChangeControl } from "./SprintChangeControl";
 import { api } from "~/utils/api";
-import { initialsFromName } from "~/utils/avatar";
 
 export interface TaskFormValues {
   title: string;
@@ -110,11 +110,11 @@ export default function TaskForm({
       {!hideSprint && sprintOptions.length > 0 && (
         <div>
           <label className="label">Sprint</label>
-          <select
-            className="input mt-1"
-            value={sprintId ?? ""}
-            onChange={(e) => {
-              const nextSprintId = e.target.value || null;
+          <SprintChangeControl
+            className="mt-1"
+            value={sprintId ?? null}
+            sprints={sprintOptions}
+            onChange={(nextSprintId) => {
               setSprintId(nextSprintId);
               const sprint = sprintOptions.find((item) => item.id === nextSprintId);
               setDeadline(
@@ -123,14 +123,7 @@ export default function TaskForm({
                   : "",
               );
             }}
-          >
-            <option value="">Backlog</option>
-            {sprintOptions.map((sprint) => (
-              <option key={sprint.id} value={sprint.id}>
-                {sprint.name}
-              </option>
-            ))}
-          </select>
+          />
         </div>
       )}
 
@@ -187,32 +180,14 @@ export default function TaskForm({
 
       <div>
         <label className="label">Assignees</label>
-        <div className="mt-2 flex flex-wrap gap-2">
-          {project.data?.members.map((m) => {
-            const selected = assigneeIds.includes(m.user.id);
-            return (
-              <button
-                type="button"
-                key={m.user.id}
-                onClick={() => setAssigneeIds(toggle(assigneeIds, m.user.id))}
-                className={`flex items-center gap-2 rounded-full px-3 py-1 text-sm ring-1 ring-inset transition ${
-                  selected
-                    ? "bg-indigo-50 text-indigo-700 ring-indigo-300"
-                    : "bg-white text-slate-700 ring-slate-200 hover:bg-slate-50"
-                }`}
-              >
-                <span className="grid h-5 w-5 place-items-center overflow-hidden rounded-full bg-indigo-100 text-[10px] font-semibold text-indigo-700 ring-1 ring-indigo-200">
-                  <CachedAvatar
-                    user={m.user}
-                    alt={m.user.name ?? m.user.email}
-                    className="h-full w-full object-cover"
-                    fallback={initialsFromName(m.user.name, m.user.email)}
-                  />
-                </span>
-                {m.user.name ?? m.user.email}
-              </button>
-            );
-          })}
+        <div className="mt-2">
+          <AssigneePicker
+            members={
+              project.data?.members.map((member) => member.user) ?? []
+            }
+            selectedIds={assigneeIds}
+            onChange={setAssigneeIds}
+          />
         </div>
       </div>
 

@@ -67,3 +67,45 @@ export async function assertProjectAccess(
 export function canManageProject(role: ProjectRole): boolean {
   return role === "OWNER" || role === "ADMIN";
 }
+
+/** Authors, project owners, and company super admins may edit or delete a comment. */
+export async function assertCanModifyTaskComment(
+  db: DbClient,
+  userId: string,
+  commentAuthorId: string,
+  projectId: string,
+): Promise<void> {
+  const projectRole = await assertProjectAccess(db, projectId, userId);
+  if (commentAuthorId === userId || projectRole === "OWNER") {
+    return;
+  }
+
+  const project = await db.project.findUnique({
+    where: { id: projectId },
+    select: { companyId: true },
+  });
+
+  if (project?.companyId) {
+    const companyMember = await db.companyMember.findUnique({
+      where: {
+        companyId_userId: {
+          companyId: project.companyId,
+          userId,
+        },
+      },
+      select: { role: true },
+    });
+
+    if (
+      companyMember?.role === "SUPER_ADMIN" ||
+      companyMember?.role === "ROOT"
+    ) {
+      return;
+    }
+  }
+
+  throw new TRPCError({
+    code: "FORBIDDEN",
+    message: "You can only edit or delete your own comments",
+  });
+}

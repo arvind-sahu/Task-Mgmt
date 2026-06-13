@@ -1,12 +1,13 @@
 import Link from "next/link";
 import { useRouter } from "next/router";
-import { useState, type FormEvent } from "react";
+import { useState } from "react";
 import type { GetServerSidePropsContext } from "next";
 
 import { AttachmentList, type AttachmentItem } from "~/components/AttachmentList";
 import EmptyState from "~/components/EmptyState";
 import { FileUploadButton } from "~/components/FileUploadButton";
 import Layout from "~/components/Layout";
+import { TaskCommentsSection } from "~/components/TaskCommentsSection";
 import TaskForm, { type TaskFormValues } from "~/components/TaskForm";
 import { PriorityBadge } from "~/components/Badges";
 import { StatusSelect } from "~/components/StatusSelect";
@@ -20,11 +21,9 @@ import { requireAuth } from "~/server/auth";
 import { api } from "~/utils/api";
 import {
   formatDate,
-  formatDateTime,
   formatBoardDueDate,
   boardDeadlineLabel,
   isOverdue,
-  wasEdited,
 } from "~/utils/date";
 
 /**
@@ -38,9 +37,6 @@ export default function TaskDetail() {
   const task = api.task.byId.useQuery({ id }, { enabled: !!id });
 
   const [editing, setEditing] = useState(false);
-  const [comment, setComment] = useState("");
-  const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
-  const [editingCommentBody, setEditingCommentBody] = useState("");
 
   const refreshTaskCaches = async () => {
     await utils.task.byId.invalidate({ id });
@@ -63,22 +59,6 @@ export default function TaskDetail() {
       }
     },
   });
-  const addComment = api.comment.create.useMutation({
-    onSuccess: async () => {
-      await refreshTaskCaches();
-      setComment("");
-    },
-  });
-  const delComment = api.comment.delete.useMutation({
-    onSuccess: () => refreshTaskCaches(),
-  });
-  const updateComment = api.comment.update.useMutation({
-    onSuccess: async () => {
-      await refreshTaskCaches();
-      setEditingCommentId(null);
-      setEditingCommentBody("");
-    },
-  });
   const setStatus = api.task.setStatus.useMutation({
     onSuccess: async () => {
       await utils.task.byId.invalidate({ id });
@@ -88,9 +68,6 @@ export default function TaskDetail() {
     },
   });
   const addTaskAttachment = api.attachment.createForTask.useMutation({
-    onSuccess: () => refreshTaskCaches(),
-  });
-  const addCommentAttachment = api.attachment.createForComment.useMutation({
     onSuccess: () => refreshTaskCaches(),
   });
   const requestAttachmentUploadUrl = api.attachment.getUploadUrl.useMutation();
@@ -141,11 +118,6 @@ export default function TaskDetail() {
       assigneeIds: values.assigneeIds,
       tagIds: values.tagIds,
     });
-  }
-
-  function handleAddComment(e: FormEvent) {
-    e.preventDefault();
-    addComment.mutate({ taskId: id, body: comment });
   }
 
   return (
@@ -272,161 +244,11 @@ export default function TaskDetail() {
               </div>
             </div>
 
-            {/* Comments */}
-            <div className="card mt-6">
-              <h2 className="mb-4 text-base font-semibold text-heading">
-                Comments ({t.comments.length})
-              </h2>
-              <ul className="space-y-4">
-                {t.comments.map((c) => (
-                  <li key={c.id} className="flex gap-3">
-                    <span className="app-avatar grid h-8 w-8 shrink-0 place-items-center rounded-full text-xs font-semibold">
-                      {(c.author.name ?? c.author.email)
-                        .charAt(0)
-                        .toUpperCase()}
-                    </span>
-                    <div className="comment-bubble flex-1 rounded-md p-3">
-                      <div className="flex flex-wrap items-start justify-between gap-2">
-                        <p className="text-sm font-medium text-heading">
-                          {c.author.name ?? c.author.email}
-                        </p>
-                        <div className="text-right text-xs text-muted">
-                          <p>{formatDateTime(c.createdAt)}</p>
-                          {wasEdited(c.createdAt, c.updatedAt) && (
-                            <p className="opacity-70">
-                              Edited {formatDateTime(c.updatedAt)}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-
-                      {editingCommentId === c.id ? (
-                        <form
-                          className="mt-2 space-y-2"
-                          onSubmit={(e) => {
-                            e.preventDefault();
-                            updateComment.mutate({
-                              id: c.id,
-                              body: editingCommentBody,
-                            });
-                          }}
-                        >
-                          <textarea
-                            className="input"
-                            rows={3}
-                            value={editingCommentBody}
-                            onChange={(e) =>
-                              setEditingCommentBody(e.target.value)
-                            }
-                            required
-                            maxLength={2000}
-                          />
-                          <div className="flex gap-2">
-                            <button
-                              type="submit"
-                              className="btn-primary"
-                              disabled={updateComment.isPending}
-                            >
-                              Save
-                            </button>
-                            <button
-                              type="button"
-                              className="btn-ghost"
-                              onClick={() => {
-                                setEditingCommentId(null);
-                                setEditingCommentBody("");
-                              }}
-                            >
-                              Cancel
-                            </button>
-                          </div>
-                        </form>
-                      ) : (
-                        <p className="mt-1 whitespace-pre-wrap text-sm text-heading">
-                          {c.body}
-                        </p>
-                      )}
-
-                      <AttachmentList
-                        items={normalizeAttachments(c.attachments)}
-                        onDelete={(attId) =>
-                          delAttachment.mutate({ id: attId })
-                        }
-                        deletingId={
-                          delAttachment.isPending ? deletingAttachmentId : null
-                        }
-                      />
-
-                      {editingCommentId !== c.id && (
-                        <div className="mt-2 flex flex-wrap items-center gap-3">
-                          <FileUploadButton
-                            label="Attach file"
-                            disabled={addCommentAttachment.isPending}
-                            requestUploadUrl={(input) =>
-                              requestAttachmentUploadUrl.mutateAsync(input)
-                            }
-                            onUploaded={async (file) => {
-                              await addCommentAttachment.mutateAsync({
-                                commentId: c.id,
-                                fileName: file.fileName,
-                                mimeType: file.mimeType,
-                                storageKey: file.storageKey,
-                              });
-                            }}
-                          />
-                          <button
-                            type="button"
-                            className="link-accent text-xs hover:underline"
-                            onClick={() => {
-                              setEditingCommentId(c.id);
-                              setEditingCommentBody(c.body);
-                            }}
-                          >
-                            Edit
-                          </button>
-                          <button
-                            type="button"
-                            className="text-xs hover:underline"
-                            style={{ color: "var(--danger-text)" }}
-                            onClick={() => delComment.mutate({ id: c.id })}
-                          >
-                            Delete
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  </li>
-                ))}
-                {t.comments.length === 0 && (
-                  <li className="text-sm italic text-muted">
-                    No comments yet — start the discussion.
-                  </li>
-                )}
-              </ul>
-
-              <form onSubmit={handleAddComment} className="mt-6 space-y-2">
-                <textarea
-                  className="input"
-                  rows={3}
-                  placeholder="Add a comment…"
-                  value={comment}
-                  onChange={(e) => setComment(e.target.value)}
-                  required
-                  maxLength={2000}
-                />
-                <p className="text-xs text-muted">
-                  You can attach images or PDFs to comments after posting.
-                </p>
-                <div className="flex justify-end">
-                  <button
-                    className="btn-primary"
-                    disabled={addComment.isPending}
-                  >
-                    {addComment.isPending ? "Posting…" : "Post comment"}
-                  </button>
-                </div>
-              </form>
-            </div>
+            <TaskCommentsSection
+              taskId={t.id}
+              comments={t.comments}
+              isProjectOwner={t.viewerProjectRole === "OWNER"}
+            />
           </div>
 
           {/* Meta sidebar */}
