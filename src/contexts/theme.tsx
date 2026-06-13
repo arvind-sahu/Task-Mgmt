@@ -1,5 +1,6 @@
 import {
   createContext,
+  useCallback,
   useContext,
   useEffect,
   useMemo,
@@ -7,6 +8,9 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { useRouter } from "next/router";
+
+import { isHomeTimeThemeRoute, isUserAppThemeRoute } from "~/utils/themeRoute";
 
 export const APP_THEMES = ["light", "dark", "greydark", "sunset"] as const;
 export type AppTheme = (typeof APP_THEMES)[number];
@@ -41,8 +45,24 @@ function readStoredTheme(): AppTheme {
 }
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
+  const router = useRouter();
   const [theme, setTheme] = useState<AppTheme>(() => readStoredTheme());
   const skipPersistRef = useRef(true);
+
+  const applyDocumentTheme = useCallback(
+    (pathname: string, appTheme: AppTheme) => {
+      if (isHomeTimeThemeRoute(pathname)) {
+        document.documentElement.setAttribute("data-theme", "light");
+        return;
+      }
+      if (isUserAppThemeRoute(pathname)) {
+        document.documentElement.setAttribute("data-theme", appTheme);
+        return;
+      }
+      document.documentElement.setAttribute("data-theme", "light");
+    },
+    [],
+  );
 
   useEffect(() => {
     const saved = readStoredTheme();
@@ -50,17 +70,20 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       skipPersistRef.current = true;
       setTheme(saved);
     }
-    document.documentElement.setAttribute("data-theme", saved);
   }, []);
 
   useEffect(() => {
-    document.documentElement.setAttribute("data-theme", theme);
+    applyDocumentTheme(router.pathname, theme);
+  }, [applyDocumentTheme, router.pathname, theme]);
+
+  useEffect(() => {
     if (skipPersistRef.current) {
       skipPersistRef.current = false;
       return;
     }
+    if (!isUserAppThemeRoute(router.pathname)) return;
     window.localStorage.setItem(STORAGE_KEY, theme);
-  }, [theme]);
+  }, [theme, router.pathname]);
 
   const value = useMemo(() => ({ theme, setTheme }), [theme]);
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;

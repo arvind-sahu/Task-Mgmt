@@ -4,6 +4,22 @@ import { Head, Html, Main, NextScript } from "next/document";
 const themeBootScript = `
 (function () {
   try {
+    var path = window.location.pathname;
+    if (path === "/") {
+      document.documentElement.setAttribute("data-theme", "light");
+      return;
+    }
+    var marketing = ["/pricing", "/about", "/team", "/features", "/blog", "/vs-jira", "/contact"];
+    for (var i = 0; i < marketing.length; i++) {
+      if (path === marketing[i] || path.indexOf(marketing[i] + "/") === 0) {
+        document.documentElement.setAttribute("data-theme", "light");
+        return;
+      }
+    }
+    if (path.indexOf("/auth") === 0) {
+      document.documentElement.setAttribute("data-theme", "light");
+      return;
+    }
     var key = "tasker.theme";
     var theme = localStorage.getItem(key);
     if (theme === "indigo") theme = "light";
