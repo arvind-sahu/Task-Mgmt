@@ -1,19 +1,18 @@
 import { NotificationType } from "@prisma/client";
-import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 
-import { assertProjectAccess } from "~/server/api/access";
+import { assertCanModifyTaskComment, assertProjectAccess } from "~/server/api/access";
 import { publicUserSelect } from "~/server/api/userSelect";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { notifyUsers } from "~/server/notifications";
-import { sanitizePlainText } from "~/server/security/sanitize";
+import { sanitizeRichTextHtml } from "~/server/security/sanitizeHtml";
 
 export const commentRouter = createTRPCRouter({
   create: protectedProcedure
     .input(
       z.object({
         taskId: z.string().cuid(),
-        body: z.string().min(1).max(2000),
+        body: z.string().min(1).max(12000),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -30,7 +29,7 @@ export const commentRouter = createTRPCRouter({
 
       const comment = await ctx.db.comment.create({
         data: {
-          body: sanitizePlainText(input.body),
+          body: sanitizeRichTextHtml(input.body),
           taskId: input.taskId,
           authorId: ctx.session.user.id,
         },
@@ -60,30 +59,28 @@ export const commentRouter = createTRPCRouter({
     .input(
       z.object({
         id: z.string().cuid(),
-        body: z.string().min(1).max(2000),
+        body: z.string().min(1).max(12000),
       }),
     )
     .mutation(async ({ ctx, input }) => {
       const comment = await ctx.db.comment.findUniqueOrThrow({
         where: { id: input.id },
-        select: { authorId: true, taskId: true },
+        select: {
+          authorId: true,
+          task: { select: { projectId: true } },
+        },
       });
-      if (comment.authorId !== ctx.session.user.id) {
-        throw new TRPCError({
-          code: "FORBIDDEN",
-          message: "You can only edit your own comments",
-        });
-      }
 
-      const task = await ctx.db.task.findUniqueOrThrow({
-        where: { id: comment.taskId },
-        select: { projectId: true },
-      });
-      await assertProjectAccess(ctx.db, task.projectId, ctx.session.user.id);
+      await assertCanModifyTaskComment(
+        ctx.db,
+        ctx.session.user.id,
+        comment.authorId,
+        comment.task.projectId,
+      );
 
       return ctx.db.comment.update({
         where: { id: input.id },
-        data: { body: sanitizePlainText(input.body) },
+        data: { body: sanitizeRichTextHtml(input.body) },
         include: {
           author: { select: publicUserSelect },
           attachments: true,
@@ -91,20 +88,25 @@ export const commentRouter = createTRPCRouter({
       });
     }),
 
-  /** Authors can edit/delete their own comments. */
+  /** Authors, project owners, and company super admins may delete comments. */
   delete: protectedProcedure
     .input(z.object({ id: z.string().cuid() }))
     .mutation(async ({ ctx, input }) => {
       const comment = await ctx.db.comment.findUniqueOrThrow({
         where: { id: input.id },
-        select: { authorId: true },
+        select: {
+          authorId: true,
+          task: { select: { projectId: true } },
+        },
       });
-      if (comment.authorId !== ctx.session.user.id) {
-        throw new TRPCError({
-          code: "FORBIDDEN",
-          message: "You can only delete your own comments",
-        });
-      }
+
+      await assertCanModifyTaskComment(
+        ctx.db,
+        ctx.session.user.id,
+        comment.authorId,
+        comment.task.projectId,
+      );
+
       await ctx.db.comment.delete({ where: { id: input.id } });
       return { ok: true };
     }),

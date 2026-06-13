@@ -4,10 +4,19 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { GetServerSidePropsContext } from "next";
 
 import EmptyState from "~/components/EmptyState";
+import { AssigneePicker } from "~/components/AssigneePicker";
 import Layout from "~/components/Layout";
+import { SprintChangeControl } from "~/components/SprintChangeControl";
 import { projectTabsForId } from "~/config/appNav";
 import { CachedAvatar } from "~/components/CachedAvatar";
 import { ProjectSettingsPanel } from "~/components/ProjectSettingsPanel";
+import {
+  RichTextContent,
+  RichTextEditor,
+} from "~/components/rich-text";
+import {
+  useRichTextImageUpload,
+} from "~/components/rich-text/useRichTextImageUpload";
 import TaskCard from "~/components/TaskCard";
 import { TaskCommentsSection } from "~/components/TaskCommentsSection";
 import { isTaskCompleted, TaskCompletedTick } from "~/components/TaskIndicators";
@@ -460,7 +469,7 @@ export default function ProjectDetail() {
           </aside>
         ) : null}
 
-        <section className="flex min-h-0 min-w-0 flex-col">
+        <section className="flex min-h-0 min-w-0 flex-1 flex-col">
           {showSettingsView && canManage ? (
             <div className="min-h-0 flex-1 overflow-y-auto">
               <ProjectSettingsPanel
@@ -497,6 +506,13 @@ export default function ProjectDetail() {
                 </span>
               </p>
             )}
+            {sprintOptions.length > 0 && (
+              <SprintChangeControl
+                value={resolvedSprintId}
+                sprints={sprintOptions}
+                onChange={(sprintId) => setActiveSprintId(sprintId ?? "")}
+              />
+            )}
             <div className="ml-auto flex shrink-0 items-center gap-2">
               <button
                 type="button"
@@ -510,16 +526,18 @@ export default function ProjectDetail() {
             </div>
           </div>
           {selectedTaskId ? (
-            <TaskDetailPanel
-              task={selectedTask.data}
-              loading={selectedTask.isLoading}
-              error={selectedTask.error?.message}
-              sprintOptions={sprintOptions}
-              submitting={updateTask.isPending}
-              updateError={updateTask.error?.message}
-              onBack={() => setSelectedTaskId(null)}
-              onSubmit={handleTaskEdit}
-            />
+            <div className="task-detail-shell min-h-0 flex-1 overflow-y-auto overscroll-contain">
+              <TaskDetailPanel
+                task={selectedTask.data}
+                loading={selectedTask.isLoading}
+                error={selectedTask.error?.message}
+                sprintOptions={sprintOptions}
+                submitting={updateTask.isPending}
+                updateError={updateTask.error?.message}
+                onBack={() => setSelectedTaskId(null)}
+                onSubmit={handleTaskEdit}
+              />
+            </div>
           ) : (
             <div className="task-board-shell flex min-h-0 flex-1 flex-col">
               {boardOverflowsX && (
@@ -722,12 +740,6 @@ function matchesTaskSearch(task: TaskListItem, query: string) {
   return false;
 }
 
-function isLongDescription(text: string) {
-  if (!text.trim()) return false;
-  if (text.split("\n").length > 5) return true;
-  return text.length > 280;
-}
-
 function TaskDetailPanel({
   task,
   loading,
@@ -756,7 +768,6 @@ function TaskDetailPanel({
   const [titleEditing, setTitleEditing] = useState(false);
   const [description, setDescription] = useState("");
   const [descriptionEditing, setDescriptionEditing] = useState(false);
-  const [descriptionExpanded, setDescriptionExpanded] = useState(false);
   const [status, setStatus] = useState<TaskStatus>(TaskStatus.TODO);
   const [priority, setPriority] = useState<TaskDetailItem["priority"]>("MEDIUM");
   const [deadline, setDeadline] = useState("");
@@ -769,6 +780,7 @@ function TaskDetailPanel({
     { id: task?.projectId ?? "" },
     { enabled: !!task?.projectId },
   );
+  const { uploadImage } = useRichTextImageUpload();
 
   useEffect(() => {
     if (!task) return;
@@ -889,12 +901,6 @@ function TaskDetailPanel({
     });
   }
 
-  function toggleValue(values: string[], id: string) {
-    return values.includes(id)
-      ? values.filter((value) => value !== id)
-      : [...values, id];
-  }
-
   if (loading) {
     return (
       <div className="card">
@@ -914,174 +920,134 @@ function TaskDetailPanel({
     );
   }
 
+  const assigneeMembers = project.data?.members.map((member) => member.user) ?? [];
+
   return (
     <>
       <div className="card">
-      <div className="mb-4 flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-        <div className="min-w-0 flex-1">
-          <div className="flex items-start gap-3">
-            <button
-              type="button"
-              className="btn-ghost grid h-9 w-9 shrink-0 place-items-center rounded-full text-lg font-semibold shadow-sm"
-              onClick={onBack}
-              aria-label="Back to task board"
-            >
-              ←
-            </button>
-            {titleEditing ? (
-              <div className="flex min-w-0 flex-1 items-start gap-2">
-                {isTaskCompleted(status) && <TaskCompletedTick className="mt-1.5" />}
-                <textarea
-                  className="editable-field-editing min-w-0 flex-1 resize-none rounded-xl px-2 py-1 text-xl font-semibold leading-7 outline-none"
-                  value={title}
-                  onChange={(event) => setTitle(event.target.value)}
-                  onBlur={() => {
-                    if (suppressNextTextBlurRef.current) {
-                      suppressNextTextBlurRef.current = false;
-                      return;
-                    }
+      <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between lg:gap-4">
+        <div className="flex min-w-0 items-start gap-3 lg:max-w-sm lg:flex-1 xl:max-w-md">
+          <button
+            type="button"
+            className="btn-ghost grid h-9 w-9 shrink-0 place-items-center rounded-full text-lg font-semibold shadow-sm"
+            onClick={onBack}
+            aria-label="Back to task board"
+          >
+            ←
+          </button>
+          {titleEditing ? (
+            <div className="flex min-w-0 flex-1 items-start gap-2">
+              {isTaskCompleted(status) && <TaskCompletedTick className="mt-1.5" />}
+              <textarea
+                className="editable-field-editing min-w-0 flex-1 resize-none rounded-xl px-2 py-1 text-lg font-semibold leading-7 outline-none"
+                value={title}
+                onChange={(event) => setTitle(event.target.value)}
+                onBlur={() => {
+                  if (suppressNextTextBlurRef.current) {
+                    suppressNextTextBlurRef.current = false;
+                    return;
+                  }
+                  setTitleEditing(false);
+                  saveTextField({ title });
+                }}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    event.preventDefault();
                     setTitleEditing(false);
                     saveTextField({ title });
-                  }}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter") {
-                      event.preventDefault();
-                      setTitleEditing(false);
-                      saveTextField({ title });
-                    }
-                    if (event.key === "Escape") {
-                      event.preventDefault();
-                      suppressNextTextBlurRef.current = true;
-                      setTitle(task.title);
-                      setTitleEditing(false);
-                    }
-                  }}
-                  maxLength={200}
-                  rows={2}
-                  autoFocus
-                  aria-label="Task title"
-                />
-              </div>
-            ) : (
-              <button
-                type="button"
-                className="editable-field flex min-w-0 flex-1 items-start gap-2 rounded-xl px-2 py-1 text-left text-xl font-semibold leading-7 text-heading"
-                onClick={() => setTitleEditing(true)}
-                title={title}
-              >
-                {isTaskCompleted(status) && <TaskCompletedTick className="mt-1.5 shrink-0" />}
-                <span className="line-clamp-2 min-w-0">{title}</span>
-              </button>
-            )}
-          </div>
-          <div className="mt-3 flex flex-wrap items-center gap-2">
-            {assigneeIds.length === 0 ? (
-              <span className="text-xs text-muted">No assignee</span>
-            ) : (
-              project.data?.members
-                .filter((member) => assigneeIds.includes(member.user.id))
-                .map((member) => (
-                  <span
-                    key={member.user.id}
-                    className="surface-row inline-flex items-center gap-2 rounded-full px-2 py-1 text-xs font-medium text-heading"
-                  >
-                    <span className="app-avatar grid h-6 w-6 place-items-center overflow-hidden rounded-full text-[10px] font-semibold">
-                      <CachedAvatar
-                        user={member.user}
-                        alt={member.user.name ?? member.user.email}
-                        className="h-full w-full object-cover"
-                        fallback={initialsFromName(
-                          member.user.name,
-                          member.user.email,
-                        )}
-                      />
-                    </span>
-                    {member.user.name ?? member.user.email}
-                  </span>
-                ))
-            )}
-          </div>
+                  }
+                  if (event.key === "Escape") {
+                    event.preventDefault();
+                    suppressNextTextBlurRef.current = true;
+                    setTitle(task.title);
+                    setTitleEditing(false);
+                  }
+                }}
+                maxLength={200}
+                rows={2}
+                autoFocus
+                aria-label="Task title"
+              />
+            </div>
+          ) : (
+            <button
+              type="button"
+              className="editable-field flex min-w-0 flex-1 items-start gap-2 rounded-xl px-2 py-1 text-left text-lg font-semibold leading-7 text-heading"
+              onClick={() => setTitleEditing(true)}
+              title={title}
+            >
+              {isTaskCompleted(status) && <TaskCompletedTick className="mt-1.5 shrink-0" />}
+              <span className="line-clamp-2 min-w-0">{title}</span>
+            </button>
+          )}
         </div>
-        <div className="w-full shrink-0 xl:w-56">
-          <label className="label text-xs">Sprint</label>
-          <select
-            className="input mt-1 h-10 text-sm"
-            value={sprintId ?? ""}
-            onChange={(event) => setSprintId(event.target.value || null)}
-          >
-            <option value="">Backlog</option>
-            {sprintOptions.map((sprint) => (
-              <option key={sprint.id} value={sprint.id}>
-                {sprint.name}
-              </option>
-            ))}
-          </select>
+
+        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:gap-3 lg:shrink-0 lg:justify-end">
+          <AssigneePicker
+            variant="compact"
+            members={assigneeMembers}
+            selectedIds={assigneeIds}
+            onChange={setAssigneeIds}
+          />
+          <SprintChangeControl
+            className="shrink-0"
+            value={sprintId}
+            sprints={sprintOptions}
+            onChange={setSprintId}
+          />
         </div>
       </div>
       <div className="grid gap-4">
         <div>
           <label className="label">Description</label>
           {descriptionEditing ? (
-            <textarea
-              className="input mt-1 min-h-[11rem] max-h-96 w-full resize-y overflow-y-auto rounded-xl px-3 py-2 text-sm leading-6"
-              value={description}
-              onChange={(event) => setDescription(event.target.value)}
-              onBlur={() => {
-                if (suppressNextTextBlurRef.current) {
-                  suppressNextTextBlurRef.current = false;
-                  return;
-                }
-                setDescriptionEditing(false);
-                saveTextField({ description });
-              }}
-              onKeyDown={(event) => {
-                if (event.key === "Enter" && event.ctrlKey) {
-                  event.preventDefault();
+            <div className="mt-1">
+              <RichTextEditor
+                value={description}
+                onChange={setDescription}
+                placeholder="Add task description…"
+                uploadImage={uploadImage}
+                onBlur={() => {
+                  if (suppressNextTextBlurRef.current) {
+                    suppressNextTextBlurRef.current = false;
+                    return;
+                  }
                   setDescriptionEditing(false);
                   saveTextField({ description });
-                  event.currentTarget.blur();
-                }
-                if (event.key === "Escape") {
-                  event.preventDefault();
-                  suppressNextTextBlurRef.current = true;
-                  setDescription(task.description ?? "");
-                  setDescriptionEditing(false);
-                  event.currentTarget.blur();
-                }
-              }}
-              rows={7}
-              maxLength={5000}
-              autoFocus
-              placeholder="Add task description..."
-            />
-          ) : (
-            <div className="surface-inset mt-1 rounded-xl px-3 py-2">
-              <button
-                type="button"
-                className={`editable-field block w-full text-left text-sm leading-6 text-heading ${
-                  descriptionExpanded || !isLongDescription(description)
-                    ? "whitespace-pre-wrap"
-                    : "line-clamp-5 whitespace-pre-wrap"
-                }`}
-                onClick={() => setDescriptionEditing(true)}
-              >
-                {description ? (
-                  description
-                ) : (
-                  <span className="italic text-muted">
-                    Add task description...
-                  </span>
-                )}
-              </button>
-              {isLongDescription(description) && (
+                }}
+              />
+              <div className="mt-2 flex justify-end gap-2">
                 <button
                   type="button"
-                  className="link-accent mt-2 text-xs font-semibold hover:underline"
-                  onClick={() => setDescriptionExpanded((value) => !value)}
+                  className="btn-ghost text-xs"
+                  onClick={() => {
+                    suppressNextTextBlurRef.current = true;
+                    setDescription(task.description ?? "");
+                    setDescriptionEditing(false);
+                  }}
                 >
-                  {descriptionExpanded ? "Show less" : "Show more"}
+                  Cancel
                 </button>
-              )}
+                <button
+                  type="button"
+                  className="btn-primary text-xs"
+                  onClick={() => {
+                    setDescriptionEditing(false);
+                    saveTextField({ description });
+                  }}
+                >
+                  Done
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="surface-inset mt-1 min-h-[6rem] rounded-xl px-3 py-2">
+              <RichTextContent
+                html={description}
+                emptyLabel="Add task description…"
+                onClick={() => setDescriptionEditing(true)}
+                className="min-h-[5rem]"
+              />
             </div>
           )}
         </div>
@@ -1127,44 +1093,6 @@ function TaskDetailPanel({
             />
           </div>
         </div>
-
-        <div>
-          <label className="label">Assignees</label>
-          <div className="mt-2 flex flex-wrap gap-2">
-            {project.data?.members.map((member) => {
-              const selected = assigneeIds.includes(member.user.id);
-              return (
-                <button
-                  key={member.user.id}
-                  type="button"
-                  onClick={() =>
-                    setAssigneeIds((current) =>
-                      toggleValue(current, member.user.id),
-                    )
-                  }
-                  className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-sm ring-1 ring-inset transition ${
-                    selected
-                      ? "chip-active"
-                      : "chip interactive-hover"
-                  }`}
-                >
-                  <span className="app-avatar grid h-6 w-6 place-items-center overflow-hidden rounded-full text-[10px] font-semibold">
-                    <CachedAvatar
-                      user={member.user}
-                      alt={member.user.name ?? member.user.email}
-                      className="h-full w-full object-cover"
-                      fallback={initialsFromName(
-                        member.user.name,
-                        member.user.email,
-                      )}
-                    />
-                  </span>
-                  {member.user.name ?? member.user.email}
-                </button>
-              );
-            })}
-          </div>
-        </div>
       </div>
       <p className="mt-4 text-xs text-slate-500">
         {submitting ? "Saving changes..." : "Changes auto-save."}
@@ -1175,7 +1103,11 @@ function TaskDetailPanel({
         </p>
       )}
       </div>
-      <TaskCommentsSection taskId={task.id} comments={task.comments} />
+      <TaskCommentsSection
+        taskId={task.id}
+        comments={task.comments}
+        isProjectOwner={project.data?.currentUserRole === "OWNER"}
+      />
     </>
   );
 }

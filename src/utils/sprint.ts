@@ -48,3 +48,28 @@ export function sprintPlanLabel(plan: string, durationWeeks: number, startDay: n
   }
   return durationWeeks === 2 ? "Bi-weekly (14 days)" : "Weekly (7 days)";
 }
+
+export function sortSprintsByStart<T extends { startDate: Date | string }>(
+  sprints: T[],
+) {
+  return [...sprints].sort(
+    (left, right) =>
+      new Date(left.startDate).getTime() - new Date(right.startDate).getTime(),
+  );
+}
+
+export function resolveSprintLabel(
+  sprint: { name: string },
+  index: number,
+): string {
+  const numbered = sprint.name.match(/^Sprint\s+(\d+)\s*$/i);
+  if (numbered?.[1]) return `Sprint ${numbered[1]}`;
+
+  const embeddedNumber = sprint.name.match(/\b(\d+)\b/);
+  if (embeddedNumber?.[1] && sprint.name.toLowerCase().includes("sprint")) {
+    return `Sprint ${embeddedNumber[1]}`;
+  }
+
+  if (sprint.name.trim()) return sprint.name;
+  return `Sprint ${index + 1}`;
+}

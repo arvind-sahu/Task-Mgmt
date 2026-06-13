@@ -10,10 +10,11 @@ import {
   sanitizeOptionalPlainText,
   sanitizePlainText,
 } from "~/server/security/sanitize";
+import { sanitizeOptionalRichTextHtml } from "~/server/security/sanitizeHtml";
 
 const baseInput = {
   title: z.string().min(1).max(200),
-  description: z.string().max(5000).optional(),
+  description: z.string().max(20000).optional(),
   status: z.nativeEnum(TaskStatus).optional(),
   priority: z.nativeEnum(TaskPriority).optional(),
   deadline: z.coerce.date().nullable().optional(),
@@ -236,8 +237,12 @@ export const taskRouter = createTRPCRouter({
           project: { select: { id: true, name: true, color: true } },
         },
       });
-      await assertProjectAccess(ctx.db, task.projectId, ctx.session.user.id);
-      return task;
+      const viewerProjectRole = await assertProjectAccess(
+        ctx.db,
+        task.projectId,
+        ctx.session.user.id,
+      );
+      return { ...task, viewerProjectRole };
     }),
 
   /** Recent tasks across every project the user has access to (for the dashboard). */
@@ -338,7 +343,7 @@ export const taskRouter = createTRPCRouter({
       const task = await ctx.db.task.create({
         data: {
           title: sanitizePlainText(title),
-          description: sanitizeOptionalPlainText(description),
+          description: sanitizeOptionalRichTextHtml(description),
           status: sprintId ? resolvedStatus : TaskStatus.BACKLOG,
           priority,
           deadline,
@@ -388,7 +393,7 @@ export const taskRouter = createTRPCRouter({
       const sanitizedRest = {
         ...rest,
         title: rest.title ? sanitizePlainText(rest.title) : undefined,
-        description: sanitizeOptionalPlainText(rest.description),
+        description: sanitizeOptionalRichTextHtml(rest.description),
       };
 
       const updated = await ctx.db.task.update({
