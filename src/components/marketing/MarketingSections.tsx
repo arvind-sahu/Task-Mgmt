@@ -3,6 +3,8 @@ import { useState, type FormEvent } from "react";
 
 import { trackMarketingEvent } from "~/lib/analytics";
 import { LeadershipTeamSection } from "~/components/team/TeamSection";
+import { PricingYearlyCelebration } from "~/components/marketing/PricingYearlyCelebration";
+import { ScrollReveal, scrollRevealStagger } from "~/components/marketing/ScrollReveal";
 import {
   blogPosts,
   caseStudies,
@@ -221,18 +223,21 @@ export function FeatureGrid({ detailed = false }: { detailed?: boolean }) {
       className="marketing-section marketing-section--after-hero marketing-section--bridge pattern-grid bg-slate-50 px-5 text-slate-950 sm:px-8"
     >
       <div className="relative mx-auto max-w-7xl">
-        <SectionIntro
-          eyebrow="Everything teams expect"
-          title="Jira-inspired features with cleaner AI-first execution."
-          description="From issue tracking to executive reporting, Tasker gives teams the structure to move fast and the clarity to stay aligned."
-        />
+        <ScrollReveal variant="fade" className="mx-auto max-w-3xl text-center">
+          <SectionIntro
+            eyebrow="Everything teams expect"
+            title="Jira-inspired features with cleaner AI-first execution."
+            description="From issue tracking to executive reporting, Tasker gives teams the structure to move fast and the clarity to stay aligned."
+          />
+        </ScrollReveal>
         <div className="mt-14 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {featureCards.map((feature, index) => (
-            <article
+            <ScrollReveal
+              as="article"
               id={feature.title.toLowerCase().includes("ai") ? "ai" : feature.title.toLowerCase().includes("analytics") ? "analytics" : feature.title.toLowerCase().includes("security") ? "security" : undefined}
               key={feature.title}
+              delay={scrollRevealStagger(index)}
               className="marketing-feature group rounded-3xl border border-slate-200 bg-white p-6 shadow-sm transition hover:-translate-y-2 hover:shadow-2xl hover:shadow-blue-100"
-              style={{ animationDelay: `${index * 70}ms` }}
               onMouseEnter={() => trackMarketingEvent("feature_explored", { feature: feature.title })}
             >
               <div className="mb-5 grid h-12 w-12 place-items-center rounded-2xl bg-gradient-to-br from-blue-600 to-purple-600 text-sm font-black text-white shadow-lg shadow-blue-200 transition group-hover:rotate-6 group-hover:scale-110">
@@ -253,7 +258,7 @@ export function FeatureGrid({ detailed = false }: { detailed?: boolean }) {
               <Link href="/features" className="mt-5 inline-block text-sm font-black text-blue-600 hover:text-blue-700">
                 Learn more
               </Link>
-            </article>
+            </ScrollReveal>
           ))}
         </div>
       </div>
@@ -303,7 +308,7 @@ export function InteractiveDemo() {
             <p className="ht-demo-label text-sm font-black">Guided preview</p>
             <span className="rounded-full bg-white/10 px-3 py-1 text-xs">{activeStep + 1}/5</span>
           </div>
-          <div className="ht-demo-inner relative min-h-[360px] overflow-hidden rounded-[1.5rem] p-5 ring-1 ring-white/10">
+          <ScrollReveal tone="glass" className="ht-demo-inner relative min-h-[360px] overflow-hidden rounded-[1.5rem] p-5 ring-1 ring-white/10">
             <div className="absolute right-8 top-8 h-28 w-28 rounded-full bg-cyan-400/20 blur-2xl" />
             <div className="relative grid gap-4 md:grid-cols-[1fr_0.72fr]">
               <div className="space-y-3">
@@ -331,7 +336,7 @@ export function InteractiveDemo() {
                 </Link>
               </div>
             </div>
-          </div>
+          </ScrollReveal>
         </div>
       </div>
     </section>
@@ -354,15 +359,19 @@ export function SocialProof() {
           </p>
         </div>
         <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-          {trustStats.map((stat) => (
-            <div key={stat.label} className="ht-stat-card rounded-3xl border p-6 text-center shadow-sm">
+          {trustStats.map((stat, index) => (
+            <ScrollReveal
+              key={stat.label}
+              delay={scrollRevealStagger(index)}
+              className="ht-stat-card rounded-3xl border p-6 text-center shadow-sm"
+            >
               <p className="text-4xl font-black" style={{ color: "var(--ht-accent)" }}>{stat.value}</p>
               <p className="mt-2 text-sm font-bold uppercase tracking-[0.16em] ht-panel-muted-text">{stat.label}</p>
-            </div>
+            </ScrollReveal>
           ))}
         </div>
 
-        <div className="ht-marquee-wrap mt-12 overflow-hidden rounded-3xl border p-5 shadow-sm">
+        <ScrollReveal delay={200} className="ht-marquee-wrap mt-12 overflow-hidden rounded-3xl border p-5 shadow-sm">
           <div className="marketing-marquee flex min-w-max gap-4">
             {[...customerLogos, ...customerLogos].map((logo, index) => (
               <span
@@ -373,17 +382,22 @@ export function SocialProof() {
               </span>
             ))}
           </div>
-        </div>
+        </ScrollReveal>
 
         <div className="mt-12 grid gap-5 lg:grid-cols-3">
-          {testimonials.map((testimonial) => (
-            <blockquote key={testimonial.name} className="ht-quote-card rounded-3xl border p-6 shadow-sm">
+          {testimonials.map((testimonial, index) => (
+            <ScrollReveal
+              as="blockquote"
+              key={testimonial.name}
+              delay={scrollRevealStagger(index)}
+              className="ht-quote-card rounded-3xl border p-6 shadow-sm"
+            >
               <p className="text-sm leading-7 ht-panel-muted-text">"{testimonial.quote}"</p>
               <footer className="mt-5">
                 <p className="ht-quote-name font-black">{testimonial.name}</p>
                 <p className="text-sm ht-panel-muted-text">{testimonial.role}</p>
               </footer>
-            </blockquote>
+            </ScrollReveal>
           ))}
         </div>
       </div>
@@ -428,9 +442,12 @@ export function TrustSecuritySection() {
         </div>
 
         <div className="grid gap-4">
-          {trustHighlights.map((item) => (
-            <article
+          {trustHighlights.map((item, index) => (
+            <ScrollReveal
+              as="article"
               key={item.title}
+              tone="dark"
+              delay={scrollRevealStagger(index, 120)}
               className="ht-spotlight-item rounded-3xl border p-6 shadow-2xl"
             >
               <div className="ht-spotlight-eyebrow mb-4 inline-flex rounded-full px-3 py-1 text-xs font-black uppercase tracking-[0.18em]">
@@ -438,7 +455,7 @@ export function TrustSecuritySection() {
               </div>
               <h3 className="ht-spotlight-title text-xl font-black">{item.title}</h3>
               <p className="ht-spotlight-muted mt-3 text-sm leading-7">{item.description}</p>
-            </article>
+            </ScrollReveal>
           ))}
         </div>
       </div>
@@ -448,52 +465,90 @@ export function TrustSecuritySection() {
 
 export function PricingSection() {
   const [yearly, setYearly] = useState(true);
+  const [celebrationBurst, setCelebrationBurst] = useState(1);
   const defaultFocusedIndex = Math.max(
     pricingPlans.findIndex((plan) => plan.popular),
     0,
   );
   const [focusedPlanIndex, setFocusedPlanIndex] = useState(defaultFocusedIndex);
 
+  const selectBilling = (nextYearly: boolean) => {
+    setYearly(nextYearly);
+    trackMarketingEvent("pricing_toggle", { billing: nextYearly ? "yearly" : "monthly" });
+    if (nextYearly) {
+      setCelebrationBurst((key) => key + 1);
+    }
+  };
+
   return (
-    <section className="marketing-section bg-slate-100 px-5 text-slate-950 sm:px-8">
+    <section
+      className={`marketing-section bg-slate-100 px-5 text-slate-950 sm:px-8 ${
+        yearly ? "pricing-section--celebration" : ""
+      }`}
+    >
       <div className="mx-auto max-w-7xl">
         <SectionIntro
           eyebrow="Pricing"
           title="Plans for every team size."
           description="Start free, then scale into AI-powered planning, automation, advanced security, and dedicated delivery support."
         />
-        <div className="mt-8 flex justify-center">
-          <button
-            type="button"
-            onClick={() => {
-              setYearly((current) => !current);
-              trackMarketingEvent("pricing_toggle", { billing: yearly ? "monthly" : "yearly" });
-            }}
-            className="rounded-full bg-slate-100 p-1 text-sm font-black text-slate-700"
+        <div className="relative mt-8 flex flex-col items-center">
+          <div
+            className={`ht-billing-toggle inline-flex rounded-full p-1 text-sm font-black ${
+              yearly ? "ht-billing-toggle--celebration" : ""
+            }`}
+            role="group"
+            aria-label="Billing period"
           >
-            <span className={`inline-block rounded-full px-5 py-2 ${!yearly ? "bg-white shadow" : ""}`}>Monthly</span>
-            <span className={`inline-block rounded-full px-5 py-2 ${yearly ? "bg-blue-600 text-white shadow" : ""}`}>
+            <button
+              type="button"
+              onClick={() => selectBilling(false)}
+              className={`ht-billing-toggle__option rounded-full px-5 py-2 transition ${
+                !yearly ? "ht-billing-toggle__option--active" : ""
+              }`}
+            >
+              Monthly
+            </button>
+            <button
+              type="button"
+              onClick={() => selectBilling(true)}
+              className={`ht-billing-toggle__option rounded-full px-5 py-2 transition ${
+                yearly ? "ht-billing-toggle__option--active ht-billing-toggle__option--celebrate" : ""
+              }`}
+            >
               Yearly - save 17%
-            </span>
-          </button>
+            </button>
+          </div>
+          <PricingYearlyCelebration yearly={yearly} burstKey={celebrationBurst} />
         </div>
 
-        <div className="mt-12 grid gap-5 lg:grid-cols-4">
+        <div className={`mt-12 grid gap-5 lg:grid-cols-4 ${yearly ? "pricing-cards--celebration" : ""}`}>
           {pricingPlans.map((plan, index) => {
             const price = plan.priceMonthly === null ? null : yearly ? Math.round(plan.priceMonthly * 10) : plan.priceMonthly;
             const isFocused = focusedPlanIndex === index;
             return (
-              <article
+              <ScrollReveal
+                as="article"
                 key={plan.name}
+                delay={scrollRevealStagger(index)}
                 onMouseEnter={() => setFocusedPlanIndex(index)}
                 onFocus={() => setFocusedPlanIndex(index)}
                 tabIndex={0}
                 className={`ht-pricing-card relative rounded-[2rem] border p-6 shadow-sm outline-none ${
                   isFocused ? "ht-pricing-card-active" : ""
-                }`}
+                } ${yearly ? "ht-pricing-card--yearly-glow" : ""}`}
               >
+                {yearly && price !== null && (
+                  <span className="pricing-savings-badge absolute left-5 top-5 rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-wide">
+                    Save 17%
+                  </span>
+                )}
                 {plan.popular && (
-                  <span className="absolute right-5 top-5 rounded-full bg-cyan-300 px-3 py-1 text-xs font-black text-slate-950">
+                  <span
+                    className={`absolute rounded-full bg-cyan-300 px-3 py-1 text-xs font-black text-slate-950 ${
+                      yearly && price !== null ? "right-5 top-12" : "right-5 top-5"
+                    }`}
+                  >
                     Most popular
                   </span>
                 )}
@@ -528,7 +583,7 @@ export function PricingSection() {
                     </li>
                   ))}
                 </ul>
-              </article>
+              </ScrollReveal>
             );
           })}
         </div>
@@ -550,11 +605,34 @@ export function FaqSection() {
           description="Clear answers for teams comparing Tasker with traditional project management platforms."
         />
         <div className="mt-10 space-y-4">
-          {pricingFaqs.map((item) => (
-            <details key={item.question} className="group rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-              <summary className="cursor-pointer text-base font-black text-slate-950">{item.question}</summary>
-              <p className="mt-3 text-sm leading-6 text-slate-600">{item.answer}</p>
-            </details>
+          {pricingFaqs.map((item, index) => (
+            <ScrollReveal
+              key={item.question}
+              delay={scrollRevealStagger(index, 70)}
+              variant="fade"
+              className="w-full"
+            >
+              <details className="faq-item group rounded-2xl border border-slate-200 bg-white p-5 shadow-sm open:shadow-md">
+                <summary className="faq-item__summary cursor-pointer text-base font-black text-slate-950">
+                  <span className="faq-item__chevron" aria-hidden="true">
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      className="faq-item__chevron-icon"
+                    >
+                      <polyline points="6 9 12 15 18 9" />
+                    </svg>
+                  </span>
+                  <span className="faq-item__question">{item.question}</span>
+                </summary>
+                <p className="faq-item__answer mt-3 text-sm leading-6 text-slate-600">{item.answer}</p>
+              </details>
+            </ScrollReveal>
           ))}
         </div>
       </div>
@@ -577,29 +655,38 @@ export function SolutionsSection() {
           description="Our team can take an idea from discovery to design, engineering, AI integration, launch, and continuous improvement."
         />
         <div className="grid gap-4 sm:grid-cols-2">
-          {solutions.map((solution) => (
-            <div key={solution} className="ht-solution-card rounded-3xl border p-6 shadow-sm">
+          {solutions.map((solution, index) => (
+            <ScrollReveal
+              key={solution}
+              delay={scrollRevealStagger(index)}
+              className="ht-solution-card rounded-3xl border p-6 shadow-sm"
+            >
               <span className="mb-5 block h-1.5 w-16 rounded-full bg-gradient-to-r from-cyan-400 to-blue-600" />
               <h3 className="ht-solution-title text-lg font-black">{solution}</h3>
               <p className="mt-3 text-sm leading-6 ht-panel-muted-text">
                 Strategy, UX, engineering, automation, deployment, and support delivered by one accountable team.
               </p>
-            </div>
+            </ScrollReveal>
           ))}
         </div>
       </div>
-      <div className="ht-spotlight-strip mx-auto mt-14 max-w-7xl rounded-[2rem] border p-8 shadow-2xl">
+      <ScrollReveal tone="dark" delay={120} className="ht-spotlight-strip mx-auto mt-14 max-w-7xl rounded-[2rem] border p-8 shadow-2xl">
         <div className="grid gap-6 md:grid-cols-4">
-          {engagementModels.map((model) => (
-            <div key={model} className="ht-spotlight-item rounded-2xl border p-5">
+          {engagementModels.map((model, index) => (
+            <ScrollReveal
+              key={model}
+              tone="dark"
+              delay={scrollRevealStagger(index, 90)}
+              className="ht-spotlight-item rounded-2xl border p-5"
+            >
               <p className="ht-spotlight-eyebrow text-sm font-black">{model}</p>
               <p className="ht-spotlight-muted mt-3 text-sm leading-6">
                 Flexible delivery model built around your timeline, team, budget, and product maturity.
               </p>
-            </div>
+            </ScrollReveal>
           ))}
         </div>
-      </div>
+      </ScrollReveal>
     </section>
   );
 }
@@ -614,13 +701,18 @@ export function BlogGrid() {
           description="Practical articles, comparisons, trends, case studies, API guides, and security best practices."
         />
         <div className="mt-12 grid gap-5 md:grid-cols-2 lg:grid-cols-3">
-          {blogPosts.map((post) => (
-            <article key={post.slug} className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm transition hover:-translate-y-2 hover:shadow-2xl hover:shadow-blue-100">
+          {blogPosts.map((post, index) => (
+            <ScrollReveal
+              as="article"
+              key={post.slug}
+              delay={scrollRevealStagger(index)}
+              className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm transition hover:-translate-y-2 hover:shadow-2xl hover:shadow-blue-100"
+            >
               <p className="text-xs font-black uppercase tracking-[0.2em] text-blue-600">{post.category}</p>
               <h3 className="mt-4 text-2xl font-black">{post.title}</h3>
               <p className="mt-3 text-sm leading-6 text-slate-600">{post.excerpt}</p>
               <p className="mt-5 text-sm font-bold text-slate-500">{post.readTime}</p>
-            </article>
+            </ScrollReveal>
           ))}
         </div>
       </div>
@@ -638,15 +730,21 @@ export function CaseStudies() {
           description="Examples of how teams use Tasker to reduce coordination overhead and ship more predictably."
         />
         <div className="mt-12 grid gap-5 lg:grid-cols-3">
-          {caseStudies.map((study) => (
-            <article key={study.company} className="ht-spotlight-card rounded-[2rem] border p-6 shadow-2xl">
+          {caseStudies.map((study, index) => (
+            <ScrollReveal
+              as="article"
+              key={study.company}
+              tone="dark"
+              delay={scrollRevealStagger(index)}
+              className="ht-spotlight-card rounded-[2rem] border p-6 shadow-2xl"
+            >
               <p className="ht-spotlight-eyebrow text-sm font-black">{study.company}</p>
               <h3 className="ht-spotlight-title mt-4 text-2xl font-black">{study.title}</h3>
               <p className="mt-4 rounded-full bg-emerald-400/15 px-4 py-2 text-sm font-black text-emerald-200">
                 {study.result}
               </p>
               <p className="ht-spotlight-muted mt-5 text-sm leading-7">{study.summary}</p>
-            </article>
+            </ScrollReveal>
           ))}
         </div>
       </div>
@@ -784,7 +882,7 @@ export function LeadCaptureForms({ mode = "all" }: { mode?: "all" | "contact" })
   return (
     <section className="marketing-section bg-slate-50 px-5 text-slate-950 sm:px-8">
       <div className="mx-auto grid max-w-7xl gap-8 lg:grid-cols-2">
-        <div className="ht-spotlight-panel rounded-[2rem] border p-8 shadow-2xl">
+        <ScrollReveal tone="dark" className="ht-spotlight-panel rounded-[2rem] border p-8 shadow-2xl">
           <p className="ht-spotlight-eyebrow text-sm font-black uppercase tracking-[0.28em]">Lead capture</p>
           <h2 className="ht-spotlight-title mt-4 text-4xl font-black">Book a demo or talk to sales.</h2>
           <p className="ht-spotlight-muted mt-5 text-sm leading-7">
@@ -824,11 +922,12 @@ export function LeadCaptureForms({ mode = "all" }: { mode?: "all" | "contact" })
               {isSubmitting ? "Submitting..." : "Request demo"}
             </button>
           </form>
-        </div>
+        </ScrollReveal>
 
         <div className="grid gap-6">
           {mode === "all" && (
-            <form className="ht-panel-muted rounded-[2rem] border p-8 shadow-sm" onSubmit={handleNewsletterSubmit}>
+            <ScrollReveal delay={100} variant="fade">
+              <form className="ht-panel-muted rounded-[2rem] border p-8 shadow-sm" onSubmit={handleNewsletterSubmit}>
               <h3 className="text-2xl font-black">Get the free AI project checklist.</h3>
               <p className="mt-3 text-sm leading-6 ht-panel-muted-text">
                 Join the newsletter for project management playbooks, AI workflow ideas, and delivery templates.
@@ -847,9 +946,11 @@ export function LeadCaptureForms({ mode = "all" }: { mode?: "all" | "contact" })
                 </button>
               </div>
             </form>
+            </ScrollReveal>
           )}
 
-          <form className="ht-panel rounded-[2rem] border p-8 shadow-sm" onSubmit={handleSalesSubmit}>
+          <ScrollReveal delay={180}>
+            <form className="ht-panel rounded-[2rem] border p-8 shadow-sm" onSubmit={handleSalesSubmit}>
             <h3 className="text-2xl font-black">Contact sales</h3>
             <p className="mt-3 text-sm leading-6 ht-panel-muted-text">
               Need enterprise security, SSO, procurement, or delivery services? Send requirements and we will respond.
@@ -897,6 +998,7 @@ export function LeadCaptureForms({ mode = "all" }: { mode?: "all" | "contact" })
               </button>
             </div>
           </form>
+          </ScrollReveal>
 
           {submitted && (
             <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-5 text-sm font-bold text-emerald-800">
@@ -929,7 +1031,7 @@ export function RoiCalculator() {
           title="Estimate the time your team can recover."
           description="Use a simple model to show visitors the business case for fewer status meetings and cleaner workflow automation."
         />
-        <div className="rounded-[2rem] border border-slate-200 bg-white p-8 shadow-xl shadow-slate-200">
+        <ScrollReveal delay={120} className="rounded-[2rem] border border-slate-200 bg-white p-8 shadow-xl shadow-slate-200">
           <div className="grid gap-5 md:grid-cols-3">
             {[
               { label: "Team size", value: teamSize, setter: setTeamSize, min: 1, max: 250 },
@@ -960,7 +1062,7 @@ export function RoiCalculator() {
               See your personalized plan
             </button>
           </div>
-        </div>
+        </ScrollReveal>
       </div>
     </section>
   );
@@ -975,7 +1077,7 @@ export function ComparisonMatrix() {
           title="Agile depth with a cleaner AI-first operating model."
           description="A practical comparison for teams evaluating price, onboarding speed, AI workflows, support, and delivery services."
         />
-        <div className="mt-12 overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-xl shadow-slate-100">
+        <ScrollReveal delay={150} className="mt-12 overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-xl shadow-slate-100">
           <div className="grid grid-cols-[1.2fr_0.8fr_0.8fr_1.4fr] bg-slate-950 px-5 py-4 text-sm font-black text-white">
             <span>Metric</span>
             <span>Tasker</span>
@@ -990,7 +1092,7 @@ export function ComparisonMatrix() {
               <span className="text-slate-600">{row.note}</span>
             </div>
           ))}
-        </div>
+        </ScrollReveal>
       </div>
     </section>
   );
@@ -1007,21 +1109,31 @@ export function AboutStory() {
           description="Tasker started with a simple belief: project management should make work clearer, not heavier. We combine a modern SaaS product with hands-on full-stack and AI delivery expertise so companies can plan, build, launch, and scale in one partnership."
         />
         <div className="grid gap-4 sm:grid-cols-2">
-          {values.map((value) => (
-            <div key={value} className="rounded-3xl border border-slate-200 bg-slate-50 p-6 shadow-sm">
+          {values.map((value, index) => (
+            <ScrollReveal
+              key={value}
+              delay={scrollRevealStagger(index)}
+              className="rounded-3xl border border-slate-200 bg-slate-50 p-6 shadow-sm"
+            >
               <p className="text-lg font-black">{value}</p>
-            </div>
+            </ScrollReveal>
           ))}
         </div>
       </div>
-      <div className="mx-auto mt-12 max-w-7xl rounded-[2rem] border border-slate-200 bg-slate-50 p-6">
+      <ScrollReveal delay={100} className="mx-auto mt-12 max-w-7xl rounded-[2rem] border border-slate-200 bg-slate-50 p-6">
         <p className="text-sm font-black uppercase tracking-[0.2em] text-blue-600">Office locations</p>
         <div className="mt-5 grid gap-4 md:grid-cols-3">
-          {["New Delhi", "Bengaluru", "Remote worldwide"].map((location) => (
-            <div key={location} className="rounded-2xl bg-white p-5 font-black shadow-sm">{location}</div>
+          {["New Delhi", "Bengaluru", "Remote worldwide"].map((location, index) => (
+            <ScrollReveal
+              key={location}
+              delay={scrollRevealStagger(index, 90)}
+              className="rounded-2xl bg-white p-5 font-black shadow-sm"
+            >
+              {location}
+            </ScrollReveal>
           ))}
         </div>
-      </div>
+      </ScrollReveal>
     </section>
   );
 }
@@ -1029,7 +1141,7 @@ export function AboutStory() {
 export function MarketingCta() {
   return (
     <section className="ht-cta-section px-5 py-20 sm:px-8">
-      <div className="ht-cta-banner mx-auto max-w-7xl overflow-hidden rounded-[2.5rem] p-8 md:p-12">
+      <ScrollReveal tone="dark" className="ht-cta-banner mx-auto max-w-7xl overflow-hidden rounded-[2.5rem] p-8 md:p-12">
         <div className="grid gap-8 lg:grid-cols-[1fr_auto] lg:items-center">
           <div>
             <p className="ht-cta-eyebrow text-sm font-black uppercase tracking-[0.28em]">
@@ -1050,7 +1162,7 @@ export function MarketingCta() {
             Start free
           </Link>
         </div>
-      </div>
+      </ScrollReveal>
     </section>
   );
 }

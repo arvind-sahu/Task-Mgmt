@@ -95,6 +95,9 @@ export default $config({
       { provider: usEast1 },
     );
 
+    const customDomain = process.env.CUSTOM_DOMAIN ?? "www.taskers.in";
+    const acmCertArn = process.env.ACM_CERT_ARN;
+
     // The Next.js component handles bundling, image optimization, and
     // CloudFront distribution. Env vars are forwarded to the Lambda.
     new sst.aws.Nextjs("Web", {
@@ -131,9 +134,17 @@ export default $config({
           },
         },
       },
-      // Add a custom domain by uncommenting and pointing your DNS at the
-      // generated CloudFront distribution:
-      // domain: { name: "tasker.example.com", dns: sst.aws.dns() },
+      // GoDaddy DNS: request ACM cert in us-east-1, set ACM_CERT_ARN, then
+      // CNAME www → CloudFront. Forward apex taskers.in → www in GoDaddy.
+      ...(acmCertArn
+        ? {
+            domain: {
+              name: customDomain,
+              dns: false,
+              cert: acmCertArn,
+            },
+          }
+        : {}),
     });
   },
 });

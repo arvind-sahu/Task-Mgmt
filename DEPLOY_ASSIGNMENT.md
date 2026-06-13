@@ -52,7 +52,9 @@ Repo → **Settings → Secrets and variables → Actions → New repository sec
 | `DATABASE_URL` | Supabase pooled URI (port 6543) |
 | `DIRECT_URL` | Supabase direct URI (port 5432) |
 | `NEXTAUTH_SECRET` | Same as in your `.env` |
-| `NEXTAUTH_URL` | `http://localhost:3000` for first deploy |
+| `NEXTAUTH_URL` | `https://www.taskers.in` (after custom domain) |
+| `CUSTOM_DOMAIN` | `www.taskers.in` (optional; defaults in SST config) |
+| `ACM_CERT_ARN` | ACM cert ARN from **us-east-1** (after DNS validation) |
 
 **IAM access key (for GitHub only):** IAM → Users → Create user → attach **AdministratorAccess** → Security credentials → Create access key → CLI. Use that key/secret in GitHub (not root keys in the repo).
 
@@ -74,7 +76,22 @@ Repo → **Settings → Secrets and variables → Actions → New repository sec
 
 ---
 
-## Step 6 — Share for evaluation
+## Step 6 — Custom domain (GoDaddy → www.taskers.in)
+
+1. AWS Console → **ACM** → region **US East (N. Virginia)** → request cert for `taskers.in` and `www.taskers.in` (DNS validation).
+2. Add the ACM validation CNAME records in GoDaddy DNS.
+3. When the cert is **Issued**, copy its ARN and set:
+   - `.env`: `ACM_CERT_ARN=arn:aws:acm:us-east-1:...`
+   - GitHub secret: `ACM_CERT_ARN` (same value)
+   - GitHub secret: `CUSTOM_DOMAIN` = `www.taskers.in`
+   - GitHub secret: `NEXTAUTH_URL` = `https://www.taskers.in`
+4. Redeploy (push to `main` or run the workflow).
+5. In GoDaddy DNS: **CNAME** `www` → your CloudFront domain (`dxxxx.cloudfront.net` from deploy log).
+6. Forward apex `taskers.in` → `https://www.taskers.in` in GoDaddy (optional but recommended).
+
+---
+
+## Step 7 — Share for evaluation
 
 Submit the CloudFront URL. Evaluators should:
 
@@ -103,5 +120,6 @@ npx sst remove --stage prod   # only if you need a clean slate
 - [ ] Code on GitHub; `.env` **not** committed
 - [ ] Six GitHub secrets set
 - [ ] Deploy workflow succeeded
-- [ ] `NEXTAUTH_URL` updated to CloudFront URL; workflow re-run
-- [ ] Sign-up works on the live URL
+- [ ] `NEXTAUTH_URL` set to `https://www.taskers.in`; workflow re-run
+- [ ] `ACM_CERT_ARN` set when using custom domain
+- [ ] GoDaddy CNAME `www` → CloudFront; sign-up works on live URL

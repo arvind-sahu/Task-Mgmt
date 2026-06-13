@@ -1308,6 +1308,63 @@
   color: var(--ht-btn-solid-text);
 }
 
+.home-time-theme .ht-billing-toggle {
+  background: var(--ht-panel-muted-bg);
+  color: var(--ht-panel-muted-text);
+  border: 1px solid var(--ht-panel-border);
+  backdrop-filter: blur(var(--ht-glass-blur));
+  -webkit-backdrop-filter: blur(var(--ht-glass-blur));
+}
+
+.home-time-theme .ht-billing-toggle__option--active {
+  background: var(--ht-btn-accent-bg);
+  color: var(--ht-btn-accent-text);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+}
+
+.home-time-theme .ht-billing-toggle--celebration {
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--ht-btn-accent-bg) 25%, transparent),
+    0 8px 28px color-mix(in srgb, var(--ht-btn-accent-bg) 22%, transparent);
+}
+
+.home-time-theme .ht-billing-toggle__option--celebrate {
+  animation: pricing-yearly-pulse-home 2.4s ease-in-out infinite;
+}
+
+.home-time-theme .pricing-celebration-banner {
+  border-color: color-mix(in srgb, var(--ht-accent) 40%, transparent);
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--ht-btn-accent-bg) 14%, white),
+    color-mix(in srgb, var(--ht-accent) 10%, white)
+  );
+  color: var(--ht-panel-text);
+}
+
+.home-time-theme .pricing-celebration-banner__highlight {
+  color: var(--ht-accent);
+}
+
+.home-time-theme .pricing-celebration-sparkles {
+  color: var(--ht-accent);
+}
+
+.home-time-theme .pricing-savings-badge {
+  background: linear-gradient(135deg, var(--ht-btn-accent-bg), var(--ht-accent));
+  color: var(--ht-btn-accent-text);
+}
+
+@keyframes pricing-yearly-pulse-home {
+  0%,
+  100% {
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  }
+  50% {
+    box-shadow: 0 6px 24px color-mix(in srgb, var(--ht-btn-accent-bg) 45%, transparent),
+      0 0 0 3px color-mix(in srgb, var(--ht-btn-accent-bg) 25%, transparent);
+  }
+}
+
 .home-time-theme .ht-btn-accent {
   background: var(--ht-btn-accent-bg);
   color: var(--ht-btn-accent-text);
