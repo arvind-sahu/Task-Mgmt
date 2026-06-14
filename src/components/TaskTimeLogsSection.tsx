@@ -2,7 +2,7 @@ import { useSession } from "next-auth/react";
 import { useState } from "react";
 
 import { api } from "~/utils/api";
-import { formatLogDate } from "~/utils/timeLog";
+import { formatLogDate, hoursFromDecimal } from "~/utils/timeLog";
 
 type TaskTimeLogsSectionProps = {
   taskId: string;
@@ -129,10 +129,7 @@ export function TaskTimeLogsSection({
       ) : (
         <ul className="divide-y text-sm" style={{ borderColor: "var(--border-muted)" }}>
           {logs.map((log) => {
-            const h =
-              typeof log.hours === "object" && log.hours !== null && "toNumber" in log.hours
-                ? (log.hours as { toNumber: () => number }).toNumber()
-                : Number(log.hours);
+            const h = hoursFromDecimal(log.hours);
             const canDelete =
               data?.canManage || (viewerId && log.userId === viewerId);
             return (
