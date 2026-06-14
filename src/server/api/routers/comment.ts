@@ -4,8 +4,20 @@ import { z } from "zod";
 import { assertCanModifyTaskComment, assertProjectAccess } from "~/server/api/access";
 import { publicUserSelect } from "~/server/api/userSelect";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
+import { notifyMentionedUsers } from "~/server/mentions";
 import { notifyUsers } from "~/server/notifications";
 import { sanitizeRichTextHtml } from "~/server/security/sanitizeHtml";
+
+async function actorDisplayName(
+  db: Parameters<typeof notifyMentionedUsers>[0],
+  userId: string,
+) {
+  const user = await db.user.findUnique({
+    where: { id: userId },
+    select: { name: true, email: true },
+  });
+  return user?.name?.trim() || user?.email || "Someone";
+}
 
 export const commentRouter = createTRPCRouter({
   create: protectedProcedure
@@ -27,9 +39,10 @@ export const commentRouter = createTRPCRouter({
       });
       await assertProjectAccess(ctx.db, task.projectId, ctx.session.user.id);
 
+      const sanitizedBody = sanitizeRichTextHtml(input.body);
       const comment = await ctx.db.comment.create({
         data: {
-          body: sanitizeRichTextHtml(input.body),
+          body: sanitizedBody,
           taskId: input.taskId,
           authorId: ctx.session.user.id,
         },
@@ -52,6 +65,17 @@ export const commentRouter = createTRPCRouter({
         link: `/tasks/${input.taskId}`,
       });
 
+      const actorName = await actorDisplayName(ctx.db, authorId);
+      await notifyMentionedUsers(ctx.db, {
+        html: sanitizedBody,
+        actorId: authorId,
+        actorName,
+        taskId: input.taskId,
+        taskTitle: task.title,
+        projectId: task.projectId,
+        contextLabel: "comment",
+      });
+
       return comment;
     }),
 
@@ -67,7 +91,10 @@ export const commentRouter = createTRPCRouter({
         where: { id: input.id },
         select: {
           authorId: true,
-          task: { select: { projectId: true } },
+          body: true,
+          task: {
+            select: { projectId: true, id: true, title: true },
+          },
         },
       });
 
@@ -78,14 +105,29 @@ export const commentRouter = createTRPCRouter({
         comment.task.projectId,
       );
 
-      return ctx.db.comment.update({
+      const sanitizedBody = sanitizeRichTextHtml(input.body);
+      const updated = await ctx.db.comment.update({
         where: { id: input.id },
-        data: { body: sanitizeRichTextHtml(input.body) },
+        data: { body: sanitizedBody },
         include: {
           author: { select: publicUserSelect },
           attachments: true,
         },
       });
+
+      const actorName = await actorDisplayName(ctx.db, ctx.session.user.id);
+      await notifyMentionedUsers(ctx.db, {
+        html: sanitizedBody,
+        previousHtml: comment.body,
+        actorId: ctx.session.user.id,
+        actorName,
+        taskId: comment.task.id,
+        taskTitle: comment.task.title,
+        projectId: comment.task.projectId,
+        contextLabel: "comment",
+      });
+
+      return updated;
     }),
 
   /** Authors, project owners, and company super admins may delete comments. */

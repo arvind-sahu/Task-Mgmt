@@ -4,6 +4,10 @@ import Link from "@tiptap/extension-link";
 import OrderedList from "@tiptap/extension-ordered-list";
 import Placeholder from "@tiptap/extension-placeholder";
 import StarterKit from "@tiptap/starter-kit";
+import type { Extensions } from "@tiptap/core";
+
+import { buildMentionExtension } from "~/components/rich-text/mentionExtension";
+import type { MentionUser } from "~/utils/mentions";
 
 const LIST_STYLE_VALUES = new Set([
   "disc",
@@ -96,8 +100,11 @@ const CustomImage = Image.configure({
   },
 });
 
-export function buildRichTextExtensions(placeholder = "Write something…") {
-  return [
+export function buildRichTextExtensions(
+  placeholder = "Write something…",
+  getMentionUsers?: () => MentionUser[],
+) {
+  const extensions: Extensions = [
     StarterKit.configure({
       heading: { levels: [2, 3] },
       bulletList: false,
@@ -118,4 +125,10 @@ export function buildRichTextExtensions(placeholder = "Write something…") {
     CustomImage,
     Placeholder.configure({ placeholder }),
   ];
+
+  if (getMentionUsers) {
+    extensions.push(buildMentionExtension(getMentionUsers));
+  }
+
+  return extensions;
 }
