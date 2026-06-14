@@ -83,10 +83,10 @@ export const secondaryNavItems: AppNavItem[] = [
     comingSoon: true,
   },
   {
-    href: "/time-tracking",
+    href: "/my-timeline",
     label: "Time Tracking",
+    tourId: "nav-time-tracking",
     icon: <Icon d="M12 8v4l3 3M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />,
-    comingSoon: true,
   },
   {
     href: "/files",
@@ -127,7 +127,7 @@ export function projectTabsForId(projectId: string): ProjectTab[] {
   return [
     { key: "overview", label: "Overview", href: `/coming-soon?feature=Overview&project=${projectId}` },
     { key: "board", label: "Board", href: `/projects/${projectId}` },
-    { key: "timeline", label: "Timeline", href: `/coming-soon?feature=Timeline&project=${projectId}` },
+    { key: "timeline", label: "Timeline", href: `/projects/${projectId}/timeline` },
     { key: "analytics", label: "Analytics", href: `/coming-soon?feature=Analytics&project=${projectId}` },
     { key: "files", label: "Files", href: `/coming-soon?feature=Files&project=${projectId}` },
     { key: "settings", label: "Settings", href: `/projects/${projectId}?view=settings` },
@@ -143,6 +143,9 @@ export function isProjectTabActive(
   pathname: string,
   view: string | string[] | undefined,
 ) {
+  if (tabKey === "timeline" && pathname === "/projects/[id]/timeline") {
+    return true;
+  }
   if (pathname !== "/projects/[id]") return false;
   const currentView = projectViewFromQuery(view);
   if (tabKey === "board") return currentView === "board";

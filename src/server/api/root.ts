@@ -10,6 +10,8 @@ import { tagRouter } from "~/server/api/routers/tag";
 import { storageRouter } from "~/server/api/routers/storage";
 import { taskRouter } from "~/server/api/routers/task";
 import { userRouter } from "~/server/api/routers/user";
+import { timeLogRouter } from "~/server/api/routers/timeLog";
+import { workflowRouter } from "~/server/api/routers/workflow";
 import { createCallerFactory, createTRPCRouter } from "~/server/api/trpc";
 
 /**
@@ -33,6 +35,8 @@ export const appRouter = createTRPCRouter({
   notification: notificationRouter,
   dashboard: dashboardRouter,
   leadRequest: leadRequestRouter,
+  workflow: workflowRouter,
+  timeLog: timeLogRouter,
 });
 
 export type AppRouter = typeof appRouter;

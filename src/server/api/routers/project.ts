@@ -7,6 +7,7 @@ import { publicUserSelect } from "~/server/api/userSelect";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { createNotification } from "~/server/notifications";
 import { companyNamesMatch } from "~/server/company";
+import { seedProjectWorkflow } from "~/server/workflow/seed";
 import { emailMatchesDomain } from "~/server/company/domain";
 import {
   canCreateCompanyProjects,
@@ -300,6 +301,7 @@ export const projectRouter = createTRPCRouter({
         await tx.projectMember.create({
           data: { userId, projectId: project.id, role: ProjectRole.OWNER },
         });
+        await seedProjectWorkflow(tx, project.id);
         return project;
       });
     }),

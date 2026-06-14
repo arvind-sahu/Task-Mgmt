@@ -1,29 +1,25 @@
 import { useRouter } from "next/router";
 import { SprintPlan, TaskStatus } from "@prisma/client";
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { GetServerSidePropsContext } from "next";
 
+import { useIsomorphicLayoutEffect } from "~/hooks/useIsomorphicLayoutEffect";
+import { useProjectBoardSwipeGuard } from "~/hooks/useProjectBoardSwipeGuard";
+
 import EmptyState from "~/components/EmptyState";
-import { AssigneePicker } from "~/components/AssigneePicker";
 import Layout from "~/components/Layout";
 import { SprintChangeControl } from "~/components/SprintChangeControl";
-import { projectTabsForId } from "~/config/appNav";
+import { TaskDetailPanel } from "~/components/TaskDetailPanel";
 import { CachedAvatar } from "~/components/CachedAvatar";
 import { ProjectSettingsPanel } from "~/components/ProjectSettingsPanel";
-import {
-  RichTextContent,
-  RichTextEditor,
-} from "~/components/rich-text";
-import {
-  useRichTextImageUpload,
-} from "~/components/rich-text/useRichTextImageUpload";
 import TaskCard from "~/components/TaskCard";
-import { TaskCommentsSection } from "~/components/TaskCommentsSection";
-import { isTaskCompleted, TaskCompletedTick } from "~/components/TaskIndicators";
+import { projectTabsForId } from "~/config/appNav";
 import { TagChip } from "~/components/TagChip";
 import { canManageProject } from "~/utils/projectRole";
-import TaskForm, { type TaskFormValues } from "~/components/TaskForm";
-import { TASK_STATUSES, statusLabel } from "~/components/Badges";
+import { CreateTaskModal } from "~/components/CreateTaskModal";
+import { type TaskFormValues } from "~/components/TaskForm";
+import { WorkflowEditorPanel } from "~/components/workflow/WorkflowEditorPanel";
+import { sortStatuses } from "~/utils/workflow";
 import { requireAuth } from "~/server/auth";
 import { api, type RouterOutputs } from "~/utils/api";
 import { initialsFromName } from "~/utils/avatar";
@@ -33,14 +29,15 @@ import {
   sprintPlanLabel,
 } from "~/utils/sprint";
 import { readSprintPanelOpen, writeSprintPanelOpen } from "~/utils/panelPrefs";
+import { richTextToPlainText } from "~/utils/richText";
 
 /**
  * Project detail page. Layout:
- *   - Left: Kanban (one column per TaskStatus)
+ *   - Left: Kanban (workflow status columns)
  *   - Right: sidebar with members + tags
  *
- * The "New task" button reveals an inline TaskForm above the board so users
- * never lose project context.
+ * The "New task" button opens a modal aligned with the task detail panel so
+ * users never leave project context.
  */
 export default function ProjectDetail() {
   const router = useRouter();
@@ -80,6 +77,12 @@ export default function ProjectDetail() {
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const topScrollRef = useRef<HTMLDivElement | null>(null);
   const boardScrollRef = useRef<HTMLDivElement | null>(null);
+
+  useProjectBoardSwipeGuard(
+    !!id && !showSettingsView && !selectedTaskId,
+    boardScrollRef,
+    topScrollRef,
+  );
   const [boardOverflowsX, setBoardOverflowsX] = useState(false);
 
   const resolvedSprintId =
@@ -107,6 +110,11 @@ export default function ProjectDetail() {
     { projectId: id },
     { enabled: !!id && (showCreate || !!selectedTaskId) },
   );
+  const workflow = api.workflow.byProject.useQuery(
+    { projectId: id },
+    { enabled: !!id },
+  );
+  const boardStatuses = sortStatuses(workflow.data?.statuses ?? []);
   const sprintOptions = (sprintBrief.data ?? []).map((sprint) => ({
     id: sprint.id,
     name: sprint.name,
@@ -146,10 +154,11 @@ export default function ProjectDetail() {
   };
 
   const createTask = api.task.create.useMutation({
-    onSuccess: () => {
+    onSuccess: (task) => {
       void utils.task.list.invalidate({ projectId: id });
       void utils.sprint.backlog.invalidate({ projectId: id });
       setShowCreate(false);
+      setSelectedTaskId(task.id);
     },
   });
 
@@ -157,12 +166,32 @@ export default function ProjectDetail() {
     // Optimistic UI: update the cached list immediately, roll back on error.
     onMutate: async (variables) => {
       if (!variables || typeof variables !== "object") return;
-      const { id: taskId, status } = variables;
-      if (!taskId || !status) return;
+      const { id: taskId, statusId, status } = variables;
+      if (!taskId) return;
       await utils.task.list.cancel(taskListInput);
       const prev = utils.task.list.getData(taskListInput);
+      const column = boardStatuses.find((s) => s.id === statusId);
       utils.task.list.setData(taskListInput, (old) =>
-        old?.map((t) => (t.id === taskId ? { ...t, status } : t)),
+        old?.map((t) =>
+          t.id === taskId
+            ? {
+                ...t,
+                statusId: statusId ?? t.statusId,
+                status: status ?? t.status,
+                projectStatus: column
+                  ? {
+                      id: column.id,
+                      name: column.name,
+                      color: column.color,
+                      orderIndex: column.orderIndex,
+                      isInitial: column.isInitial,
+                      isTerminal: column.isTerminal,
+                      legacyStatus: column.legacyStatus as TaskStatus | null,
+                    }
+                  : t.projectStatus,
+              }
+            : t,
+        ),
       );
       return { prev };
     },
@@ -242,28 +271,7 @@ export default function ProjectDetail() {
     }
   }
 
-  function handleBoardWheel(event: React.WheelEvent<HTMLDivElement>) {
-    const board = boardScrollRef.current;
-    if (!board || board.scrollWidth <= board.clientWidth + 1) return;
-
-    const delta =
-      Math.abs(event.deltaX) > Math.abs(event.deltaY)
-        ? event.deltaX
-        : event.shiftKey
-          ? event.deltaY
-          : 0;
-    if (delta === 0) return;
-
-    const maxScroll = board.scrollWidth - board.clientWidth;
-    const next = board.scrollLeft + delta;
-    if (next < 0 || next > maxScroll) return;
-
-    event.preventDefault();
-    board.scrollLeft = next;
-    syncBoardScroll("board");
-  }
-
-  useLayoutEffect(() => {
+  useIsomorphicLayoutEffect(() => {
     const board = boardScrollRef.current;
     if (!board || selectedTaskId) {
       setBoardOverflowsX(false);
@@ -281,12 +289,11 @@ export default function ProjectDetail() {
   }, [
     filteredTasks.length,
     selectedTaskId,
-    showCreate,
     showSprintPanel,
     taskSearch,
   ]);
 
-  useLayoutEffect(() => {
+  useIsomorphicLayoutEffect(() => {
     const board = boardScrollRef.current;
     const top = topScrollRef.current;
     if (!board || !top || !boardOverflowsX) return;
@@ -301,7 +308,7 @@ export default function ProjectDetail() {
       projectId: id,
       title: values.title,
       description: values.description,
-      status: values.status,
+      statusId: values.statusId,
       priority: values.priority,
       deadline: values.deadline ? new Date(values.deadline) : null,
       sprintId: values.sprintId ?? (activeSprintId || null),
@@ -316,12 +323,13 @@ export default function ProjectDetail() {
       id: selectedTaskId,
       title: values.title,
       description: values.description,
-      status: values.status,
+      statusId: values.statusId,
       priority: values.priority,
       deadline: values.deadline ? new Date(values.deadline) : null,
       sprintId: values.sprintId,
       assigneeIds: values.assigneeIds,
       tagIds: values.tagIds,
+      transitionComment: values.transitionComment,
     });
   }
 
@@ -396,31 +404,22 @@ export default function ProjectDetail() {
       }
       contentClassName="app-main mx-auto flex h-full min-h-0 w-full min-w-0 max-w-none flex-1 flex-col overflow-hidden px-2 py-2 sm:px-3 lg:px-4"
     >
-      {showCreate && !showSettingsView && (
-        <div className="card mb-3">
-          <h2 className="mb-4 text-lg font-semibold">Create task</h2>
-          <TaskForm
-            projectId={id}
-            initial={{
-              sprintId: activeSprintId || null,
-              status: TaskStatus.BACKLOG,
-              deadline: activeSprint
-                ? dateInputValue(new Date(activeSprint.endDate))
-                : undefined,
-            }}
-            sprintOptions={sprintOptions}
-            onSubmit={handleCreate}
-            onCancel={() => setShowCreate(false)}
-            submitting={createTask.isPending}
-            submitLabel="Create task"
-          />
-          {createTask.error && (
-            <p className="mt-3 text-sm text-red-600">
-              {createTask.error.message}
-            </p>
-          )}
-        </div>
-      )}
+      <CreateTaskModal
+        open={showCreate && !showSettingsView}
+        projectId={id}
+        sprintOptions={sprintOptions}
+        initial={{
+          sprintId: resolvedSprintId,
+          statusId: workflow.data?.creationAllowedStatusIds[0],
+          deadline: activeSprint
+            ? dateInputValue(new Date(activeSprint.endDate))
+            : undefined,
+        }}
+        onSubmit={handleCreate}
+        onClose={() => setShowCreate(false)}
+        submitting={createTask.isPending}
+        error={createTask.error?.message}
+      />
 
       <div
         className={`grid min-h-0 flex-1 grid-cols-1 gap-3 ${
@@ -484,6 +483,7 @@ export default function ProjectDetail() {
                 }}
               >
                 <TagsPanel projectId={id} canManage={canManage} />
+                <WorkflowEditorPanel projectId={id} canManage={canManage} />
               </ProjectSettingsPanel>
             </div>
           ) : (
@@ -516,12 +516,10 @@ export default function ProjectDetail() {
             <div className="ml-auto flex shrink-0 items-center gap-2">
               <button
                 type="button"
-                onClick={() => setShowCreate((s) => !s)}
-                className={`h-9 shrink-0 rounded-lg border px-3 text-xs font-medium transition ${
-                  showCreate ? "chip-active" : "chip interactive-hover"
-                }`}
+                onClick={() => setShowCreate(true)}
+                className="chip interactive-hover h-9 shrink-0 rounded-lg border px-3 text-xs font-medium transition"
               >
-                {showCreate ? "Cancel" : "New task"}
+                New task
               </button>
             </div>
           </div>
@@ -554,7 +552,6 @@ export default function ProjectDetail() {
                 ref={boardScrollRef}
                 className="task-board-scroll min-h-0 w-full min-w-0 flex-1 pb-2"
                 onScroll={() => syncBoardScroll("board")}
-                onWheel={handleBoardWheel}
               >
                 {taskSearch.trim() && filteredTasks.length === 0 && (
                   <div className="mb-3 rounded-2xl border border-dashed p-5 text-center text-sm text-muted" style={{ borderColor: "var(--border)" }}>
@@ -566,22 +563,44 @@ export default function ProjectDetail() {
                     </p>
                   </div>
                 )}
-                <div className="task-board-grid grid h-full min-w-[86rem] grid-cols-5 gap-3">
-                {TASK_STATUSES.map((s) => {
-                  const colTasks = filteredTasks.filter((t) => t.status === s);
+                <div
+                  className="task-board-grid grid h-full gap-3"
+                  style={{
+                    minWidth: `${Math.max(boardStatuses.length * 17, 20)}rem`,
+                    gridTemplateColumns: `repeat(${Math.max(boardStatuses.length, 1)}, minmax(0, 1fr))`,
+                  }}
+                >
+                {boardStatuses.map((columnStatus) => {
+                  const colTasks = filteredTasks.filter(
+                    (t) =>
+                      t.statusId === columnStatus.id ||
+                      (!t.statusId &&
+                        t.projectStatus?.id === columnStatus.id) ||
+                      (!t.statusId &&
+                        !t.projectStatus &&
+                        columnStatus.legacyStatus === t.status),
+                  );
                   return (
                     <div
-                      key={s}
+                      key={columnStatus.id}
                       className="task-column flex min-h-0 flex-col rounded-xl p-3"
                       onDragOver={(e) => e.preventDefault()}
                       onDrop={(e) => {
                         const taskId = e.dataTransfer.getData("text/plain");
-                        if (taskId) setStatus.mutate({ id: taskId, status: s });
+                        if (taskId) {
+                          setStatus.mutate({
+                            id: taskId,
+                            statusId: columnStatus.id,
+                          });
+                        }
                       }}
                     >
                       <div className="mb-3 flex shrink-0 items-center justify-between px-1">
-                        <h3 className="text-sm font-semibold text-heading">
-                          {statusLabel[s]}
+                        <h3
+                          className="text-sm font-semibold text-heading"
+                          style={{ color: columnStatus.color }}
+                        >
+                          {columnStatus.name}
                         </h3>
                         <span className="chip rounded-full px-2 py-0.5 text-xs">
                           {colTasks.length}
@@ -664,7 +683,6 @@ export default function ProjectDetail() {
 
 type SprintListItem = RouterOutputs["sprint"]["list"][number];
 type SprintCurrentItem = RouterOutputs["sprint"]["current"];
-type TaskDetailItem = RouterOutputs["task"]["byId"];
 type TaskListItem = RouterOutputs["task"]["list"][number];
 type ProjectDetailData = RouterOutputs["project"]["byId"];
 type ProjectMemberItem = ProjectDetailData["members"][number];
@@ -693,7 +711,8 @@ function normalizeSearchText(value: string) {
 }
 
 function taskSearchText(task: TaskListItem) {
-  return normalizeSearchText(`${task.title} ${task.description ?? ""}`);
+  const description = richTextToPlainText(task.description ?? "");
+  return normalizeSearchText(`${task.title} ${description}`);
 }
 
 function canSegmentJoinedQuery(query: string, taskText: string) {
@@ -739,379 +758,6 @@ function matchesTaskSearch(task: TaskListItem, query: string) {
 
   return false;
 }
-
-function TaskDetailPanel({
-  task,
-  loading,
-  error,
-  sprintOptions,
-  submitting,
-  updateError,
-  onBack,
-  onSubmit,
-}: {
-  task?: TaskDetailItem;
-  loading: boolean;
-  error?: string;
-  sprintOptions: Array<{
-    id: string;
-    name: string;
-    startDate: Date | string;
-    endDate: Date | string;
-  }>;
-  submitting: boolean;
-  updateError?: string;
-  onBack: () => void;
-  onSubmit: (values: TaskFormValues) => void;
-}) {
-  const [title, setTitle] = useState("");
-  const [titleEditing, setTitleEditing] = useState(false);
-  const [description, setDescription] = useState("");
-  const [descriptionEditing, setDescriptionEditing] = useState(false);
-  const [status, setStatus] = useState<TaskStatus>(TaskStatus.TODO);
-  const [priority, setPriority] = useState<TaskDetailItem["priority"]>("MEDIUM");
-  const [deadline, setDeadline] = useState("");
-  const [sprintId, setSprintId] = useState<string | null>(null);
-  const [assigneeIds, setAssigneeIds] = useState<string[]>([]);
-  const [tagIds, setTagIds] = useState<string[]>([]);
-  const lastSavedKeyRef = useRef("");
-  const suppressNextTextBlurRef = useRef(false);
-  const project = api.project.byId.useQuery(
-    { id: task?.projectId ?? "" },
-    { enabled: !!task?.projectId },
-  );
-  const { uploadImage } = useRichTextImageUpload();
-
-  useEffect(() => {
-    if (!task) return;
-    const nextDeadline = task.deadline
-      ? new Date(task.deadline).toISOString().slice(0, 10)
-      : "";
-    const nextAssigneeIds = task.assignees.map((assignee) => assignee.id);
-    const nextTagIds = task.tags.map((tag) => tag.id);
-    setTitle(task.title);
-    setDescription(task.description ?? "");
-    setStatus(task.status);
-    setPriority(task.priority);
-    setDeadline(nextDeadline);
-    setSprintId(task.sprintId);
-    setAssigneeIds(nextAssigneeIds);
-    setTagIds(nextTagIds);
-    lastSavedKeyRef.current = JSON.stringify({
-      title: task.title,
-      description: task.description ?? "",
-      status: task.status,
-      priority: task.priority,
-      deadline: nextDeadline,
-      sprintId: task.sprintId,
-      assigneeIds: nextAssigneeIds,
-      tagIds: nextTagIds,
-    });
-  }, [task]);
-
-  useEffect(() => {
-    if (!task) return;
-    const payload = {
-      title: title.trim(),
-      description,
-      status,
-      priority,
-      deadline,
-      sprintId,
-      assigneeIds,
-      tagIds,
-    };
-    const key = JSON.stringify(payload);
-    const original = JSON.parse(lastSavedKeyRef.current || "{}") as {
-      title?: string;
-      description?: string;
-      status?: TaskStatus;
-      priority?: TaskDetailItem["priority"];
-      deadline?: string;
-      sprintId?: string | null;
-      assigneeIds?: string[];
-      tagIds?: string[];
-    };
-    const autosavePayload = {
-      ...payload,
-      title: original.title ?? payload.title,
-      description: original.description ?? payload.description,
-    };
-    const autosaveKey = JSON.stringify(autosavePayload);
-    if (!payload.title || autosaveKey === lastSavedKeyRef.current) return;
-
-    const timer = window.setTimeout(() => {
-      lastSavedKeyRef.current = autosaveKey;
-      onSubmit({
-        title: autosavePayload.title,
-        description: autosavePayload.description || undefined,
-        status: payload.status,
-        priority: payload.priority,
-        deadline: payload.deadline || undefined,
-        sprintId: payload.sprintId,
-        assigneeIds: payload.assigneeIds,
-        tagIds: payload.tagIds,
-      });
-    }, 600);
-
-    return () => window.clearTimeout(timer);
-  }, [
-    task,
-    title,
-    description,
-    status,
-    priority,
-    deadline,
-    sprintId,
-    assigneeIds,
-    tagIds,
-    onSubmit,
-  ]);
-
-  function saveTextField(overrides: { title?: string; description?: string }) {
-    if (!task) return;
-    const nextTitle = (overrides.title ?? title).trim();
-    if (!nextTitle) {
-      setTitle(task.title);
-      return;
-    }
-    const nextDescription = overrides.description ?? description;
-    const payload = {
-      title: nextTitle,
-      description: nextDescription,
-      status,
-      priority,
-      deadline,
-      sprintId,
-      assigneeIds,
-      tagIds,
-    };
-    const key = JSON.stringify(payload);
-    if (key === lastSavedKeyRef.current) return;
-    lastSavedKeyRef.current = key;
-    onSubmit({
-      title: payload.title,
-      description: payload.description || undefined,
-      status: payload.status,
-      priority: payload.priority,
-      deadline: payload.deadline || undefined,
-      sprintId: payload.sprintId,
-      assigneeIds: payload.assigneeIds,
-      tagIds: payload.tagIds,
-    });
-  }
-
-  if (loading) {
-    return (
-      <div className="card">
-        <p className="text-sm text-slate-500">Loading task...</p>
-      </div>
-    );
-  }
-
-  if (!task || error) {
-    return (
-      <div className="card">
-        <button className="btn-ghost mb-4" type="button" onClick={onBack}>
-          Back to task board
-        </button>
-        <p className="text-sm text-red-600">{error ?? "Task not found."}</p>
-      </div>
-    );
-  }
-
-  const assigneeMembers = project.data?.members.map((member) => member.user) ?? [];
-
-  return (
-    <>
-      <div className="card">
-      <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between lg:gap-4">
-        <div className="flex min-w-0 items-start gap-3 lg:max-w-sm lg:flex-1 xl:max-w-md">
-          <button
-            type="button"
-            className="btn-ghost grid h-9 w-9 shrink-0 place-items-center rounded-full text-lg font-semibold shadow-sm"
-            onClick={onBack}
-            aria-label="Back to task board"
-          >
-            ←
-          </button>
-          {titleEditing ? (
-            <div className="flex min-w-0 flex-1 items-start gap-2">
-              {isTaskCompleted(status) && <TaskCompletedTick className="mt-1.5" />}
-              <textarea
-                className="editable-field-editing min-w-0 flex-1 resize-none rounded-xl px-2 py-1 text-lg font-semibold leading-7 outline-none"
-                value={title}
-                onChange={(event) => setTitle(event.target.value)}
-                onBlur={() => {
-                  if (suppressNextTextBlurRef.current) {
-                    suppressNextTextBlurRef.current = false;
-                    return;
-                  }
-                  setTitleEditing(false);
-                  saveTextField({ title });
-                }}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter") {
-                    event.preventDefault();
-                    setTitleEditing(false);
-                    saveTextField({ title });
-                  }
-                  if (event.key === "Escape") {
-                    event.preventDefault();
-                    suppressNextTextBlurRef.current = true;
-                    setTitle(task.title);
-                    setTitleEditing(false);
-                  }
-                }}
-                maxLength={200}
-                rows={2}
-                autoFocus
-                aria-label="Task title"
-              />
-            </div>
-          ) : (
-            <button
-              type="button"
-              className="editable-field flex min-w-0 flex-1 items-start gap-2 rounded-xl px-2 py-1 text-left text-lg font-semibold leading-7 text-heading"
-              onClick={() => setTitleEditing(true)}
-              title={title}
-            >
-              {isTaskCompleted(status) && <TaskCompletedTick className="mt-1.5 shrink-0" />}
-              <span className="line-clamp-2 min-w-0">{title}</span>
-            </button>
-          )}
-        </div>
-
-        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:gap-3 lg:shrink-0 lg:justify-end">
-          <AssigneePicker
-            variant="compact"
-            members={assigneeMembers}
-            selectedIds={assigneeIds}
-            onChange={setAssigneeIds}
-          />
-          <SprintChangeControl
-            className="shrink-0"
-            value={sprintId}
-            sprints={sprintOptions}
-            onChange={setSprintId}
-          />
-        </div>
-      </div>
-      <div className="grid gap-4">
-        <div>
-          <label className="label">Description</label>
-          {descriptionEditing ? (
-            <div className="mt-1">
-              <RichTextEditor
-                value={description}
-                onChange={setDescription}
-                placeholder="Add task description…"
-                uploadImage={uploadImage}
-                onBlur={() => {
-                  if (suppressNextTextBlurRef.current) {
-                    suppressNextTextBlurRef.current = false;
-                    return;
-                  }
-                  setDescriptionEditing(false);
-                  saveTextField({ description });
-                }}
-              />
-              <div className="mt-2 flex justify-end gap-2">
-                <button
-                  type="button"
-                  className="btn-ghost text-xs"
-                  onClick={() => {
-                    suppressNextTextBlurRef.current = true;
-                    setDescription(task.description ?? "");
-                    setDescriptionEditing(false);
-                  }}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  className="btn-primary text-xs"
-                  onClick={() => {
-                    setDescriptionEditing(false);
-                    saveTextField({ description });
-                  }}
-                >
-                  Done
-                </button>
-              </div>
-            </div>
-          ) : (
-            <div className="surface-inset mt-1 min-h-[6rem] rounded-xl px-3 py-2">
-              <RichTextContent
-                html={description}
-                emptyLabel="Add task description…"
-                onClick={() => setDescriptionEditing(true)}
-                className="min-h-[5rem]"
-              />
-            </div>
-          )}
-        </div>
-
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <div>
-            <label className="label">Status</label>
-            <select
-              className="input mt-1"
-              value={status}
-              onChange={(event) => setStatus(event.target.value as TaskStatus)}
-            >
-              {TASK_STATUSES.map((item) => (
-                <option key={item} value={item}>
-                  {statusLabel[item]}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="label">Priority</label>
-            <select
-              className="input mt-1"
-              value={priority}
-              onChange={(event) =>
-                setPriority(event.target.value as TaskDetailItem["priority"])
-              }
-            >
-              {["LOW", "MEDIUM", "HIGH", "URGENT"].map((item) => (
-                <option key={item} value={item}>
-                  {item.charAt(0) + item.slice(1).toLowerCase()}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="label">Deadline</label>
-            <input
-              type="date"
-              className="input mt-1"
-              value={deadline}
-              onChange={(event) => setDeadline(event.target.value)}
-            />
-          </div>
-        </div>
-      </div>
-      <p className="mt-4 text-xs text-slate-500">
-        {submitting ? "Saving changes..." : "Changes auto-save."}
-      </p>
-      {updateError && (
-        <p className="mt-3 text-sm" style={{ color: "var(--danger-text)" }}>
-          {updateError}
-        </p>
-      )}
-      </div>
-      <TaskCommentsSection
-        taskId={task.id}
-        comments={task.comments}
-        isProjectOwner={project.data?.currentUserRole === "OWNER"}
-      />
-    </>
-  );
-}
-
 
 function formatShortDate(value: Date | string) {
   return new Intl.DateTimeFormat(undefined, {
