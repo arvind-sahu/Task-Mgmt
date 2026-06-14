@@ -10,6 +10,7 @@ import {
   TaskMetaCounts,
 } from "./TaskIndicators";
 import { initialsFromName } from "~/utils/avatar";
+import { richTextToPlainText } from "~/utils/richText";
 
 type TaskListItem = RouterOutputs["task"]["list"][number];
 
@@ -24,7 +25,8 @@ export default function TaskCard({
   onOpen,
   searchQuery = "",
 }: TaskCardProps) {
-  const completed = isTaskCompleted(task.status);
+  const completed = isTaskCompleted(task.status, task.projectStatus);
+  const descriptionPreview = richTextToPlainText(task.description ?? "");
 
   const content = (
     <>
@@ -38,9 +40,9 @@ export default function TaskCard({
         <PriorityBadge priority={task.priority} />
       </div>
 
-      {task.description && (
+      {descriptionPreview && (
         <p className="mt-1 line-clamp-2 text-xs text-muted">
-          <HighlightedText text={task.description} query={searchQuery} />
+          <HighlightedText text={descriptionPreview} query={searchQuery} />
         </p>
       )}
 

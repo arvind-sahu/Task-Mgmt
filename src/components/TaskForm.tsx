@@ -9,12 +9,14 @@ import { api } from "~/utils/api";
 export interface TaskFormValues {
   title: string;
   description?: string;
-  status: TaskStatus;
+  status?: TaskStatus;
+  statusId?: string;
   priority: TaskPriority;
   deadline?: string; // YYYY-MM-DD
   sprintId?: string | null;
   assigneeIds: string[];
   tagIds: string[];
+  transitionComment?: string;
 }
 
 type SprintOption = {
