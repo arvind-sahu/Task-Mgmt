@@ -140,7 +140,7 @@ export default function Layout({
           <main
             className={
               contentClassName ??
-              "app-main relative z-0 mx-auto w-full min-w-0 max-w-[1600px] flex-1 overflow-x-hidden overflow-y-auto px-3 py-4 sm:px-5 sm:py-5 lg:px-6"
+              "app-main relative z-0 mx-auto w-full min-w-0 max-w-[1600px] min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-3 py-4 sm:px-5 sm:py-5 lg:px-6"
             }
           >
             {isAuthed && me.data && !me.data.companyName && (

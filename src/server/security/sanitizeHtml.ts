@@ -18,6 +18,7 @@ const ALLOWED_TAGS = [
   "blockquote",
   "a",
   "img",
+  "span",
 ];
 
 const ALLOWED_ATTR = [
@@ -26,6 +27,10 @@ const ALLOWED_ATTR = [
   "rel",
   "data-storage-key",
   "data-list-style",
+  "data-type",
+  "data-id",
+  "data-label",
+  "data-mention-suggestion-char",
   "class",
   "alt",
   "src",
@@ -53,6 +58,14 @@ DOMPurify.addHook("uponSanitizeAttribute", (node, data) => {
       "upper-roman",
     ]);
     if (!allowed.has(data.attrValue)) {
+      data.forceKeepAttr = false;
+      data.attrValue = "";
+    }
+    return;
+  }
+
+  if (data.attrName === "data-type" && node.tagName === "SPAN") {
+    if (data.attrValue !== "mention") {
       data.forceKeepAttr = false;
       data.attrValue = "";
     }

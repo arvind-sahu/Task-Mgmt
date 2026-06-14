@@ -42,8 +42,22 @@ export function RichTextContent({
         "blockquote",
         "a",
         "img",
+        "span",
       ],
-      ALLOWED_ATTR: ["href", "target", "rel", "data-storage-key", "data-list-style", "class", "alt", "src"],
+      ALLOWED_ATTR: [
+        "href",
+        "target",
+        "rel",
+        "data-storage-key",
+        "data-list-style",
+        "data-type",
+        "data-id",
+        "data-label",
+        "data-mention-suggestion-char",
+        "class",
+        "alt",
+        "src",
+      ],
       ALLOW_DATA_ATTR: true,
     });
   }, [html]);

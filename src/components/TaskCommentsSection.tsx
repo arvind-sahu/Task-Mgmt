@@ -11,6 +11,7 @@ import {
 } from "~/components/rich-text/useRichTextImageUpload";
 import { canModifyTaskComment } from "~/utils/commentPermissions";
 import { hasRichTextContent } from "~/utils/richText";
+import type { MentionUser } from "~/utils/mentions";
 import { api, type RouterOutputs } from "~/utils/api";
 import { formatDateTime, wasEdited } from "~/utils/date";
 
@@ -20,6 +21,7 @@ type TaskCommentsSectionProps = {
   taskId: string;
   comments: TaskComment[];
   isProjectOwner?: boolean;
+  mentionUsers?: MentionUser[];
 };
 
 function normalizeAttachments(
@@ -46,6 +48,7 @@ export function TaskCommentsSection({
   taskId,
   comments,
   isProjectOwner = false,
+  mentionUsers = [],
 }: TaskCommentsSectionProps) {
   const utils = api.useUtils();
   const me = api.user.me.useQuery();
@@ -159,6 +162,7 @@ export function TaskCommentsSection({
                     placeholder="Edit comment…"
                     minHeightClassName="min-h-[5rem]"
                     uploadImage={uploadImage}
+                    mentionUsers={mentionUsers}
                   />
                   <div className="flex gap-2">
                     <button
@@ -275,10 +279,11 @@ export function TaskCommentsSection({
           placeholder="Add a comment…"
           minHeightClassName="min-h-[5rem]"
           uploadImage={uploadImage}
+          mentionUsers={mentionUsers}
         />
         <p className="text-xs text-muted">
-          Paste screenshots, drag images in, or use the Image button. Format text
-          with the toolbar like a doc.
+          Type @ to mention a teammate. Paste screenshots, drag images in, or use
+          the Image button.
         </p>
         <div className="flex justify-end">
           <button

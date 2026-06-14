@@ -191,6 +191,10 @@ export function TaskMetaCounts({ commentCount, attachmentCount }: TaskMetaCounts
   );
 }
 
-export function isTaskCompleted(status: TaskStatus): boolean {
+export function isTaskCompleted(
+  status: TaskStatus,
+  projectStatus?: { isTerminal?: boolean } | null,
+): boolean {
+  if (projectStatus?.isTerminal) return true;
   return status === TaskStatus.DONE;
 }

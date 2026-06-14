@@ -619,9 +619,18 @@
     min-width: 0;
     overflow-x: auto;
     overflow-y: hidden;
-    overscroll-behavior-x: contain;
+    overscroll-behavior-x: none;
+    touch-action: pan-y pinch-zoom;
     scrollbar-width: thin;
     scrollbar-color: var(--scrollbar-thumb) var(--surface-muted);
+  }
+  html.project-kanban-page,
+  body.project-kanban-page {
+    overscroll-behavior-x: none;
+  }
+  .project-kanban-page .app-main,
+  .project-kanban-page .task-board-shell {
+    overscroll-behavior-x: none;
   }
   .task-board-scroll::-webkit-scrollbar {
     display: block;
@@ -655,6 +664,8 @@
     height: 0;
   }
   .task-board-scroll-top {
+    overscroll-behavior-x: none;
+    touch-action: pan-y pinch-zoom;
     scrollbar-width: none;
     -ms-overflow-style: none;
   }
@@ -1645,6 +1656,20 @@
   height: auto;
   margin: 0.75rem 0;
   border-radius: 0.5rem;
+}
+
+.rich-text-editor .rich-text-mention,
+.rich-text-content .rich-text-mention {
+  color: var(--accent-muted-text);
+  background-color: var(--accent-muted-bg);
+  border-radius: 0.25rem;
+  padding: 0 0.15rem;
+  font-weight: 600;
+}
+
+.mention-list {
+  min-width: 10rem;
+  max-width: 16rem;
 }
 
 .rich-text-content p {

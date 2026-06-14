@@ -5,6 +5,7 @@ import { buildRichTextExtensions } from "~/components/rich-text/editorExtensions
 import { hydrateRichTextHtml } from "~/components/rich-text/hydrateRichTextHtml";
 import { api } from "~/utils/api";
 import { isProbablyHtml } from "~/utils/richText";
+import type { MentionUser } from "~/utils/mentions";
 import { requestObjectUrl } from "~/utils/objectUrls";
 
 type RichTextEditorProps = {
@@ -14,6 +15,7 @@ type RichTextEditorProps = {
   placeholder?: string;
   minHeightClassName?: string;
   uploadImage: (file: File) => Promise<{ storageKey: string; previewUrl: string }>;
+  mentionUsers?: MentionUser[];
 };
 
 function normalizeEditorHtml(value: string) {
@@ -42,22 +44,30 @@ export function RichTextEditor({
   placeholder = "Write something…",
   minHeightClassName = "min-h-[6rem]",
   uploadImage,
+  mentionUsers = [],
 }: RichTextEditorProps) {
   const utils = api.useUtils();
   const imageInputId = useId();
   const uploadImageRef = useRef(uploadImage);
+  const mentionUsersRef = useRef(mentionUsers);
   const editorRef = useRef<Editor | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [hydrating, setHydrating] = useState(false);
 
   uploadImageRef.current = uploadImage;
+  mentionUsersRef.current = mentionUsers;
 
   const resolveKey = (key: string) =>
     requestObjectUrl(key, (input) => utils.storage.getDownloadUrls.fetch(input));
 
   const editor = useEditor({
     immediatelyRender: false,
-    extensions: buildRichTextExtensions(placeholder),
+    extensions: buildRichTextExtensions(
+      placeholder,
+      mentionUsers !== undefined
+        ? () => mentionUsersRef.current
+        : undefined,
+    ),
     content: "",
     editorProps: {
       attributes: {

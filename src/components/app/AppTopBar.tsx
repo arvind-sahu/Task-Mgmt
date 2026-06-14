@@ -84,7 +84,9 @@ export function AppTopBar({
     onCloseMobileMenu?.();
   }
 
-  const onProjectPage = router.pathname === "/projects/[id]";
+  const onProjectPage =
+    router.pathname === "/projects/[id]" ||
+    router.pathname === "/projects/[id]/timeline";
   const showProjectHeader = onProjectPage && headerTitle;
   const showProjectTabs = onProjectPage && projectTabs && projectTabs.length > 0;
 
